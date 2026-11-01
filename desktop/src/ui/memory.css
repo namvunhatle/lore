@@ -43,7 +43,10 @@ li .x:hover{background:var(--line);color:var(--ink)}
 .empty .chips{justify-content:center}
 [hidden]{display:none!important}
 
-.foot{flex:none;display:flex;align-items:center;gap:10px;padding:10px 32px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;flex-wrap:wrap}
+.foot{flex:none;display:flex;align-items:center;gap:10px;padding:10px 32px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+.foot #status{flex:1 1 0;min-width:0;line-height:1.4}
+.foot .spacer{display:none}
+.foot #count,.foot .dot,.foot button{flex:none;white-space:nowrap}
 .spacer{flex:1}
 .btn{height:34px;padding:0 16px;border-radius:17px;border:1px solid var(--line);color:var(--ink);font:500 13px var(--f)}
 .btn:hover{background:var(--hover)}

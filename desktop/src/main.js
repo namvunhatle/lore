@@ -460,8 +460,9 @@ function openSplit(withId) {
     const rest = tabs.filter((x) => x !== other);
     const at = rest.indexOf(first) + 1;
     const pins = rest.filter((x) => x.pinned).length;
+    other.group = first.group || 0; // inside a group, the new tab joins it, so the group stays in one piece
     rest.splice(Math.max(at, pins), 0, other);
-    tabs.splice(0, tabs.length, ...rest);
+    tabs.splice(0, tabs.length, ...tabstate.arrange(rest));
   }
   split = { a: first.id, b: other.id, ratio: 0.5 };
   selectTab(other.id);
@@ -509,6 +510,7 @@ function duplicateTab(id) {
   const url = src && (src.lazyUrl || src.url);
   if (!src || !/^https?:/.test(url)) return openTab(undefined, { private: !!(src && src.private) });
   const t = openTab({ url }, { private: src.private });
+  t.group = src.group || 0;
   const rest = tabs.filter((x) => x !== t);
   const at = rest.indexOf(src) + 1;
   const pins = rest.filter((x) => x.pinned).length;

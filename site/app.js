@@ -19,9 +19,10 @@
     "nav.privacy": "Riêng tư",
     "nav.download": "Tải về",
     "nav.faq": "Hỏi đáp",
+    "nav.extras": "Thêm nữa",
     "hero.eyebrow": "Miễn phí · Mã nguồn mở · MIT",
     "hero.h1": "<span>Trình duyệt nhớ bạn,</span> <span>và chỉ mình bạn.</span>",
-    "hero.lead": "Bài báo bạn đọc tuần trước, còn nhớ không? Lore nhớ giúp bạn, và chỉ cất ký ức ấy trên máy của bạn.",
+    "hero.lead": "Trình duyệt riêng tư có AI ngay từ đầu. Bạn hỏi trong một ô duy nhất, nhờ nó sắp xếp tab, và tìm lại bất cứ thứ gì đã đọc. Ký ức chỉ nằm trên máy của bạn.",
     "cta.download": "Tải Lore",
     "cta.github": "Xem trên GitHub",
     "cta.note": "Có cho macOS, Windows và Linux. Đây là bản đầu tiên, chưa được ký số.",
@@ -42,13 +43,42 @@
     "f2.eyebrow": "9:15 sáng",
     "f2.h": "Bài báo dài, buổi sáng ngắn.",
     "f2.p": "Lore ở ngay bên cạnh trang. Nó tóm tắt giúp bạn, nhặt ra các mốc ngày tháng, hoặc khi bạn hỏi \"bài này có nói đến giá không?\" thì chỉ ngay đúng dòng đó.",
+    "f7.eyebrow": "10:20 sáng",
+    "f7.h": "Mười hai tab, một lần dọn gọn.",
+    "f7.p": "Mở quá nhiều tab? Lore đọc tiêu đề và gom chúng theo chủ đề: một chuyến đi, một dự án, một mối quan tâm. Bạn xem trước kế hoạch, sửa tùy ý, bấm Áp dụng, và hoàn tác nếu đổi ý. Tab trùng cũng được tìm ra.",
+    "f7.note": "Các nhóm trong ảnh do một mô hình thử nghiệm tạo ra.",
+    "f7.win": "Sắp xếp",
+    "f2.note": "Bản tóm tắt trong ảnh do một mô hình thử nghiệm viết.",
     "f3.eyebrow": "11:30 sáng",
     "f3.h": "Bức email bạn cứ hoãn mãi.",
     "f3.p": "Bạn chỉ cần nói mình muốn viết gì. Lore soạn bản nháp rồi mở sẵn trong Gmail hoặc Outlook của bạn. Bạn đọc lại, và chính bạn là người bấm Gửi.",
     "f3.note": "Bản nháp trong ảnh do một mô hình thử nghiệm viết.",
+    "f8.eyebrow": "1:00 chiều",
+    "f8.h": "Đọc bên này, ghi chép bên kia.",
+    "f8.p": "Mở hai trang cạnh nhau và kéo thanh chia đến chỗ bạn muốn. Bấm vào bên nào, Lore theo bên đó, nên công cụ và địa chỉ luôn thuộc về trang bạn đang xem.",
     "f4.eyebrow": "2:00 chiều",
     "f4.h": "Khoan, trang đó ở đâu nhỉ?",
     "f4.p": "Bạn nhớ nội dung chứ không nhớ địa chỉ. Cứ hỏi theo ý, Lore sẽ tìm ra trong bộ nhớ đã mã hóa, chỉ nằm trên máy của bạn.",
+    "x.h": "Và những thứ bạn vẫn mong đợi.",
+    "x.p": "Một trình duyệt cũng phải làm tốt những điều cơ bản.",
+    "x.1.b": "Hồ sơ",
+    "x.1.t": "Tách công việc và cá nhân: đăng nhập, tab, trí nhớ và dấu trang riêng.",
+    "x.3.b": "Sáng, tối hoặc theo máy",
+    "x.3.t": "Theo hệ thống, hoặc giữ đúng kiểu bạn chọn.",
+    "x.4.b": "Mất mạng? Chơi một ván.",
+    "x.4.t": "Một trò hoa sen nhỏ trong lúc chờ. Có mạng trở lại, trang tự tải lại.",
+    "x.5.b": "Dấu trang, lịch sử, tải xuống",
+    "x.5.t": "Thanh dấu trang, lịch sử theo ngày, danh sách tải xuống, tìm trong trang, và các tab trở lại sau khi mở lại.",
+    "x.6.b": "Tự cập nhật",
+    "x.6.t": "Lore báo khi có bản mới, và tự cài trên Windows và Linux.",
+    "x.7.b": "Một ô cho mọi việc",
+    "x.7.t": "Khi bạn gõ, một nhãn nhỏ cho biết Enter sẽ làm gì: mở trang, hỏi Lore, soạn thảo hay tìm trong trí nhớ.",
+    "m.eyebrow": "Phút đầu tiên",
+    "m.h": "Chuyển sang chỉ mất khoảng một phút.",
+    "m.1": "Đặt tên hồ sơ",
+    "m.2": "Mang dấu trang và lịch sử sang",
+    "m.3": "Đặt Lore làm mặc định",
+    "m.note": "Nhập được dấu trang và lịch sử từ Chrome, Edge, Brave, Vivaldi, Cốc Cốc và Firefox. Mật khẩu không được nhập.",
     "p.eyebrow": "Cả ngày, âm thầm",
     "p.h": "Bạn chưa hề chỉnh cài đặt nào. Mọi thứ đã được bật sẵn.",
     "p.1.b": "Chặn quảng cáo và trình theo dõi",
@@ -71,6 +101,8 @@
     "l.r1.c": "Các từ khóa chủ đề",
     "l.r2.a": "Bạn tìm kiếm trên web",
     "l.r2.c": "Câu bạn tìm",
+    "l.r5.a": "Vài giờ một lần",
+    "l.r5.c": "Chỉ địa chỉ IP và số phiên bản (kiểm tra bản cập nhật)",
     "l.r3.a": "Khoảng mỗi tuần một lần",
     "l.r3.c": "Không gửi gì (chỉ tải danh sách lọc)",
     "l.r4.a": "Bạn dùng khóa AI trên đám mây",
@@ -90,14 +122,14 @@
     "c.t2": "Tắt hẳn AI. Câu trả lời từ Wikipedia, trí nhớ, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động.",
     "h.h": "Nói thật với bạn",
     "h.p": "Lore còn non trẻ. Chúng tôi muốn nói trước, còn hơn để bạn tự phát hiện.",
-    "h.1": "Chưa có bản cho điện thoại, và bản Linux chưa được kiểm tra",
+    "h.1": "Chưa có bản cho điện thoại. Bản Linux còn mới.",
     "h.2": "Chưa thể thanh toán hóa đơn hay đặt vé thật",
     "h.3": "Chưa có VPN, đồng bộ giữa các thiết bị hay tiện ích mở rộng",
     "h.4": "Bộ cài chưa được ký số, nên máy tính của bạn sẽ cảnh báo",
     "d.h": "Sẵn sàng khi bạn muốn.",
     "d.sub": "Miễn phí, không cần tài khoản, không kèm điều kiện nào.",
     "d.none": "Bản phát hành đầu tiên sắp ra mắt. Trong lúc chờ, bạn có thể tự build từ mã nguồn.",
-    "d.linux.note": "Đã đóng gói nhưng chưa được thử trên máy Linux thật.",
+    "d.upd": "Lore tự kiểm tra bản cập nhật. Bạn có thể tắt trong Cài đặt.",
     "d.sums": "Mỗi bản phát hành đều kèm mã SHA-256 để bạn đối chiếu.",
     "d.all": "Tất cả bản phát hành",
     "w.s1": "macOS không cho mở ứng dụng",
@@ -113,6 +145,10 @@
     "q.2p": "Lore không có công cụ phân tích hay thu thập dữ liệu. Lịch sử và trí nhớ nằm trên máy bạn và được mã hóa. Lore nói \"riêng tư\" chứ không nói \"ẩn danh\": các trang web bạn truy cập vẫn thấy kết nối của bạn, và dịch vụ AI trên đám mây sẽ nhận nội dung bạn gửi cho nó. Mỗi kết quả đều cho biết văn bản đã được gửi đi đâu.",
     "q.3s": "Tôi có cần mô hình AI không?",
     "q.3p": "Không. Khi không có mô hình, các tính năng trả lời, trí nhớ, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động. Mô hình AI bổ sung khả năng viết, tóm tắt và dịch.",
+    "q.8s": "Tôi mang dấu trang và lịch sử sang được không?",
+    "q.8p": "Được, từ Chrome, Edge, Brave, Vivaldi, Cốc Cốc và Firefox trên máy này, hoặc từ một tệp dấu trang. Mật khẩu không được nhập.",
+    "q.9s": "Lore có tự cập nhật không?",
+    "q.9p": "Lore tự kiểm tra bản mới, và trên Windows và Linux sẽ cài giúp bạn. Trên macOS, cho đến khi ứng dụng được ký số, Lore chỉ báo và mở trang tải về.",
     "q.5s": "Tôi đăng nhập Google được không?",
     "q.5p": "Đôi khi được. Google chặn đăng nhập trên một số trình duyệt nhúng. Nếu bị từ chối, Lore sẽ đề nghị mở trang đó bằng trình duyệt của hệ thống.",
     "q.6s": "Có bản cho Android hay iPhone không?",
@@ -149,14 +185,14 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const DEMO = {
     en: [
-      { q: 'What is Da Nang?', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Answer'), el('p', 'd-big', 'Da Nang is the fourth largest city in Vietnam by population, on the South Central Coast.'), (() => { const s = el('div', 'd-src'); s.append(el('span', 'd-chip', 'Source: Wikipedia, Da Nang'), el('span', 'd-chip', 'Open the original page')); return s; })()); return c; } },
-      { q: 'Draft an email asking for a day off', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Draft'), field('Subject', 'Request for a day off on Friday'), el('p', 'd-body', 'Hi [name],\n\nCould I take Friday off? I will make sure everything is covered before I go.\n\nThanks,'), actions('Open in Gmail', 'You review it. You press Send.')); return c; } },
-      { q: 'Find the article I read last week about EVs', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'From your memory'), hit('E', 'Electric cars: what changed this year', 'example.com · 6 days ago'), el('p', 'd-note', 'Found on this computer. Nothing was uploaded.')); return c; } }
+      { q: 'What is Da Nang?', chip: 'Ask Lore', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Answer'), el('p', 'd-big', 'Da Nang is the fourth largest city in Vietnam by population, on the South Central Coast.'), (() => { const s = el('div', 'd-src'); s.append(el('span', 'd-chip', 'Source: Wikipedia, Da Nang'), el('span', 'd-chip', 'Open the original page')); return s; })()); return c; } },
+      { q: 'Draft an email asking for a day off', chip: 'Write with AI', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Draft'), field('Subject', 'Request for a day off on Friday'), el('p', 'd-body', 'Hi [name],\n\nCould I take Friday off? I will make sure everything is covered before I go.\n\nThanks,'), actions('Open in Gmail', 'You review it. You press Send.')); return c; } },
+      { q: 'Find the article I read last week about EVs', chip: 'Search memory', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'From your memory'), hit('E', 'Electric cars: what changed this year', 'example.com · 6 days ago'), el('p', 'd-note', 'Found on this computer. Nothing was uploaded.')); return c; } }
     ],
     vi: [
-      { q: 'Đà Nẵng là gì?', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Trả lời'), el('p', 'd-big', 'Đà Nẵng là thành phố lớn thứ tư của Việt Nam theo dân số, nằm ở Duyên hải Nam Trung Bộ.'), (() => { const s = el('div', 'd-src'); s.append(el('span', 'd-chip', 'Nguồn: Wikipedia, Đà Nẵng'), el('span', 'd-chip', 'Mở trang gốc')); return s; })()); return c; } },
-      { q: 'Soạn email xin nghỉ một ngày', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Bản nháp'), field('Tiêu đề', 'Xin nghỉ phép ngày thứ Sáu'), el('p', 'd-body', 'Chào anh/chị [tên],\n\nEm xin phép được nghỉ vào thứ Sáu này. Em sẽ bàn giao xong công việc trước khi nghỉ.\n\nEm cảm ơn anh/chị,'), actions('Mở trong Gmail', 'Bạn xem lại rồi tự bấm Gửi.')); return c; } },
-      { q: 'Tìm lại bài báo tuần trước về xe điện', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Từ trí nhớ của bạn'), hit('X', 'Xe điện: những thay đổi trong năm nay', 'example.com · 6 ngày trước'), el('p', 'd-note', 'Tìm thấy ngay trên máy. Không có gì được tải lên.')); return c; } }
+      { q: 'Đà Nẵng là gì?', chip: 'Hỏi Lore', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Trả lời'), el('p', 'd-big', 'Đà Nẵng là thành phố lớn thứ tư của Việt Nam theo dân số, nằm ở Duyên hải Nam Trung Bộ.'), (() => { const s = el('div', 'd-src'); s.append(el('span', 'd-chip', 'Nguồn: Wikipedia, Đà Nẵng'), el('span', 'd-chip', 'Mở trang gốc')); return s; })()); return c; } },
+      { q: 'Soạn email xin nghỉ một ngày', chip: 'Soạn bằng AI', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Bản nháp'), field('Tiêu đề', 'Xin nghỉ phép ngày thứ Sáu'), el('p', 'd-body', 'Chào anh/chị [tên],\n\nEm xin phép được nghỉ vào thứ Sáu này. Em sẽ bàn giao xong công việc trước khi nghỉ.\n\nEm cảm ơn anh/chị,'), actions('Mở trong Gmail', 'Bạn xem lại rồi tự bấm Gửi.')); return c; } },
+      { q: 'Tìm lại bài báo tuần trước về xe điện', chip: 'Tìm trong trí nhớ', card: () => { const c = el('div', 'd-card'); c.append(el('span', 'd-tag', 'Từ trí nhớ của bạn'), hit('X', 'Xe điện: những thay đổi trong năm nay', 'example.com · 6 ngày trước'), el('p', 'd-note', 'Tìm thấy ngay trên máy. Không có gì được tải lên.')); return c; } }
     ]
   };
   function field(k, v) { const d = el('div', 'd-field'); d.append(el('b', '', k), el('span', '', v)); return d; }
@@ -164,6 +200,7 @@
   function hit(ico, title, meta) { const d = el('div', 'd-hit'); const b = el('div'); b.append(el('b', '', title), el('span', '', meta)); d.append(el('span', 'd-ico', ico), b); return d; }
 
   const qEl = $('#demo-q');
+  const chipEl = $('#demo-chip');
   const body = $('#demo-body');
   let run = 0;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -177,15 +214,17 @@
 
   async function play() {
     const id = ++run;
-    if (calm) { qEl.textContent = DEMO[lang][0].q; showCard(0); return; }
+    if (calm) { qEl.textContent = DEMO[lang][0].q; chipEl.hidden = false; chipEl.textContent = DEMO[lang][0].chip + '  ↵'; showCard(0); return; }
     for (let i = 0; ; i = (i + 1) % 3) {
       const text = DEMO[lang][i].q;
       body.replaceChildren();
       qEl.textContent = '';
+      chipEl.hidden = true;
       await sleep(500);
       for (let k = 1; k <= text.length; k++) {
         if (id !== run) return;
         qEl.textContent = text.slice(0, k);
+        if (k === 2) { chipEl.textContent = DEMO[lang][i].chip + '  ↵'; chipEl.hidden = false; }
         await sleep(36 + Math.random() * 40);
       }
       await sleep(450);
@@ -225,7 +264,7 @@
 
   // ---- Reveal on scroll, and the story that follows the day --------------------------------------------------
   if ('IntersectionObserver' in window && !calm) {
-    for (const group of $$('.cards, .dl')) [...group.children].forEach((c, i) => c.style.setProperty('--i', i));
+    for (const group of $$('.cards, .dl, .bento, .steps3')) [...group.children].forEach((c, i) => c.style.setProperty('--i', i));
     const seen = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); seen.unobserve(e.target); } }, { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
     for (const r of $$('.reveal')) seen.observe(r);
   } else {
