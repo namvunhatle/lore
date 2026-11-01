@@ -66,6 +66,20 @@ test('browsers are found on a Mac by their folders, with profile names', () => {
   assert.deepStrictEqual(imp.detect({ platform: 'darwin', home: tmp(), env: {} }), []);
 });
 
+test('Arc, Dia and Helium are found on a Mac in their own folders', () => {
+  const home = tmp();
+  for (const dir of ['Arc/User Data', 'Dia/User Data', 'net.imput.helium']) {
+    const prof = path.join(home, 'Library', 'Application Support', dir, 'Default');
+    fs.mkdirSync(prof, { recursive: true });
+    fs.writeFileSync(path.join(prof, 'History'), '');
+  }
+  const r = imp.detect({ platform: 'darwin', home, env: {} });
+  assert.deepStrictEqual(r.map((b) => [b.id, b.name, b.kind]), [['arc', 'Arc', 'chromium'], ['dia', 'Dia', 'chromium'], ['helium', 'Helium', 'chromium']]);
+  // Neither has a folder we know of on these systems: they are skipped, not an error.
+  assert.deepStrictEqual(imp.detect({ platform: 'win32', home, env: {} }), []);
+  assert.deepStrictEqual(imp.detect({ platform: 'linux', home, env: {} }), []);
+});
+
 test('only web addresses are accepted', () => {
   assert.ok(imp.isWeb('https://a.example'));
   assert.ok(!imp.isWeb('file:///x'));

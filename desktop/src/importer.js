@@ -1,5 +1,5 @@
 // Bringing data over from another browser (BRW-14). Reads, never writes: bookmarks and history from Chrome, Edge, Brave,
-// Vivaldi, Cốc Cốc and Firefox on this computer, or from a bookmarks file any browser can export. Passwords are not
+// Vivaldi, Cốc Cốc, Arc, Dia, Helium and Firefox on this computer, or from a bookmarks file any browser can export. Passwords are not
 // imported (they sit in each system's keychain and are encrypted with keys Lore cannot, and should not, reach).
 const fs = require('fs');
 const os = require('os');
@@ -15,7 +15,11 @@ const CHROMIUM = [
   { id: 'edge', name: 'Microsoft Edge', mac: 'Microsoft Edge', win: 'Microsoft/Edge/User Data', linux: 'microsoft-edge' },
   { id: 'brave', name: 'Brave', mac: 'BraveSoftware/Brave-Browser', win: 'BraveSoftware/Brave-Browser/User Data', linux: 'BraveSoftware/Brave-Browser' },
   { id: 'vivaldi', name: 'Vivaldi', mac: 'Vivaldi', win: 'Vivaldi/User Data', linux: 'vivaldi' },
-  { id: 'coccoc', name: 'Cốc Cốc', mac: 'Coccoc', win: 'CocCoc/Browser/User Data', linux: 'coccoc' }
+  { id: 'coccoc', name: 'Cốc Cốc', mac: 'Coccoc', win: 'CocCoc/Browser/User Data', linux: 'coccoc' },
+  // Mac only for now. Arc keeps its sidebar outside Chromium's Bookmarks file, so it brings history alone.
+  { id: 'arc', name: 'Arc', mac: 'Arc/User Data' },
+  { id: 'dia', name: 'Dia', mac: 'Dia/User Data' },
+  { id: 'helium', name: 'Helium', mac: 'net.imput.helium' }
 ];
 
 function roots({ platform, home, env }) {
@@ -33,6 +37,7 @@ function detect({ platform = process.platform, home = process.env.LORE_IMPORT_HO
   const key = platform === 'darwin' ? 'mac' : platform === 'win32' ? 'win' : 'linux';
   const found = [];
   for (const b of CHROMIUM) {
+    if (!b[key]) continue;
     const base = path.join(r.chromium, b[key]);
     const local = readJson(path.join(base, 'Local State'));
     const names = (local && local.profile && local.profile.info_cache) || {};
