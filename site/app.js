@@ -87,7 +87,7 @@
     "c.2": "Tắt AI",
     "c.t0": "Mô hình chạy qua Ollama ngay trên máy, nên điều bạn hỏi không bao giờ rời khỏi máy.",
     "c.t1": "Nhập khóa API của bạn cho dịch vụ tương thích OpenAI hoặc Claude. Lore luôn cho bạn biết văn bản đã được gửi đi đâu.",
-    "c.t2": "Tắt hẳn AI. Câu trả lời từ Wikipedia, trí nhớ, chế độ đọc, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động.",
+    "c.t2": "Tắt hẳn AI. Câu trả lời từ Wikipedia, trí nhớ, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động.",
     "h.h": "Nói thật với bạn",
     "h.p": "Lore còn non trẻ. Chúng tôi muốn nói trước, còn hơn để bạn tự phát hiện.",
     "h.1": "Chưa có bản cho điện thoại, và bản Linux chưa được kiểm tra",
@@ -112,7 +112,7 @@
     "q.2s": "Lore có thật sự riêng tư không?",
     "q.2p": "Lore không có công cụ phân tích hay thu thập dữ liệu. Lịch sử và trí nhớ nằm trên máy bạn và được mã hóa. Lore nói \"riêng tư\" chứ không nói \"ẩn danh\": các trang web bạn truy cập vẫn thấy kết nối của bạn, và dịch vụ AI trên đám mây sẽ nhận nội dung bạn gửi cho nó. Mỗi kết quả đều cho biết văn bản đã được gửi đi đâu.",
     "q.3s": "Tôi có cần mô hình AI không?",
-    "q.3p": "Không. Khi không có mô hình, các tính năng trả lời, trí nhớ, chế độ đọc, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động. Mô hình AI bổ sung khả năng viết, tóm tắt và dịch.",
+    "q.3p": "Không. Khi không có mô hình, các tính năng trả lời, trí nhớ, chặn quảng cáo và cảnh báo lừa đảo vẫn hoạt động. Mô hình AI bổ sung khả năng viết, tóm tắt và dịch.",
     "q.5s": "Tôi đăng nhập Google được không?",
     "q.5p": "Đôi khi được. Google chặn đăng nhập trên một số trình duyệt nhúng. Nếu bị từ chối, Lore sẽ đề nghị mở trang đó bằng trình duyệt của hệ thống.",
     "q.6s": "Có bản cho Android hay iPhone không?",
@@ -130,7 +130,7 @@
   const nodes = $$('[data-i18n]');
   for (const el of nodes) if (!(el.dataset.i18n in EN)) EN[el.dataset.i18n] = el.innerHTML;
   EN['c.t1'] = 'Plug in your key for any OpenAI-compatible service or Claude. Lore tells you where each text went.';
-  EN['c.t2'] = 'Switch AI off. Answers from Wikipedia, memory, the reader, ad blocking and scam warnings all still work.';
+  EN['c.t2'] = 'Switch AI off. Answers from Wikipedia, memory, ad blocking and scam warnings all still work.';
   // ---- Signed or not: the warnings follow the switch in config.js ---------------------------------------------
   const signed = (window.LORE && window.LORE.signed) || {};
   const sm = !!signed.mac, sw = !!signed.windows;

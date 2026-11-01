@@ -8,7 +8,7 @@ Lore's own code is MIT-licensed. These components keep their own licences. Check
 |---|---|---|
 | [Electron](https://www.electronjs.org/) (includes Chromium) | App shell and rendering engine | MIT (Chromium parts: BSD-style and others, see Electron's `LICENSES.chromium.html` in every build) |
 | [@ghostery/adblocker](https://github.com/ghostery/adblocker) | Filter-list matching engine | MPL-2.0 |
-| [@mozilla/readability](https://github.com/mozilla/readability) | Reader mode article extraction | Apache-2.0 |
+| [@mozilla/readability](https://github.com/mozilla/readability) | Article text extraction for the AI features | Apache-2.0 |
 | [EasyList and EasyPrivacy](https://easylist.to) | Bundled in `desktop/src/filters/engine.bin`, compiled at build time by `npm run filters` (the file is not committed) | Dual: GPLv3+ and CC BY-SA 3.0. Credit: easylist.to |
 
 ## Landing page only (`site/`)

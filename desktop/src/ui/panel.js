@@ -76,7 +76,6 @@ const P = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const ICONS = {
   summarize: '<path d="M4 6h16M4 12h16M4 18h10"/>',
   translate: '<path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M12 5c0 4-3 7-6 8M13 21l4-10 4 10M14.5 18h5"/>',
-  reader: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
   facts: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
   decide: '<path d="M12 4v16M6 20h12M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
   'share-email': '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>',
@@ -89,7 +88,6 @@ const ICONS = {
 const ACTIONS = [
   { id: 'summarize', label: () => T('pg.summarize'), run: () => agent.pageDo('summarize') },
   { id: 'translate', label: () => T('pg.translate'), run: () => agent.pageDo('translate') },
-  { id: 'reader', label: () => T('pg.reader'), run: () => agent.pageDo('reader') },
   { id: 'facts', label: () => T('task.facts.name'), run: () => agent.pageDo('task', 'facts') },
   { id: 'explain', label: () => T('task.explain.name'), run: () => agent.pageDo('task', 'explain') },
   { id: 'decide', label: () => T('task.decide.name'), run: () => agent.pageDo('task', 'decide') },
@@ -102,7 +100,7 @@ const msgs = new Map(); // seq -> { root, card, body }
 let lastSeq = 0;
 
 const DESC = {
-  summarize: () => T('pg.summarize.d'), translate: () => T('pg.translate.d'), reader: () => T('pg.reader.d'),
+  summarize: () => T('pg.summarize.d'), translate: () => T('pg.translate.d'),
   facts: () => T('task.facts.d'), explain: () => T('task.explain.d'), decide: () => T('task.decide.d'),
   'event-page': () => T('task.event-page.d'), 'share-email': () => T('task.share-email.d')
 };

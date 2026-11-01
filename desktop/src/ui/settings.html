@@ -13,6 +13,7 @@
 <nav class="side" role="tablist" aria-orientation="vertical">
   <h1 data-i18n="set.title"></h1>
   <button class="nav on" role="tab" data-pane="general" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span data-i18n="set.nav.general"></span></button>
+  <button class="nav" role="tab" data-pane="profiles" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.5 3.5-5.5 7-5.5s6.2 2 7 5.5"/></svg><span data-i18n="prof.h"></span></button>
   <button class="nav" role="tab" data-pane="privacy" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span data-i18n="set.priv.h"></span></button>
   <button class="nav" role="tab" data-pane="ai" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span data-i18n="set.ai.h"></span></button>
 </nav>
@@ -23,9 +24,24 @@
   <h2 data-i18n="set.lang.h"></h2>
   <p class="lead" data-i18n="set.lang.lead"></p>
   <label class="f" for="language"><select id="language"></select></label>
+  <h2 data-i18n="set.look.h"></h2>
+  <p class="lead" data-i18n="set.look.lead"></p>
+  <label class="f" for="appearance"><select id="appearance"></select></label>
   <h2 data-i18n="set.start.h"></h2>
   <p class="lead" data-i18n="set.start.lead"></p>
   <label class="f" for="startup"><select id="startup"></select></label>
+</div>
+
+<div class="pane" id="pane-profiles" role="tabpanel">
+  <h2 data-i18n="prof.h"></h2>
+  <p class="lead" data-i18n="prof.lead"></p>
+  <div class="group" id="plist"></div>
+  <form id="padd" class="padd">
+    <input id="pname" type="text" maxlength="30" data-i18n-ph="prof.namePh" data-i18n-aria="prof.name" autocomplete="off">
+    <div class="swatches" id="pcolors" role="radiogroup" data-i18n-aria="group.color"></div>
+    <button class="btn" type="submit" data-i18n="prof.add"></button>
+  </form>
+  <p class="fine" data-i18n="prof.note"></p>
 </div>
 
 <div class="pane" id="pane-privacy" role="tabpanel">

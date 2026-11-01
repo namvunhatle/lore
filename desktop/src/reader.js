@@ -1,5 +1,5 @@
-// AI-06: clean reader. Extracts the article with Mozilla's Readability inside the page's isolated world.
-// The reader page sanitizes the result again before showing it (see ui/sanitize.js).
+// Reads a page's article text with Mozilla's Readability inside the page's isolated world. Hidden text is dropped first
+// (see shield.js). This is what the AI features read; there is no separate reader view.
 const fs = require('fs');
 const { CLEAN_SOURCE } = require('./shield');
 

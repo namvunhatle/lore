@@ -1,0 +1,5 @@
+html,body{margin:0;height:100%;background:var(--bg,#E9ECF0);overflow:hidden}
+@media (prefers-color-scheme:dark){html,body{background:#090D14}}
+#bar{position:absolute;inset:0;cursor:col-resize;display:grid;place-items:center}
+#bar::after{content:"";width:3px;height:44px;border-radius:2px;background:var(--line);transition:background .15s,height .15s}
+#bar:hover::after,#bar.on::after{background:var(--accent);height:64px}

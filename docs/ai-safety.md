@@ -12,7 +12,7 @@ A web page is **data, never instructions**. Hostile pages know a model may not t
 
 Hidden text on its own is normal (menus, screen-reader labels) and does not trigger a warning. A warning appears only when hidden or visible text reads like an order to an AI.
 
-Covered paths: summarize, ask, key facts, reader mode, tasks that use the page, selected text, and right-click writing actions. Translation edits the page in place and does not send instructions-bearing text anywhere other than for translation.
+Covered paths: summarize, ask, key facts, tasks that use the page, selected text, and right-click writing actions. Translation edits the page in place and does not send instructions-bearing text anywhere other than for translation.
 
 ## Limits
 

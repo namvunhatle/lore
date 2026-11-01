@@ -17,6 +17,7 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | MEM-02 | Auto collections | Cluster related pages into topics (travel, shopping) without manual saving. | P1 | A I D | Depends on MEM-01 embeddings. Replaces bookmarks as primary organizer. |
 | MEM-04 | Ask across everything I read | One question answered from **many** pages in memory, each claim cited [1][2] back to the page it came from. Extends to "compare these tabs". | P1 | D (then A I) | Reuses MEM-01 and the cited-answer code. Best quality needs the local embedding model; without it, keyword search only. Market note: others do this in the cloud; Lore can do it on device. |
 | MEM-05 | Daily digest | End-of-day summary on device: what you read, what is worth keeping, loose ends. Saved into memory. | P1 | D (then A I) | Replaces EXP-03. No server. Opt-in. |
+| MEM-06 | Pick up where you left off | The New tab page offers a short "resume" strip: the groups you had open yesterday, pages read recently, loose ends from the daily digest. One click reopens a group. | P1 | D (then A I) | Dia's "Morning Brief" pulls in calendar and inbox; Lore does the useful part with only what is on the device (session, memory, bookmarks). No account connections. Builds on tab groups and MEM-05. |
 | MEM-03 | Memory review and delete | User can see, search, and delete anything stored; per-site and time-range delete; export. | P0 | A I D | Required for trust. Ship together with MEM-01. |
 | AGT-01 | Confirmed agent tasks | Agent performs multi-step web tasks and **always stops for explicit confirmation** before payment, send, delete, settings changes, terms acceptance, or personal-data submission. | P1 | A I D | See agent safety rules in `CLAUDE.md`. Confirmation card shows exact item and amount. |
 | AGT-02 | Smart form fill | Fill forms (passenger, address, contact) from on-device profile data. Never auto-fill passwords or card numbers; use the platform credential manager. | P1 | A I D | Needs form-field understanding (page parsing, may use cloud tier with redacted values). |
@@ -35,7 +36,7 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | AI-03 | Page summary and Q&A | Summarize current page, ask questions about it, quote the source passage. | P0 | A I D | Truncate pages before cloud calls (see cost notes in AI strategy). |
 | AI-04 | In-place translation | Translate in layout; bilingual mode for long articles. | P0 | A I D | On-device model where quality is acceptable, otherwise cloud. |
 | AI-05 | Side assistant panel | Trailing panel (desktop) or sheet (mobile) for assistant without leaving the page. | P1 | A I D | Already sketched in mockups. |
-| AI-06 | Clean reader | Reader mode without ads, popups, cookie banners, with optional summary on top. | P0 | A I D | Can ship without LLM first. |
+| AI-06 | Clean reader | Reader mode without ads, popups, cookie banners, with optional summary on top. | **Removed (desktop)** | A I D | Dropped in November 2026: people did not use it, and the page-reading code remains for the AI features. Bring it back only if users ask. |
 | AI-07 | Read aloud (Vietnamese) | Text-to-speech for articles. Prefer on-device voice. | P1 | A I D | Check Vietnamese voice quality per platform. |
 | AI-08 | Compare tabs | Select 2-3 product tabs, produce a comparison table. Prices and terms are quoted verbatim, never guessed. | P1 | A I D | Part of MEM-04. |
 | AI-10 | Safe reading for AI (injection shield) | Before page text reaches a model: strip hidden text (zero-size, off-screen, aria-hidden, same-colour-as-background), warn when text tries to command the assistant, and always show what was sent. | **P0 · Done (desktop)** | A I D | **Prerequisite for any agent that acts on pages.** Shipped: hidden-text removal, invisible-character stripping, fence protection, EN/VI order detection with notice; see `docs/ai-safety.md`. Still open: image-borne text, per-site allowlist. Prompt injection is the unsolved problem of AI browsers (see section 11). Builds on the existing text-extraction step. |
@@ -44,6 +45,7 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | AI-13 | Organize tabs with AI | Groups open tabs by what they are about (a trip, a project), names the groups, finds duplicate tabs, and shows the plan before changing anything, with undo. The same flow files loose bookmarks into folders. | **Done (desktop)** | D (then A) | Without a model, tabs are grouped by site. Page titles and addresses go to the model only when the person opens the window; the window says where they went. Sensitive sites (banks, health) are left out. Next: suggest which old tabs to close, re-group as new tabs open. |
 | AI-14 | AI bookmark | When a page is starred, a model suggests a clean title, a folder (an existing one if it fits) and a one-line note. Search finds bookmarks by the note. | **Done (desktop)** | D (then A) | Runs once, only with a model set up; the page title is kept unless it is poor. Next: semantic search over bookmarks, "what was this for?" reminders. |
 | AI-15 | AI in the browser's own features | Bring the same idea to other defaults: smart names for downloads, a one-line "why I opened this" on history rows, find-in-page that answers a question, a new-tab page that resumes what you were doing. | P1 | D | Each one runs on demand or after an explicit action, never in the background. Pick by what people use most. |
+| AI-16 | AI off for chosen sites | A switch per site (and a default list: banks, health, mail) that stops Lore from reading that page for any AI feature, and shows the shield state in the address bar. | P1 | D (then A I) | Dia offers this only to company admins. For Lore it is a privacy feature for everyone: the person decides what the assistant may read. Today sensitive hosts are skipped for memory, organize and bookmarks; this makes the list visible and editable. |
 | AI-09 | Explain terms and contracts | Select text, get plain-language explanation and flags for unfavorable clauses. | P2 | A I D | Show disclaimer; not legal advice. |
 
 ## 3. Privacy and safety (visible and measurable)
@@ -62,7 +64,8 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | PRV-11 | HTTPS-first | Upgrade to HTTPS when possible and warn before an insecure page. | P1 | A I D | Parity with privacy browsers. |
 | PRV-12 | Encrypted DNS | DNS over HTTPS with a visible setting. | P1 | A D | Parity. Mention in the privacy report. |
 | PRV-13 | Strip tracking parameters | Remove `utm_*`, `fbclid`, `gclid` and similar from links before loading. | P1 | A I D | Small and visible. Keep a per-site off switch. |
-| PRV-14 | Site containers | Separate cookie jars for work, personal and one-off logins. | P1 | A D | Electron partitions already exist for private tabs. Firefox containers are the reference. |
+| PRV-14 | Profiles and site containers | Separate profiles (work, personal, one-off): their own tabs, logins, memory and AI settings; switch from the tab strip. | **Done (desktop)** | A D | Each profile has its own logins and site data, open tabs, memory, bookmarks and favicons. Switch from the avatar at the start of the tab strip (shown once there are two profiles) or the Profile menu; add, rename, recolour and delete in Settings > Profiles. Shared by all profiles: the AI model, tasks, settings, downloads. Switching closes the other profile's tabs (they come back, unloaded, when you return) and private tabs are not kept. Not yet: a different AI model per profile, a profile per window, moving a tab between profiles. |
+| PRV-15 | Privacy at a glance | One small panel (from the shield) with plain switches: memory on or off, ad and tracker blocking, AI may read this page, share anything to improve Lore (off). Shows what each one did today. | P1 | D (then A I) | Dia's home page leads with the same five switches. Lore already has the settings; the gain is putting them where people look. Pairs with PRV-04 and AI-16. |
 | PRV-10 | Private mode wipe | Wipe cookies, cache, history on private tab close; anti-fingerprinting; block third-party cookies by default. | P0 | A I D | |
 
 ## 4. Downloads and media
@@ -110,6 +113,7 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | WRK-01 | Tasks | Ready-made and user-built tasks (email, reply, calendar event, social post, key facts, explain, study notes, cover letter). Fields are remembered. Drafts open in the user's own webmail or calendar in a new tab. **Lore never sends, posts or books.** | **Done (desktop)** | D | Next: more built-ins from real use, share a task as a file, mobile. |
 | WRK-02 | Right-click Lore AI | Rewrite, fix, shorten, expand, tone, translate, explain, summarize on selected text or in a text box. | **Done (desktop)** | D | Next: a small bar that appears on selection. |
 | WRK-03 | Mail and calendar awareness | Read the open webmail message (with the user's selection) and the open calendar day, to draft replies and propose free slots. | P2 | D | Needs sign-in inside Lore, which Google may refuse in embedded browsers. Outlook and others first. |
+| WRK-04 | Share a task | Export a saved task as a small file (or link to a file) and import one from someone else. No server. | P2 | D | Dia has a "Skills" gallery where people share prompts. Lore starts with files, so nothing is hosted and nothing can be tracked. A gallery (AGT-07) only after review and signing exist. |
 
 ## 7c. Quality and release (added November 2026)
 
@@ -134,12 +138,12 @@ Every browser has these. Their absence is why people go back to Chrome after a d
 | BRW-06 | Tab management | Reopen closed tab (Cmd/Ctrl+Shift+T), duplicate, close others, close to the right, pin, reorder by dragging, Ctrl+Tab and Cmd+1..9 to switch, middle-click to close. | **P0 · Done (desktop)** | A I D | Right-click a tab: reload, duplicate, pin, close, close others, close to the right, reopen. Reopen closed (Cmd/Ctrl+Shift+T, last 25), Ctrl+Tab and Ctrl+Shift+Tab, Cmd/Ctrl+1 to 9, middle-click closes, drag to reorder, pinned tabs show only the icon and stay in front. Not yet: tab groups. |
 | BRW-07 | Address bar security state | Lock icon for HTTPS, a clear warning for HTTP and for certificate errors (with a proper interstitial), click to see the site's permissions and certificate. | **P0 · Done (desktop)** | A I D | A lock chip beside the address: encrypted, "Not secure" on plain http (menu offers the https version), "Certificate ignored". Certificate errors show a full-page warning with reason and a per-host, this-run-only "continue anyway". Menu also clears cookies and data for the site. Not yet: certificate details, HTTPS-first upgrade (PRV-11). |
 | BRW-08 | Search engine choice | Pick the default (DuckDuckGo, Google, Bing, Brave, Coccoc), add a custom one, keywords in the address bar. | P1 | A I D | Fixed to DuckDuckGo today. Search-partner revenue (business model) would live here. |
-| BRW-09 | Make Lore the default browser | Register for http/https and open links from other apps in Lore; a prompt in settings. | P1 | A I D | Missing. Without it, links from mail and chat never reach Lore. |
+| BRW-09 | Make Lore the default browser | Register for http/https and open links from other apps in Lore; a prompt in settings. | **Done (desktop, partly)** | A I D | Offered at first run. macOS and Linux register Lore for http and https; Windows opens its own default-apps page, because only the person can choose there. Links from other apps open as a new tab in the running Lore. Only works in the installed app, not in a development run, and the Windows and Linux paths have not been tried on those systems. |
 | BRW-10 | Clear browsing data | Pick data types (history, cookies, cache, passwords, site data) and a time range; clear on exit option. | P1 | A I D | A wipe-everything action exists; no choices. |
 | BRW-11 | Print and save as PDF | Cmd/Ctrl+P with preview; save the page as PDF. | P1 | A I D | Missing from the menu. |
 | BRW-12 | Password manager | Offer to save, fill, generate, check for reuse; protected by the OS or biometrics; import and export. Never autofill without the user seeing the site. | P1 | A I D | Missing. Agent rules say use the platform credential manager; decide: own vault, OS keychain, or integrate with an existing manager (Bitwarden, 1Password). Also unblocks AGT-02 and PRV-08. |
 | BRW-13 | Autofill for addresses and contacts | Saved profiles for forms, with the same on-device storage as memory. | P1 | A I D | Shares work with AGT-02. |
-| BRW-14 | Import from other browsers | Bookmarks, history and (where the OS allows) passwords from Chrome, Edge, Firefox, Safari, Cốc Cốc; HTML bookmark file. | P1 | D | Missing. Decides whether people can switch in one afternoon. |
+| BRW-14 | Import from other browsers | Bookmarks, history and (where the OS allows) passwords from Chrome, Edge, Firefox, Safari, Cốc Cốc; HTML bookmark file. | **Done (desktop, partly)** | D | Bookmarks and history from Chrome, Edge, Brave, Vivaldi, Cốc Cốc and Firefox on this computer, and from an exported bookmarks file, at first run or from the More menu. Not imported: passwords (they are encrypted with keys of each system's keychain), Safari (macOS protects its files), extensions, open tabs. Windows may need the other browser closed, because it locks its history file. |
 | BRW-15 | Multiple windows | New window, drag a tab out to make one, private window. | P1 | D | Single window today. |
 | BRW-16 | Page zoom per site | Zoom keys exist now; remember the level for each site and show it in the address bar. | P1 | A I D | Keys work on the page (November 2026). Not remembered. |
 | BRW-17 | Built-in PDF and media handling | Open PDFs in the tab, play audio and video in the tab with the usual controls, picture-in-picture. | P1 | A I D | PDF is DL-06; PiP is DL-04. |
@@ -150,6 +154,8 @@ Every browser has these. Their absence is why people go back to Chrome after a d
 | BRW-22 | Developer tools and view source | Open the inspector on the page (works, Alt+Cmd+I) and a View source command. | P2 | D | Inspector done; view source missing. |
 | BRW-23 | Context menu completeness | Open link in new tab or private tab, copy link, save image as, copy image, inspect, search the web for the selection. | **P0 · Done (desktop)** | A I D | Links: open in new tab or private tab, copy address. Images: open, save as, copy, copy address. Selection: copy, search the web, Lore AI. Page: back, forward, reload, find, inspect. |
 | BRW-24 | Crash and hang recovery | A crashed tab shows a "reload" page instead of a white tab; the app offers to restore. | P1 | A I D | Not checked. |
+| BRW-25 | Split view | Two pages side by side in one window (a meeting and its notes, a doc and a reference), with a draggable divider; the layout is remembered per tab group. | **Done (desktop)** | D | Cmd/Ctrl+Alt+D, or "Open in split view" on a tab's menu, shows two tabs side by side with a draggable divider (double-click resets it to half). Clicking into either side makes it the tab in front; closing one side leaves the other. Not yet: more than two panes, remembering the layout per tab group, dragging a tab onto the edge to split. |
+| BRW-26 | Appearance | Light, dark or follow the system, chosen in Settings > General. | **Done (desktop)** | A I D | Also sets the colour scheme that web pages see, so sites with a dark theme follow it. Mobile uses the system setting. |
 
 Done in November 2026: all P0 basics (BRW-01 to BRW-07, BRW-23). Next, by how often people ask: BRW-14 import from other browsers, BRW-12 password manager, BRW-08 search engine choice, BRW-09 default browser, BRW-10 clear data by type, BRW-11 print, BRW-15 multiple windows.
 
@@ -160,14 +166,14 @@ Done in November 2026: all P0 basics (BRW-01 to BRW-07, BRW-23). Next, by how of
 
 ## 9. Status snapshot (desktop prototype, November 2026)
 
-Done: AI-10 (desktop), MEM-01, MEM-03, AI-01, AI-02, AI-03, AI-04, AI-05, AI-06, PRV-01, PRV-02, PRV-03, PRV-10 (including private tabs), VN-01, WRK-01, WRK-02, favicons in memory, Linux/macOS/Windows packaging.
+Done: AI-10 (desktop), MEM-01, MEM-03, AI-01, AI-02, AI-03, AI-04, AI-05, PRV-01, PRV-02, PRV-03, PRV-10 (including private tabs), VN-01, WRK-01, WRK-02, favicons in memory, Linux/macOS/Windows packaging.
 Partly done: AGT-01 (confirm-first engine and browser driver exist, tested against a local demo portal only; **no real service yet**), DL-01 (plain files and HLS, no DASH, resume or ffmpeg merge).
 Known problems (fix before adding features):
 - **REL-01** The first macOS installers opened with no window: the Dock icon was read from a folder missing in the package. Fixed in code, not yet released. Lesson: nothing tests the packaged app.
 - **WEB-01** Sign-in on some sites loops (reported on Lovable after Google sign-in). Suspects: third-party cookie blocking applied to embedded frames, and pop-ups being turned into new tabs (the page loses `window.opener`, which OAuth pop-ups need). `LORE_DEBUG=1` prints navigations and refused cookies to find the cause.
 - The v0.1.0 release workflow failed on Windows; the workflow now uses the unsigned scripts, not yet confirmed on GitHub.
 
-Missing basics: search engine choice, default browser, password manager, import, print, multiple windows (section 7d). Done: find bar, downloads manager, session restore, tab management, full context menu, bookmarks, history page, security indicator.
+Missing basics: search engine choice, password manager, print, multiple windows (section 7d). Done: find bar, downloads manager, session restore, tab management, full context menu, bookmarks, history page, security indicator.
 
 Not started: mobile apps, Rust core, VPN, sync, extensions, code signing (pipeline written, untested without certificates), auto-update.
 
@@ -200,4 +206,32 @@ Where Lore can stand apart:
 4. **Match the privacy-browser basics** (PRV-11 to PRV-14) so privacy users take Lore seriously.
 5. **Keep the Vietnamese advantage** (VN-01 to VN-03) for services other browsers will not build.
 
-Proposed next slice, in order: **WEB-01 and REL-01 first**, then the P0 browser basics in section 7d (BRW-01 to BRW-07, BRW-23), (a browser that cannot sign in or cannot open is not worth new features), then MEM-04 with AI-08, AI-11, DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.
+## 12. Dia review (November 2026)
+
+Source: diabrowser.com (home, apps, privacy policy effective 9 April 2026, For Work), read in November 2026. Marketing and policy text, not hands-on use; check before relying on a detail. Dia is by The Browser Company; Chromium-based; macOS and Windows; free to download, with a "Pro" tier whose price the site does not give.
+
+What Dia offers, and what Lore does about it:
+
+| Dia | What it is | Lore |
+|---|---|---|
+| Morning Brief | Calendar, inbox and key links before the day starts | Take the idea, drop the accounts: MEM-06 resumes from session, memory and bookmarks, on the device |
+| Ask across Slack, Notion, Teams, G Suite | AI answers from the user's work apps | Not now. Needs connections to many services and sends that data to a server. Lore's version is MEM-04 (across pages you read). WRK-03 stays P2 |
+| Profiles | Separate tabs, logins and AI for work, freelance, personal | PRV-14, widened to profiles with their own memory |
+| Live Work | Tab bar shows what each work tab is (a PR, a spec) | Covered in part by group names (AI-13). Smarter tab titles are an AI-15 idea |
+| Better Meetings | Opens the meeting page, agenda, notes and a countdown | Needs a calendar. Left with WRK-03 |
+| Splits | Two panes side by side, layouts remembered | BRW-25, P1 |
+| Decks | Slides from gathered context | Not planned. Tasks produce text; slides are a different product |
+| Organized Tabs | Groups tabs with names | Done (AI-13), with a preview and undo |
+| Switches: Memory, block trackers, block ads, personalize, share data | Five plain on/off controls on the home page | PRV-15, plus AI-16 for per-site control |
+| Skills and a Skills gallery | User-made prompts, shared and published | Tasks already do this locally. WRK-04 shares them as files; AGT-07 (gallery) stays P3 |
+| Import from all major browsers | One-step switch | BRW-14, now first of the P1 group |
+| For Work: SSO, MDM, SOC 2, disable AI on chosen sites | Company controls | Out of scope today. AI-16 is the individual version. A "Lore for work" tier is a P3 note, not a plan |
+
+Where Lore can stay different, from what Dia says about itself:
+- Dia's AI requests go through its servers to partner models (the privacy policy says so; the For Work page also says data "stays on your device", and the two are worded differently). Lore's promise is narrower and testable: nothing about browsing leaves the computer, and a local model is a first-class choice.
+- Dia syncs end to end encrypted when asked. Lore has no sync yet (SYN-01); do not claim parity.
+- Dia is closed and US-hosted. Lore is open source and keeps Vietnamese understanding and local services (VN-01 to VN-03) as its own ground.
+
+Done in November 2026 after the Dia review: profiles (PRV-14), split view (BRW-25), first-run welcome with import (BRW-14) and default browser (BRW-09), appearance (BRW-26).
+
+Proposed next slice, in order: **REL-01** (smoke test of the packaged app) and the rest of **WEB-01** (sign-in on more sites) first, since a browser that cannot open or sign in is not worth new features; then PRV-15 with AI-16 (privacy switches, AI off for chosen sites), MEM-04 with AI-08, MEM-06, AI-11, BRW-25 (split view), DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.

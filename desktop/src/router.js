@@ -1,5 +1,5 @@
 // Classifies what the user typed into the intent bar.
-// Kinds: url | search | memory | agent | download | write (email, reply, event, post) | page (summarize, translate, reader, ask about the current page).
+// Kinds: url | search | memory | agent | download | write (email, reply, event, post) | page (summarize, translate, ask about the current page).
 
 function norm(s) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
@@ -26,7 +26,6 @@ function expand(n) { return SLANG.reduce((t, [re, to]) => t.replace(re, to), n);
 const QUESTION_OPENER = /^(cach|lam sao|lam the nao|how to|how do|how can|tai sao|why)\b/;
 
 const PAGE = [
-  ['reader', /\bche do doc\b|\breader( mode)?\b|\bdoc sach\b|\bdoc (trang|bai) nay\b|\bdoc (cho )?gon\b|\bclean reader\b/],
   ['summarize', /\btl;?dr\b|\b(tom tat|summari[sz]e|tong ket)\b.*\b(trang|bai|page|article|nay|this)\b|\b(tom tat|summari[sz]e)\b$/],
   ['translate', /\b(dich|translate)\b.*\b(trang|bai|page|article|nay|this)\b/],
   ['ask', /\b(trang|bai) (nay|do)\b.*\b(noi|nhac|co|viet|cho biet|de cap)\b|\bwhat does this (page|article) say\b|\bdoes this (page|article) (mention|say|cover)\b/]

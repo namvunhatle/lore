@@ -114,6 +114,16 @@ function render(s) {
   $('#bar').classList.toggle('loading', !!(active && active.loading));
   const tabs = $('#tabs');
   tabs.replaceChildren();
+  if (s.profiles && s.profiles.length > 1 && s.profile) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'avatar g-' + s.profile.color;
+    b.textContent = (s.profile.name || '?').charAt(0).toUpperCase();
+    b.setAttribute('aria-label', T('prof.menuAria', { name: s.profile.name }));
+    b.dataset.tip = s.profile.name;
+    b.addEventListener('click', () => { const r = b.getBoundingClientRect(); lore.send('profile:menu', Math.round(r.left), Math.round(r.bottom)); });
+    tabs.append(b);
+  }
   const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
   let lastGroup = 0;
   for (const t of s.tabs) {
@@ -129,6 +139,7 @@ function render(s) {
     el.setAttribute('aria-selected', String(t.active));
     if (t.private) el.classList.add('is-private');
     if (t.pinned) el.classList.add('pinned');
+    if (t.split) el.classList.add('in-split', 'split-' + t.split);
     el.addEventListener('click', () => lore.send('tab:select', t.id));
     el.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); lore.send('tab:close', t.id); } });
     el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
@@ -205,7 +216,7 @@ function render(s) {
     sec.dataset.tip = T('sec.' + st);
   }
   const star = $('#star');
-  star.hidden = !s.reader;
+  star.hidden = !s.web;
   star.setAttribute('aria-pressed', String(!!s.starred));
   star.dataset.tip = T(s.starred ? 'bm.remove' : 'tip.star', { k: key });
 
@@ -237,15 +248,15 @@ function render(s) {
     if (!s.bar.items.length) { const h = document.createElement('span'); h.className = 'hint'; h.textContent = T('bm.barEmpty'); bar.append(h); }
   }
 
-  $('#reader').hidden = !s.reader;
   $('#media').hidden = !s.media;
+  $('.sep').hidden = $('#media').hidden && $('#downloads').hidden;
   $('#media .badge').textContent = s.media;
   $('#back').disabled = !s.canBack;
   $('#fwd').disabled = !s.canForward;
   $('#badge').textContent = s.blocked.toLocaleString('vi-VN');
   $('#shield').setAttribute('aria-pressed', String(s.adsOn));
   $('#assist').disabled = !/^https?:/.test(s.url);
-  if (!focused) intent.value = s.url;
+  if (!focused) { intent.value = s.url; edited = false; updateChip(); }
 }
 
 // Placeholder: an overlay that slides between examples. It is only a hint: clicks go to the input, never to an example.
@@ -280,7 +291,7 @@ function typeRun(text) {
   let i = 0;
   const step = () => {
     if (id !== typing) return;
-    intent.value = text.slice(0, ++i);
+    intent.value = text.slice(0, ++i); edited = true; updateChip();
     if (i < text.length) setTimeout(step, Math.max(12, Math.min(40, 700 / text.length)));
     else setTimeout(done, 220);
   };
@@ -288,7 +299,27 @@ function typeRun(text) {
 }
 lore.onTypeRun(typeRun);
 $('#omni').addEventListener('click', () => intent.focus());
-intent.addEventListener('input', () => { typing++; $('#omni').classList.remove('typing'); });
+intent.addEventListener('input', () => { typing++; $('#omni').classList.remove('typing'); edited = true; updateChip(); });
+
+// While you type, a small label says what Enter will do with it: open a site, ask Lore, write, search memory…
+const chip = $('#ichip');
+let edited = false;
+let chipTimer;
+function updateChip() {
+  clearTimeout(chipTimer);
+  const v = intent.value.trim();
+  const show = edited && !!v;
+  $('#omni').classList.toggle('has-text', show);
+  if (!show) { chip.hidden = true; return; }
+  chipTimer = setTimeout(async () => {
+    let kind = '';
+    try { kind = await lore.classify(v); } catch { /* no label */ }
+    if (intent.value.trim() !== v || !edited) return;
+    chip.hidden = !kind;
+    chip.dataset.kind = kind;
+    chip.textContent = kind ? T('ichip.' + kind) + '  ↵' : '';
+  }, 50);
+}
 
 const tipEl = $('#tip');
 let tipTimer;
@@ -337,13 +368,14 @@ lore.onToast((t) => {
 lore.onState(render);
 lore.focusIntent(() => { intent.focus(); intent.select(); });
 intent.addEventListener('focus', () => { focused = true; });
-intent.addEventListener('blur', () => { focused = false; });
+intent.addEventListener('blur', () => { focused = false; edited = false; updateChip(); });
 $('#omni').addEventListener('submit', (e) => {
   e.preventDefault();
   lore.send('nav:submit', intent.value);
   intent.blur();
 });
 document.querySelector('kbd').textContent = key + 'L';
+LORE_I18N.apply(lang);
 tips();
 // Tooltips are drawn by the page (see below) so they appear fast and can show the shortcut as a key cap.
 function tips() {
@@ -355,9 +387,7 @@ $('#back').addEventListener('click', () => lore.send('nav:back'));
 $('#fwd').addEventListener('click', () => lore.send('nav:forward'));
 $('#reload').addEventListener('click', () => lore.send('nav:reload'));
 $('#shield').addEventListener('click', () => lore.send('shield:toggle'));
-$('#reader').addEventListener('click', () => lore.send('reader:open'));
 $('#memory').addEventListener('click', () => lore.send('memory:open'));
-$('#settings').addEventListener('click', () => lore.send('settings:open'));
 $('#media').addEventListener('click', () => lore.send('media:open'));
 $('#downloads').addEventListener('click', () => lore.send('downloads:open'));
 $('#star').addEventListener('click', () => lore.send('bookmark:toggle'));

@@ -16,11 +16,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .tab .x{width:18px;height:18px;border-radius:5px;line-height:1;color:var(--muted)}
 .tab .x:hover,.plus:hover,.ib:hover:not(:disabled){background:var(--hover)}
 .plus{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:8px;color:var(--muted);font-size:18px;line-height:1}
-.bar{position:relative;display:flex;align-items:center;gap:6px;height:48px;padding:0 12px;border-bottom:1px solid var(--line)}
+.bar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,720px) minmax(0,1fr);align-items:center;column-gap:14px;height:48px;padding:0 12px;border-bottom:1px solid var(--line)}
 .ib{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--muted);flex:none;position:relative}
 .ib:disabled{opacity:.35;cursor:default}
-.omni{flex:1;min-width:0;max-width:620px;margin:0 auto;display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:18px;background:var(--hover);border:1px solid transparent}
-.omni:focus-within{background:var(--win);border-color:var(--accent)}
+.omni{min-width:0;width:100%;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px 0 16px;border-radius:19px;background:var(--hover);border:1px solid transparent;transition:background .15s,border-color .15s,box-shadow .15s}
+.omni:focus-within{background:var(--win);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 #intent{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--ink);font:400 14px var(--f);outline:0;-webkit-user-select:text;user-select:text}
 #intent::placeholder{color:var(--muted)}
 kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 6px;line-height:18px}
@@ -32,7 +32,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 @media (prefers-reduced-motion:reduce){.fav.spin{animation:none}#bar.loading::after{animation:none;width:100%;opacity:.6}}
 /* Windows draws its own window buttons on the right, so leave them room and drop the macOS traffic-light gap. */
 .win32 .tabs,.linux .tabs{padding-left:12px;padding-right:150px}
-#reader[hidden]{display:none}
 #media[hidden]{display:none}
 #media{color:var(--accent)}
 #assist:not(:disabled){color:var(--accent)}
@@ -111,3 +110,39 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .gplus{-webkit-app-region:no-drag;flex:none;width:20px;height:20px;border-radius:50%;color:var(--g);font-size:15px;line-height:1;opacity:.7}
 .gplus:hover{opacity:1;background:color-mix(in srgb,var(--g) 20%,transparent)}
 .grp-edit{border-color:var(--g)}
+
+/* Toolbar layout: navigation on the left, the address box in the middle (centred on the window), tools on the right. */
+.navs{display:flex;align-items:center;gap:2px;justify-self:start}
+.tools{display:flex;align-items:center;gap:2px;justify-self:end;min-width:0}
+.ib.ctx{color:var(--accent)}
+.ib.ctx[hidden]{display:none}
+.sep{width:1px;height:18px;margin:0 6px;background:var(--line);flex:none}
+.sep[hidden]{display:none}
+/* The one button that is always the AI: filled with the accent colour. */
+.aibtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px 0 11px;margin:0 4px 0 6px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font:600 13px var(--f);flex:none;transition:opacity .15s}
+.aibtn:hover:not(:disabled){opacity:.9}
+.aibtn:disabled{background:var(--hover);color:var(--muted);opacity:1;cursor:default}
+.aibtn svg{fill:currentColor;stroke:currentColor;stroke-width:.6}
+#assist:not(:disabled){color:var(--accent-ink)}
+/* What Enter will do with the text being typed. */
+.ichip{flex:none;display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;background:var(--hover);color:var(--muted);font:600 11.5px var(--f);white-space:pre;animation:chip .14s ease-out both}
+.ichip[hidden]{display:none}
+.ichip[data-kind="search"],.ichip[data-kind="write"],.ichip[data-kind="page"],.ichip[data-kind="agent"],.ichip[data-kind="memory"]{background:var(--accent-soft);color:var(--accent)}
+@keyframes chip{from{opacity:0;transform:translateX(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ichip{animation:none}}
+.omni.has-text .star,.omni.has-text kbd{display:none}
+@media (max-width:980px){.aibtn span{display:none}.aibtn{padding:0 10px;margin:0 2px}.bar{column-gap:8px}}
+
+/* Blocking off: the shield is crossed out and loses its accent colour. */
+#shield .slash{display:none}
+#shield[aria-pressed="false"] .slash{display:inline}
+#shield[aria-pressed="false"]{color:var(--muted)}
+
+/* Profile avatar at the start of the tab strip (only when there is more than one profile). */
+.avatar{-webkit-app-region:no-drag;flex:none;width:26px;height:26px;margin-right:4px;border-radius:50%;background:var(--g);color:#fff;font:600 12px var(--f);display:grid;place-items:center}
+.avatar:hover{filter:brightness(1.1)}
+
+/* The two tabs of a split view are joined by one accent line. */
+.tab.in-split{box-shadow:inset 0 -2px 0 var(--accent)}
+.tab.split-a{border-bottom-right-radius:0}
+.tab.split-b{border-bottom-left-radius:0}

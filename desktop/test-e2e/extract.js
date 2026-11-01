@@ -1,4 +1,4 @@
-// Reader mode: extracts an article from a noisy page and sanitizes hostile content.
+// Page text extraction: the article is found in a noisy page, and ads and navigation are left out.
 const { app, BrowserWindow } = require('electron');
 // Own data folder, so tests never collide with a running Lore.
 app.setPath('userData', require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'lore-e2e-')));
@@ -33,25 +33,7 @@ app.whenReady().then(async () => {
     const hits = pageai.bestPassages(a.text, 'lãi suất huy động quý tới');
     assert.match(hits[0], /huy động/);
 
-    const reader = new BrowserWindow({ show: false, webPreferences: { backgroundThrottling: false } });
-    const article = { title: a.title, siteName: 'x', byline: '', content: a.content + '<img src="javascript:alert(4)"><a href="data:text/html,hi">d</a>', summary, minutes: 1 };
-    await reader.loadFile(path.join(__dirname, '..', 'src', 'ui', 'reader.html'), { query: { lang: 'vi', url: 'https://news.example/a', d: JSON.stringify(article) } });
-    const r = await reader.webContents.executeJavaScript(`({
-      scripts: document.querySelectorAll('#content script, #content iframe').length,
-      handlers: [...document.querySelectorAll('#content *')].filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
-      badLinks: [...document.querySelectorAll('#content a')].filter((e) => /^(javascript|data):/i.test(e.getAttribute('href') || '')).length,
-      badImgs: [...document.querySelectorAll('#content img')].filter((e) => !/^https?:/i.test(e.getAttribute('src') || '')).length,
-      text: document.getElementById('content').textContent, points: document.querySelectorAll('#pts li').length,
-      meta: document.getElementById('meta').textContent, orig: document.getElementById('orig').href, title: document.title })`);
-    assert.strictEqual(r.scripts, 0);
-    assert.strictEqual(r.handlers, 0);
-    assert.strictEqual(r.badLinks, 0);
-    assert.strictEqual(r.badImgs, 0);
-    assert.match(r.text, /giữ nguyên lãi suất/);
-    assert.ok(r.points >= 1);
-    assert.match(r.meta, /Đọc trong 1 phút/);
-    assert.strictEqual(r.orig, 'https://news.example/a');
-    console.log('reader ok');
-  } catch (e) { console.error('reader FAILED', e); code = 1; }
+    console.log('extract ok');
+  } catch (e) { console.error('extract FAILED', e); code = 1; }
   app.exit(code);
 });

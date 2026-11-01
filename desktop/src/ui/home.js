@@ -8,7 +8,7 @@ const kind = p.get('kind');
 const q0 = p.get('q') || '';
 const cut = (t) => (t.length > 40 ? t.slice(0, 39) + '…' : t);
 
-document.title = { loading: cut(q0), answer: cut(q0), memory: T('title.memory', { q: cut(q0) }), agent: T('title.agent'), noreader: T('bar.reader'), nopage: T('title.page'), download: T('title.download') }[kind] || T(p.get('private') === '1' ? 'tab.newPrivate' : 'tab.new');
+document.title = { loading: cut(q0), answer: cut(q0), memory: T('title.memory', { q: cut(q0) }), agent: T('title.agent'), nopage: T('title.page'), download: T('title.download') }[kind] || T(p.get('private') === '1' ? 'tab.newPrivate' : 'tab.new');
 
 // Cards run their example through the intent bar: the main process handles lore-run: links.
 const run = (q) => 'lore-run:?q=' + encodeURIComponent(q);
@@ -50,8 +50,6 @@ if (kind === 'memory') {
   noteWith(T('kind.agent') + ': "' + q0 + '"', T('note.agentNo'));
 } else if (kind === 'nopage') {
   noteWith(T('title.page'), T('note.noPage'));
-} else if (kind === 'noreader') {
-  noteWith(T('bar.reader'), T('note.noReader'));
 } else if (kind === 'download') {
   noteWith(T('kind.download') + ': "' + q0 + '"', T('note.noVideo'));
 }

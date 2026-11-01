@@ -4,6 +4,7 @@ const { isLocalHost } = require('./llm');
 
 const DEFAULTS = () => ({
   language: 'auto', // auto | en | vi
+  appearance: 'system', // system | light | dark
   startup: 'restore', // restore (continue where I left off) | new (start with a new tab)
   privacy: { blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask' }, // permissions: ask | block
   provider: 'local', // local | openai | anthropic | off
@@ -14,6 +15,7 @@ const DEFAULTS = () => ({
 const PROVIDERS = ['local', 'openai', 'anthropic', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
+const APPEARANCES = ['system', 'light', 'dark'];
 
 function httpUrl(u, { allowPlainLocal }) {
   let x;
@@ -36,6 +38,7 @@ class Settings {
     if (patch.provider !== undefined) out.provider = patch.provider;
     if (patch.language !== undefined) out.language = patch.language;
     if (STARTUPS.includes(patch.startup)) out.startup = patch.startup;
+    if (APPEARANCES.includes(patch.appearance)) out.appearance = patch.appearance;
     const pv = patch.privacy || {};
     for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
     if (pv.permissions !== undefined) out.privacy.permissions = pv.permissions;
@@ -82,7 +85,7 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, language: c.language, startup: c.startup, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, language: c.language, startup: c.startup, appearance: c.appearance, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key }

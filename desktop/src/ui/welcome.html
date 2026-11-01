@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lore</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+<main>
+  <ol class="dots" id="dots" aria-hidden="true"></ol>
+
+  <section id="s-profile" hidden>
+    <div class="mark" aria-hidden="true"><svg viewBox="-10 -10 20 20"><g transform="translate(0 7.5)"><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-66) scale(.76)" fill-opacity=".55"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(66) scale(.76)" fill-opacity=".55"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-33) scale(.9)" fill-opacity=".8"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(33) scale(.9)" fill-opacity=".8"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z"/></g></svg></div>
+    <h1 data-i18n="wel.h1"></h1>
+    <p class="sub" data-i18n="wel.tag"></p>
+    <label class="f"><span data-i18n="wel.name"></span><input id="pname" type="text" maxlength="30" autocomplete="off"></label>
+    <div class="swatches" id="pcolors" role="radiogroup" data-i18n-aria="group.color"></div>
+    <div class="btns"><button class="btn pri" id="to-import" type="button" data-i18n="wel.next"></button></div>
+  </section>
+
+  <section id="s-import" hidden>
+    <h1 id="imp-h" data-i18n="wel.imp.h"></h1>
+    <p class="sub" data-i18n="wel.imp.s"></p>
+    <ul id="blist" class="blist"></ul>
+    <p class="none" id="bnone" hidden data-i18n="wel.imp.none"></p>
+    <p class="status" id="istatus" role="status"></p>
+    <div class="btns">
+      <button class="btn pri" id="do-import" type="button" data-i18n="wel.imp.go"></button>
+      <button class="link" id="do-file" type="button" data-i18n="wel.imp.file"></button>
+      <button class="link quiet" id="skip-import" type="button" data-i18n="wel.skip"></button>
+    </div>
+    <p class="fine" data-i18n="wel.imp.pw"></p>
+  </section>
+
+  <section id="s-default" hidden>
+    <h1 data-i18n="wel.def.h"></h1>
+    <p class="sub" id="def-sub"></p>
+    <p class="status" id="dstatus" role="status"></p>
+    <div class="btns">
+      <button class="btn pri" id="do-default" type="button" data-i18n="wel.def.go"></button>
+      <button class="link quiet" id="finish" type="button" data-i18n="wel.finish"></button>
+    </div>
+  </section>
+</main>
+<script src="i18n.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>

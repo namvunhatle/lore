@@ -36,7 +36,7 @@ npm test             # unit tests
 npm run test:e2e     # needs a display; quit other Electron apps first
 ```
 
-End-to-end suites sometimes hang if another Electron app is open. If a suite stalls, quit the other apps and run it again. The `reader` suite is known to be flaky.
+End-to-end suites sometimes hang if another Electron app is open. If a suite stalls, quit the other apps and run it again. The `extract` suite is known to be flaky.
 
 ## How the code is organised
 

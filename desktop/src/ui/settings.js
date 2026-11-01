@@ -21,6 +21,10 @@ function setLang(l) {
     const o = document.createElement('option'); o.value = v; o.textContent = name; sel.append(o);
   }
   sel.value = cur;
+  const ap = $('#appearance');
+  ap.replaceChildren();
+  for (const [v, k] of [['system', 'set.look.system'], ['light', 'set.look.light'], ['dark', 'set.look.dark']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); ap.append(o); }
+  ap.value = view ? view.appearance : 'system';
   const st = $('#startup');
   st.replaceChildren();
   for (const [v, k] of [['restore', 'set.start.restore'], ['new', 'set.start.new']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); st.append(o); }
@@ -74,6 +78,7 @@ function patch() {
     provider: p,
     language: $('#language').value,
     startup: $('#startup').value,
+    appearance: $('#appearance').value,
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value },
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },
@@ -149,6 +154,47 @@ $('#pull').addEventListener('click', () => pull(val('#local-model'), $('#pull'))
 $('#pull-embed').addEventListener('click', () => pull(val('#local-embed'), $('#pull-embed')));
 settings.onPull((p) => { $('#pull-bar i').style.width = Math.round(p * 100) + '%'; });
 
+// ---- Profiles ----------------------------------------------------------------------------------------------------------
+const COLORS = ['blue', 'green', 'amber', 'red', 'purple', 'grey'];
+let pcolor = 'blue';
+function swatches(box, current, onPick) {
+  box.replaceChildren();
+  for (const c of COLORS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sw-c g-' + c; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(c === current)); b.setAttribute('aria-label', T('group.c.' + c));
+    b.addEventListener('click', () => onPick(c));
+    box.append(b);
+  }
+}
+function paintProfiles(r) {
+  const list = $('#plist');
+  list.replaceChildren();
+  for (const p of r.items) {
+    const row = document.createElement('div'); row.className = 'prow';
+    const dot = document.createElement('span'); dot.className = 'pdot g-' + p.color; dot.textContent = (p.name || '?').charAt(0).toUpperCase();
+    const name = document.createElement('input'); name.type = 'text'; name.value = p.name; name.maxLength = 30; name.setAttribute('aria-label', T('prof.name'));
+    name.addEventListener('change', async () => paintProfiles(await settings.profiles.update(p.id, { name: name.value })));
+    const sw = document.createElement('div'); sw.className = 'swatches';
+    swatches(sw, p.color, async (c) => paintProfiles(await settings.profiles.update(p.id, { color: c })));
+    const act = document.createElement('div'); act.className = 'pacts';
+    if (p.id === r.active) { const t = document.createElement('span'); t.className = 'pcur'; t.textContent = T('prof.current'); act.append(t); }
+    else { const b = document.createElement('button'); b.type = 'button'; b.className = 'link'; b.textContent = T('prof.switch'); b.addEventListener('click', async () => paintProfiles(await settings.profiles.switch(p.id))); act.append(b); }
+    if (r.items.length > 1) { const d = document.createElement('button'); d.type = 'button'; d.className = 'link del'; d.textContent = T('prof.delete'); d.addEventListener('click', async () => paintProfiles(await settings.profiles.remove(p.id))); act.append(d); }
+    row.append(dot, name, sw, act);
+    list.append(row);
+  }
+}
+function pickColor(c) { pcolor = c; swatches($('#pcolors'), pcolor, pickColor); }
+swatches($('#pcolors'), pcolor, pickColor);
+$('#padd').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await settings.profiles.create($('#pname').value, pcolor);
+  $('#pname').value = '';
+  paintProfiles(r);
+});
+settings.profiles.list().then(paintProfiles);
+settings.onPane((id) => go(id));
+
 settings.get().then((r) => { view = r.view; setLang(r.lang); fill(r.view); });
 
 // Left-hand navigation: one pane at a time, arrow keys move between them.
@@ -168,6 +214,6 @@ navs.forEach((n, i) => {
     const t = navs[(i + d + navs.length) % navs.length]; t.focus(); go(t.dataset.pane);
   });
 });
-let start = 'general';
-try { start = sessionStorage.getItem('pane') || start; } catch { /* optional */ }
+let start = new URLSearchParams(location.search).get('pane') || 'general';
+try { start = new URLSearchParams(location.search).get('pane') || sessionStorage.getItem('pane') || start; } catch { /* optional */ }
 go(start);
