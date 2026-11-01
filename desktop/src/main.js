@@ -23,6 +23,7 @@ const tabstate = require('./tabstate');
 const { Bookmarks } = require('./bookmarks');
 const { ProfileList, dirFor, partitionFor } = require('./profiles');
 const importer = require('./importer');
+const updates = require('./update');
 const secure = require('./security');
 const organize = require('./organize');
 const aibookmark = require('./aibookmark');
@@ -208,6 +209,7 @@ function startTabs() {
     windowReady = true;
     for (const u of pendingUrls.splice(0)) openLink(u);
     if (freshInstall) { freshInstall = false; setTimeout(() => openWelcome('first'), 400); }
+    scheduleUpdateChecks();
   }
 }
 
@@ -1489,6 +1491,55 @@ function wireDownloadsIpc() {
   ipcMain.on('downloads:open', (e) => { if (e.sender === win.webContents) openDownloads(); });
 }
 
+// ---- Updates (REL-03) -------------------------------------------------------------------------------------------------
+let updater = null;
+let upd = { state: 'idle', version: '', manual: false, asked: false }; // idle | available | downloading | ready | error
+const buildSigned = (() => { try { return !!require('./build-info.json').signed; } catch { return false; } })();
+const updateMode = () => updates.mode({ platform: process.platform, signed: buildSigned, appImage: !!process.env.APPIMAGE });
+
+function getUpdater() {
+  if (updater) return updater;
+  try { updater = require('electron-updater').autoUpdater; } catch { return null; }
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = false;
+  updater.logger = null;
+  if (process.env.LORE_UPDATE_URL) { updater.forceDevUpdateConfig = true; updater.setFeedURL({ provider: 'generic', url: process.env.LORE_UPDATE_URL }); }
+  updater.on('update-available', (info) => {
+    upd = { ...upd, state: 'available', version: info.version };
+    toast({ text: T('upd.available', { v: info.version }), action: 'update', actionLabel: T(updateMode() === 'auto' ? 'upd.install' : 'upd.download') });
+  });
+  updater.on('update-not-available', () => { upd.state = 'idle'; if (upd.asked) toast({ text: T('upd.latest', { v: app.getVersion() }) }); upd.asked = false; });
+  updater.on('download-progress', (p) => { upd.state = 'downloading'; toast({ text: T('upd.downloading', { p: Math.round(p.percent || 0) }), busy: true }); });
+  updater.on('update-downloaded', () => { upd.state = 'ready'; toast({ text: T('upd.ready', { v: upd.version }), action: 'update', actionLabel: T('upd.restart') }); });
+  updater.on('error', () => {
+    const was = upd.state;
+    upd.state = was === 'downloading' ? 'error' : 'idle';
+    if (was === 'downloading') toast({ text: T('upd.failed'), action: 'update', actionLabel: T('upd.download') });
+    else if (upd.asked) toast({ text: T('upd.checkFailed') });
+    upd.asked = false;
+  });
+  return updater;
+}
+// `asked` is true when the person chose "Check for updates", so the answer is always shown.
+function checkForUpdates(asked) {
+  if (!asked && !settings.get().autoUpdate) return;
+  if (!app.isPackaged && !process.env.LORE_UPDATE_URL) { if (asked) toast({ text: T('upd.dev') }); return; }
+  const u = getUpdater();
+  if (!u) return;
+  upd.asked = !!asked;
+  if (asked) toast({ text: T('upd.checking'), busy: true });
+  u.checkForUpdates().catch(() => { if (asked) toast({ text: T('upd.checkFailed') }); });
+}
+function handleUpdateAction() {
+  if (upd.state === 'ready') return updater.quitAndInstall(false, true);
+  if (upd.state === 'available' && updateMode() === 'auto') { upd.state = 'downloading'; toast({ text: T('upd.downloading', { p: 0 }), busy: true }); return updater.downloadUpdate().catch(() => {}); }
+  shell.openExternal(updates.RELEASES);
+}
+function scheduleUpdateChecks() {
+  setTimeout(() => checkForUpdates(false), 30000).unref();
+  setInterval(() => checkForUpdates(false), 6 * 3600 * 1000).unref();
+}
+
 // ---- First run: profile, import, default browser ------------------------------------------------------------------------
 const onboardedFile = () => path.join(app.getPath('userData'), 'onboarded.json');
 function defaultStatus() {
@@ -1641,6 +1692,8 @@ function wireIpc() {
   ipcMain.on('tab:new', () => openTab());
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
+  ipcMain.on('update:check', (e) => { if (e.sender === win.webContents) checkForUpdates(true); });
+  ipcMain.on('update:open', (e) => { if (e.sender === win.webContents) handleUpdateAction(); });
   ipcMain.on('welcome:open', (e) => { if (e.sender === win.webContents) openWelcome('import'); });
   ipcMain.on('split:toggle', (e) => { if (e.sender === win.webContents) openSplit(); });
   ipcMain.on('split:drag', (e, screenX) => {
@@ -1706,6 +1759,7 @@ function wireIpc() {
       { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
       { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
       { label: T('menu.import'), click: () => openWelcome('import') },
+      { label: T('menu.update'), click: () => checkForUpdates(true) },
       { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
       { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
       { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
@@ -1775,13 +1829,14 @@ function detectMedia(details) {
 function buildMenu() {
   const focus = () => win.webContents.send('focus-intent');
   const settingsItem = { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings };
+  const updateItem = { label: T('menu.update'), click: () => checkForUpdates(true) };
   const first = process.platform === 'darwin'
     ? { label: app.name, submenu: [
-        { role: 'about' }, { type: 'separator' }, settingsItem,
+        { role: 'about' }, updateItem, { type: 'separator' }, settingsItem,
         { type: 'separator' }, { role: 'services' }, { type: 'separator' },
         { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }
       ] }
-    : { label: app.name, submenu: [settingsItem, { type: 'separator' }, { role: 'quit' }] };
+    : { label: app.name, submenu: [settingsItem, updateItem, { type: 'separator' }, { role: 'quit' }] };
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     first,
     { label: T('menu.tab'), submenu: [

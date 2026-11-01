@@ -70,6 +70,7 @@ Lore không có công cụ phân tích, không thu thập dữ liệu sử dụn
 |---|---|---|
 | Bạn hỏi một câu kiến thức thông thường | `wikipedia.org` | Các từ khóa chủ đề |
 | Bạn tìm kiếm trên web | `duckduckgo.com` | Câu bạn tìm kiếm |
+| Ngay sau khi mở và vài giờ một lần | `github.com` (bản phát hành mới nhất) | Không gì ngoài địa chỉ IP và số phiên bản trong yêu cầu. Tắt được ở Cài đặt → Chung |
 | Khoảng mỗi tuần một lần | `easylist.to`, `abpvn.com`, `raw.githubusercontent.com` | Không gì ngoài địa chỉ IP của bạn (tải danh sách chặn quảng cáo và danh sách tên miền lừa đảo) |
 | Dùng AI với mô hình chạy trên máy | Ollama của bạn (`localhost`) | Nội dung bạn nhờ xử lý, gửi tới chính máy của bạn |
 | Dùng AI với khóa trên đám mây | Nhà cung cấp bạn đã cấu hình | Nội dung bạn nhờ xử lý. Phần Cài đặt cảnh báo máy chủ sẽ nhận nội dung, và mỗi kết quả đều ghi rõ văn bản đã được gửi đi đâu |

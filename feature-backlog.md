@@ -122,7 +122,7 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | WEB-01 | Sign-in compatibility | Google, Microsoft, Apple and other OAuth sign-ins complete on popular sites (Lovable, Notion, Figma, GitHub). Pop-ups keep `window.opener` when they are sign-in windows; third-party cookies stay blocked except on a sign-in flow, with a visible per-site exception. | **P0** | D | Today's blocking is all-or-nothing. A site that cannot sign in makes users leave, so this outranks new AI features. Test with a list of 10 real sites. |
 | REL-01 | Smoke test the packaged app | CI launches the built app on each OS and checks that a window opens and a page loads, before publishing. | **P0** | D | Would have caught the empty-window release. |
 | REL-02 | macOS ad-hoc signature, then Developer ID | Ad-hoc sign now so Gatekeeper's "damaged" message is avoided where possible; notarize when a certificate exists. | P1 | D | Document `xattr -cr` as the workaround meanwhile. |
-| REL-03 | Auto-update | Check for a signed update and install on restart. | P1 | D | Needs signing first. |
+| REL-03 | Auto-update | Check for a signed update and install on restart. | **Done (desktop, partly)** | D | Checks GitHub Releases after start and every six hours (a setting turns it off); Windows and Linux AppImage download and restart by themselves, macOS does so only once builds are signed, and until then shows a notice with a Download button. Checked against a local feed; a real download and restart has not been tried. See docs/release.md. |
 
 ## 7d. Browser basics (must exist before anyone switches to Lore)
 

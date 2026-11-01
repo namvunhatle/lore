@@ -30,8 +30,8 @@
     "filters": "node scripts/build-filters.js",
     "dist:win": "electron-builder --win nsis --x64 -c.win.signAndEditExecutable=false --publish never",
     "dist:win:signed": "electron-builder --win nsis --x64 --publish never",
-    "dist:mac": "electron-builder --mac dmg --arm64 --x64 -c.mac.identity=null --publish never",
-    "dist:mac:signed": "electron-builder --mac dmg --arm64 --x64 --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 -c.mac.identity=null --publish never",
+    "dist:mac:signed": "electron-builder --mac dmg zip --arm64 --x64 --publish never",
     "dist:linux": "electron-builder --linux AppImage tar.gz --x64 --publish never",
     "predist:win": "npm run filters",
     "predist:win:signed": "npm run filters",
@@ -83,6 +83,13 @@
             "arm64",
             "x64"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
@@ -121,11 +128,19 @@
           "https"
         ]
       }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "tevo-web",
+        "repo": "lore"
+      }
     ]
   },
   "dependencies": {
     "@ghostery/adblocker": "^2.20.3",
-    "@mozilla/readability": "^0.6.0"
+    "@mozilla/readability": "^0.6.0",
+    "electron-updater": "^6.8.11"
   },
   "engines": {
     "node": ">=22"

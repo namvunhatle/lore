@@ -26,17 +26,23 @@ jobs:
             platform: mac
             files: |
               desktop/dist/Lore-mac-*.dmg
+              desktop/dist/Lore-mac-*.zip
+              desktop/dist/Lore-mac-*.blockmap
+              desktop/dist/latest-mac.yml
               desktop/dist/signed-mac.txt
           - os: windows-latest
             platform: win
             files: |
               desktop/dist/Lore-win-*-setup.exe
+              desktop/dist/Lore-win-*-setup.exe.blockmap
+              desktop/dist/latest.yml
               desktop/dist/signed-win.txt
           - os: ubuntu-latest
             platform: linux
             files: |
               desktop/dist/Lore-linux-x64.AppImage
               desktop/dist/Lore-linux-x64.tar.gz
+              desktop/dist/latest-linux.yml
     runs-on: ${{ matrix.os }}
     env:
       SIGN: ${{ (matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '') || (matrix.platform == 'win' && secrets.WIN_CSC_LINK != '') }}
@@ -52,6 +58,12 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm test
+
+      # The app reads this to know whether a new version can be swapped in by itself (macOS only allows it when signed).
+      - name: Record signing in the app
+        if: ${{ env.SIGN == 'true' }}
+        shell: bash
+        run: echo '{ "signed": true }' > src/build-info.json
 
       # Compiles the bundled ad-block lists first (predist:*), then packages.
       # Unsigned builds use the plain dist:* scripts, which skip every signing tool (this is the path known to work).

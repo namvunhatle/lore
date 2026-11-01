@@ -25,6 +25,7 @@ function setLang(l) {
   ap.replaceChildren();
   for (const [v, k] of [['system', 'set.look.system'], ['light', 'set.look.light'], ['dark', 'set.look.dark']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); ap.append(o); }
   ap.value = view ? view.appearance : 'system';
+  $('#autoupdate').checked = view ? view.autoUpdate !== false : true;
   const st = $('#startup');
   st.replaceChildren();
   for (const [v, k] of [['restore', 'set.start.restore'], ['new', 'set.start.new']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); st.append(o); }
@@ -79,6 +80,7 @@ function patch() {
     language: $('#language').value,
     startup: $('#startup').value,
     appearance: $('#appearance').value,
+    autoUpdate: $('#autoupdate').checked,
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value },
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },

@@ -74,5 +74,18 @@ Linux has no system-level signing check. Each release lists SHA-256 checksums in
 
 Set `signed: { mac: true, windows: true }` in `site/config.js` (only for what is really signed). The landing page then drops the unsigned warnings.
 
-## Auto-update (not set up yet)
-Needs a place to host releases (for example GitHub Releases or an S3 bucket) and `electron-updater`. Until then, send users the new installer.
+## Auto-update
+Lore looks for a newer version on GitHub Releases 30 seconds after it starts and every six hours (Settings > General > Updates turns this off; **Lore > Check for Updates** asks right away). It reads `latest.yml`, `latest-mac.yml` or `latest-linux.yml` from the latest release, so those files must stay attached to it: the release workflow uploads them with the installers, and it also uploads the macOS `.zip` files that macOS updates use.
+
+What happens next depends on the system:
+
+| System | Result |
+|---|---|
+| Windows | A notice "Lore X is available"; the person presses Update, it downloads in the background, then "Restart to update". Works with an unsigned installer. |
+| Linux, AppImage | The same. The `.tar.gz` build cannot replace itself, so it opens the download page. |
+| macOS, signed and notarized | The same. |
+| macOS, unsigned (today) | Only a notice with a Download button, because macOS refuses to swap in an unsigned app. The workflow records `{ "signed": true }` in `src/build-info.json` for signed builds, which turns self-install on. |
+
+What was tried: the check and the notice on macOS, against a local feed (a newer version gives the notice, the same version gives "latest version"); the local build produces the `.zip`, the block maps, `latest-mac.yml` and `app-update.yml`. **Not tried:** a real download and restart on any system. Try one on Windows with two real releases before relying on it.
+
+Publish a new version by changing `version` in `desktop/package.json` and pushing a tag `vX.Y.Z` that matches it: the updater compares the version in the app with the one in `latest*.yml`.

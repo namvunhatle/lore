@@ -83,6 +83,7 @@ Lore has no analytics, no telemetry and no account. These are the only network r
 |---|---|---|
 | You ask a plain question | `wikipedia.org` | The topic words |
 | You search the web | `duckduckgo.com` | Your query (you opened a search) |
+| Shortly after start and every few hours | `github.com` (the latest release) | Nothing but your IP address and the version number in the request. Turn it off in Settings > General |
 | About once a week | `easylist.to`, `abpvn.com`, `raw.githubusercontent.com` | Nothing but your IP address (ad filter lists and the phishing domain list) |
 | You use AI with a local model | Your Ollama (`localhost`) | The text you asked about, to your own machine |
 | You use AI with a cloud key | The provider you configured | The text you asked about. Settings warn you which host will receive it, and every result states where the text was sent |
