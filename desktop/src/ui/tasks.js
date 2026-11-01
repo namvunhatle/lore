@@ -202,6 +202,11 @@ function runView(task) {
     editBox.hidden = !wasOpen;
     const toggle = h('button', { class: 'link', type: 'button', onclick: () => { editBox.hidden = !editBox.hidden; } }, T('task.edit.sent'));
     using.append(h('p', { class: 'chip-using' }, h('b', null, label), ' ', toggle), editBox);
+    const sf = ctx.safety;
+    if (sf && ((sf.flagged && sf.flagged.length) || sf.hiddenFlagged)) {
+      const q = (sf.flagged && sf.flagged[0] && sf.flagged[0].excerpt) || sf.hiddenExcerpt;
+      using.append(h('div', { class: 'warnbox', role: 'alert' }, h('b', null, T('safe.title')), h('p', null, T('safe.body')), q ? h('blockquote', null, q) : null));
+    }
   }
 
   async function loadContext() {

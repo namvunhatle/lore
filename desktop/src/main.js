@@ -11,6 +11,7 @@ const { extractionScript } = require('./reader');
 const { cookieBannerScript } = require('./cookiebanner');
 const pageai = require('./pageai');
 const pageassist = require('./pageassist');
+const shield = require('./shield');
 const { Memory, fileStore, RANGES, isSensitiveHost } = require('./memory');
 const { Favicons, toDataUrl } = require('./favicons');
 const { createEmbedder } = require('./embedder');
@@ -349,13 +350,22 @@ function claimPanel(tab) {
 const sendPage = (s) => { if (pa) panel.webContents.send('page:state', { ...s, lang: L() }); };
 const modelInfo = async () => ({ ready: !!llm && (await llm.available()), remote: !!llm && llm.remote ? llm.host : '', model: llm ? llm.model : '' });
 
-async function pageText(tab) {
+// Everything a model reads from a page comes through here (AI-10): visible text only, invisible characters stripped,
+// and a report of anything that looked like an order to the assistant.
+async function pageRead(tab) {
   const wc = tab.view.webContents;
+  let raw = '', hidden = {};
   try {
     const a = await wc.executeJavaScriptInIsolatedWorld(1003, [{ code: extractionScript() }]);
-    if (a && a.text && a.text.length > 300) return a.text;
+    if (a && a.text && a.text.length > 300) { raw = a.text; hidden = a.hidden || {}; }
   } catch { /* fall through */ }
-  try { return (await wc.executeJavaScriptInIsolatedWorld(1003, [{ code: 'document.body ? document.body.innerText : ""' }])) || ''; } catch { return ''; }
+  if (!raw) {
+    try {
+      const f = await wc.executeJavaScriptInIsolatedWorld(1003, [{ code: shield.fallbackScript() }]);
+      if (f) { raw = f.text || ''; hidden = f.hidden || {}; }
+    } catch { /* nothing readable */ }
+  }
+  return shield.prepare(raw, hidden);
 }
 
 async function pageAssistant(action, question = '') {
@@ -372,18 +382,19 @@ async function pageAssistant(action, question = '') {
   sendPage({ ...meta, reset: fresh, state: 'working' });
   try {
     if (action === 'translate') return await translatePage(tab, mine, meta, m, live);
-    const text = await pageText(tab);
+    const { text, report } = await pageRead(tab);
+    const safety = shield.worthWarning(report) || report.invisible || report.hiddenChars ? report : null;
     if (!live()) return;
     if (text.length < 120) return sendPage({ ...meta, state: 'error', error: 'pg.noText' });
     const l = m.ready ? llm : null;
     if (action === 'summarize') {
       const s = await pageassist.summarize({ text, llm: l, lang: L() });
       mine.text = text;
-      return live() && sendPage({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai });
+      return live() && sendPage({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
     }
     const a = await pageassist.ask({ text, question, llm: l, lang: L() });
     mine.text = text;
-    if (live()) sendPage({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai });
+    if (live()) sendPage({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
   } catch { if (live()) sendPage({ ...meta, state: 'error', error: 'pg.error' }); }
 }
 
@@ -660,9 +671,14 @@ function wireTasksIpc() {
     // A slow or busy page must not leave the form waiting: give each read a few seconds, then go on without it.
     const within = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(''), ms))]);
     try { out.selection = clip(await within(tab.view.webContents.executeJavaScriptInIsolatedWorld(1005, [{ code: 'String(getSelection())' }]), 2500)); } catch { /* page gone */ }
-    out.selection = (out.selection || '').trim();
+    out.selection = shield.prepare((out.selection || '').trim()).text;
     // "content" is what the user is pointing at: the selected text, or else the whole page.
-    if (needPage && !out.selection) out.page = clip(await within(pageText(tab), 6000), 6000);
+    let report = shield.prepare(out.selection).report;
+    if (needPage && !out.selection) {
+      const r = await within(pageRead(tab), 6000);
+      if (r && r.text != null) { out.page = clip(r.text, 6000); report = r.report; }
+    }
+    out.safety = shield.worthWarning(report) ? report : null;
     out.content = out.selection || out.page || '';
     out.source = out.selection ? 'selection' : out.page ? 'page' : '';
     return out;
@@ -775,7 +791,8 @@ async function runWriting(tab, action, params, { target } = {}) {
   const a = writing.ACTIONS[action];
   const selected = (params.selectionText || '').trim();
   const whole = !selected && params.isEditable;
-  const text = selected || (whole ? String(await fieldText(wc)).trim() : '');
+  const prep = shield.prepare(selected || (whole ? String(await fieldText(wc)).trim() : ''));
+  const text = prep.text;
   if (!text) return toast({ text: T('ai.nothing') });
   const label = action === 'translate' ? T('ai.translate', { lang: writing.targetName(target || L()) }) : T('ai.' + action);
   toast({ text: T('ai.working', { a: label }), busy: true });
@@ -791,7 +808,7 @@ async function runWriting(tab, action, params, { target } = {}) {
   toast(null);
   if (active() !== tab) return;
   const fresh = claimPanel(tab);
-  sendPage({ mode: 'sel', state: 'done', question: label, answer: out, ai: true, model: m.model, remote: m.remote, seq: ++paSeq, reset: fresh, page: pageMeta(tab) });
+  sendPage({ mode: 'sel', state: 'done', question: label, answer: out, ai: true, safety: shield.worthWarning(prep.report) ? prep.report : null, model: m.model, remote: m.remote, seq: ++paSeq, reset: fresh, page: pageMeta(tab) });
 }
 
 function openSettings() {

@@ -175,6 +175,19 @@ function head(s, copyText) {
   return h;
 }
 
+// AI-10: shown above the result when the page tried to give the assistant orders.
+function safetyNote(r) {
+  const flagged = (r.flagged && r.flagged.length) || r.hiddenFlagged;
+  if (!flagged) return null;
+  const w = el('div', 'warnbox');
+  w.setAttribute('role', 'alert');
+  w.append(el('b', '', T('safe.title')), el('p', '', T('safe.body')));
+  const quote = (r.flagged && r.flagged[0] && r.flagged[0].excerpt) || r.hiddenExcerpt;
+  if (quote) w.append(el('blockquote', '', quote));
+  if (r.hiddenFlagged) w.append(el('p', '', T('safe.hidden')));
+  return w;
+}
+
 function body(s) {
   const b = el('div', 'cb');
   const extra = [];
@@ -224,6 +237,12 @@ function body(s) {
     b.append(seg);
   }
   if (s.remote && (s.ai || s.mode === 'translate')) extra.push(T('pg.sentTo', { host: s.remote }));
+  if (s.safety) {
+    const w = safetyNote(s.safety);
+    if (w) b.prepend(w);
+    const n = s.safety.invisible || 0;
+    if (n) extra.push(T('safe.cleaned', { n }));
+  }
   for (const t of extra) b.append(el('p', 'fine', t));
   return { b, copy };
 }

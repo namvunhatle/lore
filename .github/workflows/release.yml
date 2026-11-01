@@ -54,11 +54,10 @@ jobs:
       - run: npm test
 
       # Compiles the bundled ad-block lists first (predist:*), then packages.
-      # On the Windows runner, dist:win:signed still skips signing when there is no certificate, and it (unlike the local
-      # dist:win, which exists for building on a Mac) also stamps Lore's icon and version into the .exe.
+      # Unsigned builds use the plain dist:* scripts, which skip every signing tool (this is the path known to work).
       - name: Build (unsigned)
         if: ${{ env.SIGN != 'true' }}
-        run: npm run dist:${{ matrix.platform == 'win' && 'win:signed' || matrix.platform }}
+        run: npm run dist:${{ matrix.platform }}
 
       - name: Build (signed)
         if: ${{ env.SIGN == 'true' }}
