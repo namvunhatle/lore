@@ -1,0 +1,31 @@
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{flex:none;display:flex;align-items:baseline;justify-content:space-between;padding:26px 32px 14px;border-bottom:1px solid var(--line)}
+h1{font-size:24px;font-weight:500;letter-spacing:-.01em;margin:0}
+.link{color:var(--accent);font-size:13px;font-weight:500}
+.link:hover{text-decoration:underline}
+main{flex:1;overflow-y:auto;padding:6px 32px}
+ul{list-style:none;margin:0 auto;padding:0;max-width:720px}
+li{display:flex;gap:14px;align-items:flex-start;padding:14px 10px;margin:0 -10px;border-radius:12px}
+li:hover{background:var(--hover)}
+.ext{flex:none;width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font:600 10.5px var(--f);text-transform:uppercase;letter-spacing:.02em}
+.body{flex:1;min-width:0}
+.name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta.bad{color:var(--warn)}
+.bar{height:3px;border-radius:2px;background:var(--line);margin:8px 0 2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.bar.wait i{width:35%!important;animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+.acts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}
+.acts button{color:var(--accent);font-size:12.5px;font-weight:500}
+.acts button:hover{text-decoration:underline}
+.acts button.quiet{color:var(--muted)}
+.warnline{margin-top:4px;padding:2px 8px;border-radius:6px;background:var(--warn-soft);color:var(--warn);font-size:12px;display:inline-block}
+.empty{max-width:420px;margin:90px auto;text-align:center;color:var(--muted)}
+.empty svg{width:40px;height:40px;fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.empty p{margin:10px 0 2px;color:var(--ink);font-weight:500}
+@media (prefers-reduced-motion:reduce){.bar.wait i{animation:none;width:100%!important;opacity:.5}}

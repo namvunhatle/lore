@@ -38,6 +38,7 @@ Bộ cài **chưa được ký số**, nên Windows SmartScreen và macOS Gateke
 - **Đọc trang an toàn.** Trước khi mô hình đọc một trang, Lore loại bỏ chữ ẩn và ký tự không nhìn thấy được, đồng thời cảnh báo khi trang cố ra lệnh cho AI. Xem [docs/ai-safety.md](docs/ai-safety.md).
 - **Riêng tư ngay từ đầu.** Chặn quảng cáo và trình theo dõi (EasyList, EasyPrivacy và danh sách dành cho Việt Nam), chặn cookie bên thứ ba, bật Global Privacy Control, giảm khả năng nhận diện qua dấu vân tay trình duyệt, tự đóng thông báo cookie, cảnh báo các trang giả mạo ngân hàng và ví điện tử, chỉ hỏi quyền camera và vị trí một lần, và tab riêng tư không để lại dấu vết.
 - **AI do bạn chọn.** Chạy mô hình ngay trên máy qua [Ollama](https://ollama.com), hoặc dùng khóa API riêng cho dịch vụ tương thích OpenAI hay Claude. Bạn cũng có thể tắt AI: mọi tính năng không cần mô hình vẫn hoạt động.
+- **Những tính năng cơ bản.** Tìm trong trang, trình quản lý tải xuống, tab được khôi phục sau khi khởi động lại, ghim tab, kéo để sắp xếp, mở lại tab vừa đóng và menu chuột phải đầy đủ.
 - **Tiếng Việt và tiếng Anh.** Giao diện và ô nhập hiểu cả hai thứ tiếng, có dấu hay không dấu.
 - **Tải video** những nội dung bạn được phép lưu (tệp thường và luồng HLS). Luồng mã hóa và các nền tảng như YouTube, Netflix sẽ không bao giờ được hỗ trợ.
 

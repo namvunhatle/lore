@@ -19,6 +19,8 @@ const { answerQuery } = require('./answer');
 const { createLlm, listLocalModels, pullLocalModel, isLocalHost } = require('./llm');
 const { Settings } = require('./settings');
 const writing = require('./writing');
+const tabstate = require('./tabstate');
+const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
 let settings;
@@ -51,6 +53,14 @@ const TAB_PRELOAD = path.join(__dirname, 'tab-preload.js');
 let win;
 let nextId = 1;
 const tabs = [];
+const closedTabs = new tabstate.ClosedTabs();
+let sessionStore = null;   // encrypted record of open tabs, for "continue where I left off"
+let sessionReady = false;  // false until the saved tabs were reopened, so an empty strip never overwrites them
+let sessionTimer = null;
+let lastSession = '';
+let downloads = null;      // every file saved by the browser (BRW-04)
+let downloadsWin = null;
+let findView = null;       // the find-in-page bar (BRW-01)
 let activeId = null;
 const S = { blocked: 0, adsOn: true };
 let statsFile = null;
@@ -86,6 +96,7 @@ function layout() {
   const pw = agentOpen() ? PANEL_W : 0;
   t.view.setBounds({ x: 0, y: CHROME_HEIGHT, width: w - pw, height: h - CHROME_HEIGHT });
   if (panel && pw) panel.setBounds({ x: w - pw, y: CHROME_HEIGHT, width: pw, height: h - CHROME_HEIGHT });
+  layoutFind();
 }
 
 function isLoading(tab) {
@@ -100,6 +111,7 @@ function paintTitleBar(priv) {
 }
 
 function pushState() {
+  scheduleSessionSave();
   const t = active();
   if (t) paintTitleBar(!!t.private);
   const wc = t && t.view.webContents;
@@ -107,8 +119,9 @@ function pushState() {
     lang: L(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
-      loading: isLoading(x) || !!x.pending, private: x.private
+      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned
     })),
+    downloads: downloads ? { count: downloads.items.length, active: downloads.active } : { count: 0, active: 0 },
     // While a page is loading, keep showing what the user asked for instead of the old (or empty) address.
     url: t ? t.pending || (!t.isHome ? t.url : '') : '',
     canBack: !!wc && wc.navigationHistory.canGoBack(),
@@ -120,7 +133,29 @@ function pushState() {
   });
 }
 
-function openTab(target, { private: priv = false } = {}) {
+// ---- Session: reopen the tabs of the last run (BRW-05) ---------------------------------------------------------------
+function writeSession() {
+  if (!sessionStore || !sessionReady) return;
+  const snap = tabstate.snapshot(tabs.map((t) => ({ id: t.id, url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private })), activeId);
+  const json = JSON.stringify(snap);
+  if (json === lastSession) return;
+  lastSession = json;
+  sessionStore.save(snap);
+}
+function scheduleSessionSave() {
+  if (!sessionReady || sessionTimer) return;
+  sessionTimer = setTimeout(() => { sessionTimer = null; writeSession(); }, 1500);
+}
+function startTabs() {
+  const saved = settings.get().startup === 'restore' && sessionStore ? tabstate.restore(sessionStore.load()) : { tabs: [], active: 0 };
+  if (saved.tabs.length) {
+    const made = saved.tabs.map((s) => openTab({ url: s.url }, { lazy: true, pinned: s.pinned, title: s.title }));
+    selectTab(made[saved.active].id);
+  } else openTab();
+  sessionReady = true;
+}
+
+function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '' } = {}) {
   const id = nextId++;
   // A partition without the "persist:" prefix lives in memory only, so a private tab leaves nothing on disk.
   const view = new WebContentsView({
@@ -130,12 +165,14 @@ function openTab(target, { private: priv = false } = {}) {
       ...(priv ? { partition: 'private-' + id } : {})
     }
   });
-  const tab = { id, view, title: '', url: '', isHome: true, media: [], favicon: '', busy: false, private: priv };
+  const tab = { id, view, title: '', url: '', isHome: true, media: [], favicon: '', busy: false, private: priv, pinned, lazyUrl: '' };
   tabs.push(tab);
+  if (pinned) tabs.splice(0, tabs.length, ...tabstate.setPinned(tabs, id, true));
   const wc = view.webContents;
   hardenSession(wc.session, priv);
   wc.setWebRTCIPHandlingPolicy('default_public_interface_only'); // do not leak the local network address
   wc.on('context-menu', (_e, params) => showContextMenu(tab, params));
+  wireFind(wc);
   wc.setWindowOpenHandler(({ url }) => {
     if (isAllowedNavigation(url)) openTab({ url }, { private: priv });
     return { action: 'deny' };
@@ -183,6 +220,7 @@ function openTab(target, { private: priv = false } = {}) {
     if (q && isOurHome(wc.getURL()) && tab.id === activeId) win.webContents.send('type-run', q);
   });
   wc.on('page-favicon-updated', (_e, icons) => { tab.favicon = icons[0] || ''; pushState(); if (!priv && !tab.isHome) saveFavicon(wc, tab.url, icons); });
+  wc.on('did-start-navigation', (_e, _u, inPlace, isMain) => { if (isMain && !inPlace && tab.id === activeId) closeFind(); });
   wc.on('did-navigate', (_e, url) => { tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv) memory.add({ url, title: tab.title }); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
@@ -229,10 +267,22 @@ function openTab(target, { private: priv = false } = {}) {
       app.exit(0);
     }, 800));
   }
+  if (lazy && target && target.url) {
+    // A restored tab does not load until it is shown: starting with thirty tabs must not mean thirty page loads.
+    tab.lazyUrl = target.url; tab.url = target.url; tab.title = title; tab.isHome = false;
+    return tab;
+  }
   selectTab(tab.id);
   if (target && target.url) wc.loadURL(target.url);
   else loadHome(wc, target || {});
   return tab;
+}
+
+function zoomActive(step) {
+  const t = active();
+  if (!t) return;
+  const wc = t.view.webContents;
+  wc.setZoomLevel(step === null ? 0 : Math.max(-3, Math.min(5, wc.getZoomLevel() + step)));
 }
 
 function selectTab(id) {
@@ -241,6 +291,8 @@ function selectTab(id) {
   activeId = id;
   const t = active();
   win.contentView.addChildView(t.view);
+  closeFind();
+  if (t.lazyUrl) { const u = t.lazyUrl; t.lazyUrl = ''; t.view.webContents.loadURL(u); }
   layout();
   pushState();
 }
@@ -249,6 +301,7 @@ function closeTab(id) {
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
   const [t] = tabs.splice(i, 1);
+  closedTabs.push({ url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private });
   if (t.id === activeId) win.contentView.removeChildView(t.view);
   const ses = t.view.webContents.session;
   t.view.webContents.close();
@@ -256,6 +309,49 @@ function closeTab(id) {
   if (!tabs.length) return openTab();
   if (t.id === activeId) selectTab(tabs[Math.min(i, tabs.length - 1)].id);
   else pushState();
+}
+
+// ---- Tab operations (BRW-06) ---------------------------------------------------------------------------------------
+const setOrder = (next) => { tabs.splice(0, tabs.length, ...next); pushState(); };
+function reopenClosed() {
+  const c = closedTabs.pop();
+  if (!c) return toast({ text: T('tab.noClosed') });
+  const t = openTab({ url: c.url }, { pinned: c.pinned });
+  return t;
+}
+function duplicateTab(id) {
+  const src = tabs.find((t) => t.id === id);
+  const url = src && (src.lazyUrl || src.url);
+  if (!src || !/^https?:/.test(url)) return openTab(undefined, { private: !!(src && src.private) });
+  const t = openTab({ url }, { private: src.private });
+  const rest = tabs.filter((x) => x !== t);
+  const at = rest.indexOf(src) + 1;
+  const pins = rest.filter((x) => x.pinned).length;
+  rest.splice(Math.max(at, pins), 0, t);
+  setOrder(rest);
+  return t;
+}
+function closeOthers(id) { for (const t of tabs.slice()) if (t.id !== id && !t.pinned) closeTab(t.id); }
+function closeToRight(id) { const i = tabs.findIndex((t) => t.id === id); for (const t of tabs.slice(i + 1)) if (!t.pinned) closeTab(t.id); }
+function pinTab(id) { const t = tabs.find((x) => x.id === id); if (t) setOrder(tabstate.setPinned(tabs, id, !t.pinned)); }
+function switchTab(next) { if (next) selectTab(next.id); }
+
+function showTabMenu(id) {
+  const t = tabs.find((x) => x.id === id);
+  if (!t) return;
+  const web = /^https?:/.test(t.lazyUrl || t.url);
+  const i = tabs.indexOf(t);
+  Menu.buildFromTemplate([
+    { label: T('nav.reload'), enabled: web, click: () => { if (t.lazyUrl) selectTab(t.id); else t.view.webContents.reload(); } },
+    { label: T('tab.duplicate'), click: () => duplicateTab(id) },
+    { label: t.pinned ? T('tab.unpin') : T('tab.pin'), click: () => pinTab(id) },
+    { type: 'separator' },
+    { label: T('tab.closeTab'), click: () => closeTab(id) },
+    { label: T('tab.closeOthers'), enabled: tabs.some((x) => x !== t && !x.pinned), click: () => closeOthers(id) },
+    { label: T('tab.closeRight'), enabled: tabs.slice(i + 1).some((x) => !x.pinned), click: () => closeToRight(id) },
+    { type: 'separator' },
+    { label: T('tab.reopen'), enabled: closedTabs.size > 0, accelerator: 'CmdOrCtrl+Shift+T', click: reopenClosed }
+  ]).popup({ window: win });
 }
 
 function startAgent(id) {
@@ -501,7 +597,8 @@ function createWindow() {
   panel = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'panel-preload.js'), contextIsolation: true, sandbox: true } });
   panel.webContents.loadFile(path.join(__dirname, 'ui', 'panel.html'));
   panel.webContents.on('did-finish-load', () => panel.webContents.send('lang', L()));
-  win.webContents.once('did-finish-load', () => openTab());
+  win.webContents.once('did-finish-load', startTabs);
+  win.webContents.on('did-finish-load', () => pushState()); // if the browser's own window ever reloads, the tab strip comes back
 }
 
 function refreshEmbedder() {
@@ -762,14 +859,39 @@ function wireTasksIpc() {
   ipcMain.on('settings:open-from-tasks', (e) => { if (trusted(e)) openSettings(); });
 }
 
-// Right-click on selected text or in a text box: Lore AI actions, plus the usual edit commands.
+// Right-click: what the page offers (links, images, selected text, text boxes) plus the Lore AI actions (BRW-23).
 function showContextMenu(tab, params) {
   if (tab.isHome && !params.isEditable) return;
+  const wc = tab.view.webContents;
   const sel = (params.selectionText || '').trim();
   const edit = params.isEditable;
+  const link = isAllowedNavigation(params.linkURL || '') && params.linkURL;
+  const img = params.mediaType === 'image' && isAllowedNavigation(params.srcURL || '') ? params.srcURL : '';
   const items = [];
-  if (edit) items.push({ role: 'cut', enabled: !!sel }, { role: 'copy', enabled: !!sel }, { role: 'paste' }, { role: 'selectAll' });
+  const sep = () => { if (items.length && items[items.length - 1].type !== 'separator') items.push({ type: 'separator' }); };
+  if (link) {
+    items.push(
+      { label: T('ctx.openTab'), click: () => openTab({ url: link }, { private: tab.private }) },
+      { label: T('ctx.openPrivate'), click: () => openTab({ url: link }, { private: true }) },
+      { label: T('ctx.copyLink'), click: () => clipboard.writeText(link) }
+    );
+    sep();
+  }
+  if (img) {
+    items.push(
+      { label: T('ctx.openImage'), click: () => openTab({ url: img }, { private: tab.private }) },
+      { label: T('ctx.saveImage'), click: () => { tab.saveAs = true; wc.downloadURL(img); } },
+      { label: T('ctx.copyImage'), click: () => wc.copyImageAt(params.x, params.y) },
+      { label: T('ctx.copyImageUrl'), click: () => clipboard.writeText(img) }
+    );
+    sep();
+  }
+  if (edit) items.push({ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut', enabled: !!sel }, { role: 'copy', enabled: !!sel }, { role: 'paste' }, { role: 'selectAll' });
   else if (sel) items.push({ role: 'copy' });
+  if (sel && !edit) {
+    const q = sel.replace(/\s+/g, ' ').slice(0, 200);
+    items.push({ label: T('ctx.search', { q: q.length > 30 ? q.slice(0, 30) + '…' : q }), click: () => openTab({ url: 'https://duckduckgo.com/?q=' + encodeURIComponent(q) }, { private: tab.private }) });
+  }
   if (sel || edit) {
     const A = (action, label, extra) => ({ label, click: () => runWriting(tab, action, params, extra) });
     const other = L() === 'vi' ? 'en' : 'vi';
@@ -780,10 +902,22 @@ function showContextMenu(tab, params) {
       A('explain', T('ai.explain')), A('summarize', T('ai.summarize')),
       ...(sel && !edit ? [{ type: 'separator' }, { label: T('ai.reply'), click: () => openTasks({ quick: { kind: 'email', request: '', reply: true } }) }] : [])
     ];
-    if (items.length) items.push({ type: 'separator' });
+    sep();
     items.push({ label: T('ai.menu'), submenu: ai });
   }
-  if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
+  if (!sel && !edit && !link && !img) {
+    const nav = wc.navigationHistory;
+    items.push(
+      { label: T('nav.back'), enabled: nav.canGoBack(), click: () => nav.goBack() },
+      { label: T('nav.forward'), enabled: nav.canGoForward(), click: () => nav.goForward() },
+      { label: T('nav.reload'), click: () => wc.reload() },
+      { type: 'separator' },
+      { label: T('menu.find'), accelerator: 'CmdOrCtrl+F', click: () => openFind() }
+    );
+  }
+  sep();
+  items.push({ label: T('ctx.inspect'), click: () => { wc.inspectElement(params.x, params.y); if (wc.isDevToolsOpened()) wc.devToolsWebContents.focus(); } });
+  Menu.buildFromTemplate(items).popup({ window: win });
 }
 
 async function fieldText(wc) {
@@ -817,6 +951,89 @@ async function runWriting(tab, action, params, { target } = {}) {
   if (active() !== tab) return;
   const fresh = claimPanel(tab);
   sendPage({ mode: 'sel', state: 'done', question: label, answer: out, ai: true, safety: shield.worthWarning(prep.report) ? prep.report : null, model: m.model, remote: m.remote, seq: ++paSeq, reset: fresh, page: pageMeta(tab) });
+}
+
+// ---- Find in page (BRW-01) ------------------------------------------------------------------------------------------
+const FIND_W = 380;
+function layoutFind() {
+  if (!findView || !win) return;
+  const [w] = win.getContentSize();
+  const pw = agentOpen() ? PANEL_W : 0;
+  findView.setBounds({ x: Math.max(0, w - pw - FIND_W - 12), y: CHROME_HEIGHT + 8, width: FIND_W, height: 46 });
+}
+function openFind() {
+  const t = active();
+  if (!t || t.isHome || !/^https?:/.test(t.url)) return;
+  if (!findView) {
+    findView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'find-preload.js'), contextIsolation: true, sandbox: true } });
+    findView.setBackgroundColor('#00000000');
+    findView.webContents.loadFile(path.join(__dirname, 'ui', 'find.html'), { query: { lang: L() } });
+  }
+  win.contentView.addChildView(findView);
+  layoutFind();
+  findView.webContents.focus();
+  findView.webContents.send('find:focus');
+}
+function closeFind() {
+  if (!findView) return;
+  const t = active();
+  for (const x of tabs) { try { x.view.webContents.stopFindInPage('clearSelection'); } catch { /* tab gone */ } }
+  if (win && !win.isDestroyed()) win.contentView.removeChildView(findView);
+  if (t) t.view.webContents.focus();
+}
+function wireFind(wc) {
+  wc.on('found-in-page', (_e, r) => {
+    if (findView && active() && active().view.webContents === wc) findView.webContents.send('find:result', { active: r.activeMatchOrdinal, total: r.matches });
+  });
+}
+function wireFindIpc() {
+  const ok = (e) => findView && e.sender === findView.webContents;
+  ipcMain.on('find:query', (e, text, forward, next) => {
+    if (!ok(e)) return;
+    const t = active();
+    if (!t) return;
+    const q = String(text || '').slice(0, 200);
+    if (!q) { t.view.webContents.stopFindInPage('clearSelection'); findView.webContents.send('find:result', { active: 0, total: 0 }); return; }
+    t.view.webContents.findInPage(q, { forward: forward !== false, findNext: !!next });
+  });
+  ipcMain.on('find:close', (e) => { if (ok(e)) closeFind(); });
+}
+
+// ---- Downloads window (BRW-04) ---------------------------------------------------------------------------------------
+function openDownloads() {
+  if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.focus();
+  downloadsWin = new BrowserWindow({
+    width: 640, height: 560, minWidth: 460, minHeight: 360, title: T('dl2.title'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'downloads-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  downloadsWin.setMenuBarVisibility(false);
+  downloadsWin.loadFile(path.join(__dirname, 'ui', 'downloads.html'), { query: { lang: L() } });
+  downloadsWin.on('closed', () => { downloadsWin = null; });
+}
+function wireDownloadsIpc() {
+  const trusted = (e) => downloadsWin && e.sender === downloadsWin.webContents;
+  ipcMain.handle('downloads:list', (e) => (trusted(e) ? downloads.view() : []));
+  ipcMain.handle('downloads:act', async (e, id, action) => {
+    if (!trusted(e)) return false;
+    const r = downloads.get(Number(id));
+    if (!r) return false;
+    if (action === 'pause') downloads.pause(r.id);
+    else if (action === 'resume') downloads.resume(r.id);
+    else if (action === 'cancel') downloads.cancel(r.id);
+    else if (action === 'remove') downloads.remove(r.id);
+    else if (action === 'reveal' && r.path) shell.showItemInFolder(r.path);
+    else if (action === 'open' && r.state === 'done' && r.path && fs.existsSync(r.path)) {
+      if (r.risky) {
+        const ask = await dialog.showMessageBox(downloadsWin, { type: 'warning', buttons: [T('dl2.openAnyway'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('dl2.riskyAsk', { name: r.name }), detail: T('dl2.riskyDetail', { host: r.host || '?' }) });
+        if (ask.response !== 0) return false;
+      }
+      shell.openPath(r.path);
+    }
+    return true;
+  });
+  ipcMain.handle('downloads:clear', (e) => { if (trusted(e)) downloads.clearFinished(); return true; });
+  ipcMain.on('downloads:open', (e) => { if (e.sender === win.webContents) openDownloads(); });
 }
 
 function openSettings() {
@@ -885,6 +1102,8 @@ function wireIpc() {
   ipcMain.on('tab:new', () => openTab());
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
+  ipcMain.on('tab:menu', (e, id) => { if (e.sender === win.webContents) showTabMenu(Number(id)); });
+  ipcMain.on('tab:move', (e, id, beforeId) => { if (e.sender === win.webContents) setOrder(tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId))); });
   ipcMain.on('nav:submit', (_e, text) => submit(String(text)));
   ipcMain.on('nav:back', () => active().view.webContents.navigationHistory.goBack());
   ipcMain.on('nav:forward', () => active().view.webContents.navigationHistory.goForward());
@@ -926,6 +1145,8 @@ function wireIpc() {
       { type: 'separator' },
       { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
       { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
+      { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
+      { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
       { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings },
       { type: 'separator' },
       { label: T('more.shortcuts', { k: process.platform === 'darwin' ? '⌘' : 'Ctrl+' }), enabled: false }
@@ -939,8 +1160,23 @@ function wireIpc() {
   ipcMain.on('shield:toggle', () => { S.adsOn = !S.adsOn; pushState(); });
 }
 
+const downloadHooked = new WeakSet();
+function hookDownloads(ses, isPrivate) {
+  if (downloadHooked.has(ses)) return;
+  downloadHooked.add(ses);
+  ses.on('will-download', (_e, item, wc) => {
+    if (!downloads) return;
+    const tab = wc ? tabForWc(wc.id) : null;
+    const askWhere = !!(tab && tab.saveAs);
+    if (tab) tab.saveAs = false;
+    const rec = downloads.track(item, { askWhere, private: isPrivate });
+    if (!askWhere) toast({ text: T('dl2.started', { name: rec.name }), action: 'downloads', actionLabel: T('dl2.show') });
+  });
+}
+
 // Applied to every session: the normal one and each private tab's own.
 function hardenSession(ses, isPrivate = false) {
+  hookDownloads(ses, isPrivate);
   harden(ses, {
     isPrivate, blocker,
     adsOn: () => S.adsOn,
@@ -997,10 +1233,28 @@ function buildMenu() {
       { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
       { label: T('menu.newPrivate'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openTab(undefined, { private: true }) },
       { label: T('menu.closeTab'), accelerator: 'CmdOrCtrl+W', click: () => active() && closeTab(activeId) },
+      { label: T('tab.reopen'), accelerator: 'CmdOrCtrl+Shift+T', click: reopenClosed },
+      { label: T('tab.next'), accelerator: 'Ctrl+Tab', click: () => switchTab(tabstate.cycle(tabs, activeId, 1)) },
+      { label: T('tab.prev'), accelerator: 'Ctrl+Shift+Tab', click: () => switchTab(tabstate.cycle(tabs, activeId, -1)) },
+      { label: T('tab.goTo'), submenu: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ label: n === 9 ? T('tab.last') : T('tab.nth', { n }), accelerator: 'CmdOrCtrl+' + n, click: () => switchTab(tabstate.nth(tabs, n)) })) },
+      { type: 'separator' },
+      { label: T('menu.find'), accelerator: 'CmdOrCtrl+F', click: openFind },
+      { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
       { label: T('menu.focus'), accelerator: 'CmdOrCtrl+L', click: focus }
     ] },
     { role: 'editMenu' },
-    { role: 'viewMenu' },
+    // Not the stock viewMenu: its Reload (Cmd/Ctrl+R) reloads the browser's own window, which empties the tab strip.
+    { label: T('menu.view'), submenu: [
+      { label: T('nav.reload'), accelerator: 'CmdOrCtrl+R', click: () => { const t = active(); if (t) t.view.webContents.reload(); } },
+      { label: T('menu.hardReload'), accelerator: 'CmdOrCtrl+Shift+R', click: () => { const t = active(); if (t) t.view.webContents.reloadIgnoringCache(); } },
+      { type: 'separator' },
+      { label: T('menu.zoomIn'), accelerator: 'CmdOrCtrl+=', click: () => zoomActive(0.5) },
+      { label: T('menu.zoomOut'), accelerator: 'CmdOrCtrl+-', click: () => zoomActive(-0.5) },
+      { label: T('menu.zoomReset'), accelerator: 'CmdOrCtrl+0', click: () => zoomActive(null) },
+      { type: 'separator' },
+      { role: 'togglefullscreen' },
+      { label: T('menu.devtools'), accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => { const t = active(); if (t) t.view.webContents.toggleDevTools(); } }
+    ] },
     { role: 'windowMenu' }
   ]));
 }
@@ -1016,6 +1270,13 @@ app.whenReady().then(() => {
   memory = new Memory(fileStore(path.join(app.getPath('userData'), 'memory.bin'), safeStorage));
   favicons = new Favicons(fileStore(path.join(app.getPath('userData'), 'favicons.bin'), safeStorage));
   taskStore = new taskLib.TaskStore(fileStore(path.join(app.getPath('userData'), 'tasks.bin'), safeStorage));
+  sessionStore = fileStore(path.join(app.getPath('userData'), 'session.bin'), safeStorage);
+  downloads = new DownloadList({ dir: app.getPath('downloads'), onChange: (rec, isNew) => {
+    pushState();
+    if (downloadsWin && !downloadsWin.isDestroyed()) downloadsWin.webContents.send('downloads:update', downloads.view());
+    if (rec && rec.state === 'done' && !isNew) toast({ text: T('dl2.done', { name: rec.name }), action: 'downloads', actionLabel: T('dl2.show') });
+    if (rec && rec.state === 'failed') toast({ text: T('dl2.failed', { name: rec.name }), action: 'downloads', actionLabel: T('dl2.show') });
+  } });
   refreshEmbedder();
   const logStore = fileStore(path.join(app.getPath('userData'), 'agent-log.bin'), safeStorage);
   const entries = logStore.load();
@@ -1024,6 +1285,8 @@ app.whenReady().then(() => {
   wireSettingsIpc();
   wireMemoryIpc();
   wireTasksIpc();
+  wireFindIpc();
+  wireDownloadsIpc();
   statsFile = path.join(app.getPath('userData'), 'stats.json');
   loadStats();
   blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
@@ -1037,5 +1300,5 @@ app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
-app.on('before-quit', () => { if (memory) memory.flush(); saveStats(); });
+app.on('before-quit', () => { if (memory) memory.flush(); saveStats(); writeSession(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

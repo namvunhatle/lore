@@ -53,7 +53,33 @@ function render(s) {
     el.setAttribute('role', 'tab');
     el.setAttribute('aria-selected', String(t.active));
     if (t.private) el.classList.add('is-private');
+    if (t.pinned) el.classList.add('pinned');
     el.addEventListener('click', () => lore.send('tab:select', t.id));
+    el.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); lore.send('tab:close', t.id); } });
+    el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('tab:menu', t.id); });
+    // Drag to reorder: dropping on the left half of a tab puts the dragged tab before it, on the right half after it.
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(t.id)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); for (const x of tabs.children) x.classList.remove('over-l', 'over-r'); });
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const left = e.clientX < r.left + r.width / 2;
+      el.classList.toggle('over-l', left);
+      el.classList.toggle('over-r', !left);
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('over-l', 'over-r'));
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const id = Number(e.dataTransfer.getData('text/plain'));
+      const r = el.getBoundingClientRect();
+      const left = e.clientX < r.left + r.width / 2;
+      const i = s.tabs.findIndex((x) => x.id === t.id);
+      const before = left ? t.id : (s.tabs[i + 1] ? s.tabs[i + 1].id : null);
+      el.classList.remove('over-l', 'over-r');
+      if (id && id !== before) lore.send('tab:move', id, before);
+    });
     el.append(icon(t));
     const label = document.createElement('span');
     label.textContent = t.title;
@@ -73,6 +99,12 @@ function render(s) {
   plus.dataset.tip = T('tip.newTab', { k: key });
   plus.addEventListener('click', () => lore.send('tab:new'));
   tabs.append(plus);
+
+  const dlb = $('#downloads');
+  dlb.hidden = !s.downloads || !s.downloads.count;
+  dlb.classList.toggle('busy', !!(s.downloads && s.downloads.active));
+  $('#downloads .badge').textContent = s.downloads ? s.downloads.active : 0;
+  $('#downloads .badge').hidden = !(s.downloads && s.downloads.active);
 
   $('#reader').hidden = !s.reader;
   $('#media').hidden = !s.media;
@@ -196,3 +228,4 @@ $('#reader').addEventListener('click', () => lore.send('reader:open'));
 $('#memory').addEventListener('click', () => lore.send('memory:open'));
 $('#settings').addEventListener('click', () => lore.send('settings:open'));
 $('#media').addEventListener('click', () => lore.send('media:open'));
+$('#downloads').addEventListener('click', () => lore.send('downloads:open'));

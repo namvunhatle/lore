@@ -21,6 +21,10 @@ function setLang(l) {
     const o = document.createElement('option'); o.value = v; o.textContent = name; sel.append(o);
   }
   sel.value = cur;
+  const st = $('#startup');
+  st.replaceChildren();
+  for (const [v, k] of [['restore', 'set.start.restore'], ['new', 'set.start.new']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); st.append(o); }
+  st.value = view ? view.startup : 'restore';
 }
 
 const provider = () => document.querySelector('input[name="provider"]:checked').value;
@@ -69,6 +73,7 @@ function patch() {
   return {
     provider: p,
     language: $('#language').value,
+    startup: $('#startup').value,
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value },
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },

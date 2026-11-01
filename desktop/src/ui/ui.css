@@ -59,3 +59,16 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 #bar.loading .omni-load{display:block}
 #bar.loading .omni kbd{display:none}
 @media (prefers-reduced-motion:reduce){.omni-load{animation:none}}
+
+/* Pinned tabs show only their icon; dragging shows where the tab will land. */
+.tab.pinned{min-width:0;width:36px;max-width:36px;padding:0;justify-content:center}
+.tab.pinned span:not(.fav),.tab.pinned .x{display:none}
+.tab[draggable="true"]{cursor:default}
+.tab.dragging{opacity:.5}
+.tab{position:relative}
+.tab.over-l::before,.tab.over-r::after{content:"";position:absolute;top:3px;bottom:3px;width:2px;border-radius:1px;background:var(--accent)}
+.tab.over-l::before{left:-3px}
+.tab.over-r::after{right:-3px}
+#downloads[hidden]{display:none}
+#downloads .badge[hidden]{display:none}
+#downloads.busy{color:var(--accent)}

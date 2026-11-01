@@ -117,6 +117,39 @@ Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat an
 | REL-02 | macOS ad-hoc signature, then Developer ID | Ad-hoc sign now so Gatekeeper's "damaged" message is avoided where possible; notarize when a certificate exists. | P1 | D | Document `xattr -cr` as the workaround meanwhile. |
 | REL-03 | Auto-update | Check for a signed update and install on restart. | P1 | D | Needs signing first. |
 
+## 7d. Browser basics (must exist before anyone switches to Lore)
+
+Every browser has these. Their absence is why people go back to Chrome after a day, whatever the AI can do. Status is for the desktop prototype as of November 2026; checked against the code, not remembered.
+
+| ID | Feature | Behavior | Pri | Platform | Status and notes |
+|---|---|---|---|---|---|
+| BRW-01 | Find in page | Cmd/Ctrl+F opens a find bar: next, previous, match count, highlight, Esc to close. | **P0 · Done (desktop)** | A I D | Cmd/Ctrl+F opens a find bar at the top right of the page: type to search, Enter and Shift+Enter move, count shown, Esc closes. Also in the right-click menu and the More menu. Not yet: match whole word, case switch. |
+| BRW-02 | Bookmarks | Star button, folders, a bookmarks bar toggle, bookmarks page, search. Optional: suggest saving what Memory shows you revisit. | **P0** | A I D | Missing. Memory is not a substitute: people want pages they chose. |
+| BRW-03 | Browsing history page | Chronological list by day, search, delete one, a range or everything. Distinct from Memory's semantic search. | **P0** | A I D | Missing. Memory already stores visits; this is a view over it, with Cmd/Ctrl+Y. Private tabs excluded. |
+| BRW-04 | Downloads manager | Any file download (not only media): progress, pause, cancel, open, show in folder, a list with Cmd/Ctrl+J, ask-where setting. Warn on risky file types. | **P0 · Done (desktop)** | A I D | Every download is tracked: file goes to Downloads with a numbered name if taken, progress, pause, resume, cancel, open, show in folder, remove; window with Cmd/Ctrl+J and a toolbar button that appears after the first download. Programs and installers are marked and never opened without asking. Not yet: ask-where setting, list kept across restarts. |
+| BRW-05 | Restore tabs on start | Reopen the previous session after a quit or crash; setting for "new tab" or "continue where I left off". Private tabs are never restored. | **P0 · Done (desktop)** | A I D | Tabs are saved (encrypted, never private tabs) and reopened next start; only the active one loads, the rest load when shown. Setting: Settings > General > On startup. Needs secure storage on the system, otherwise nothing is saved. |
+| BRW-06 | Tab management | Reopen closed tab (Cmd/Ctrl+Shift+T), duplicate, close others, close to the right, pin, reorder by dragging, Ctrl+Tab and Cmd+1..9 to switch, middle-click to close. | **P0 · Done (desktop)** | A I D | Right-click a tab: reload, duplicate, pin, close, close others, close to the right, reopen. Reopen closed (Cmd/Ctrl+Shift+T, last 25), Ctrl+Tab and Ctrl+Shift+Tab, Cmd/Ctrl+1 to 9, middle-click closes, drag to reorder, pinned tabs show only the icon and stay in front. Not yet: tab groups. |
+| BRW-07 | Address bar security state | Lock icon for HTTPS, a clear warning for HTTP and for certificate errors (with a proper interstitial), click to see the site's permissions and certificate. | **P0** | A I D | Missing. The scam warning exists; the plain "is this connection secure" signal does not. Pairs with PRV-11. |
+| BRW-08 | Search engine choice | Pick the default (DuckDuckGo, Google, Bing, Brave, Coccoc), add a custom one, keywords in the address bar. | P1 | A I D | Fixed to DuckDuckGo today. Search-partner revenue (business model) would live here. |
+| BRW-09 | Make Lore the default browser | Register for http/https and open links from other apps in Lore; a prompt in settings. | P1 | A I D | Missing. Without it, links from mail and chat never reach Lore. |
+| BRW-10 | Clear browsing data | Pick data types (history, cookies, cache, passwords, site data) and a time range; clear on exit option. | P1 | A I D | A wipe-everything action exists; no choices. |
+| BRW-11 | Print and save as PDF | Cmd/Ctrl+P with preview; save the page as PDF. | P1 | A I D | Missing from the menu. |
+| BRW-12 | Password manager | Offer to save, fill, generate, check for reuse; protected by the OS or biometrics; import and export. Never autofill without the user seeing the site. | P1 | A I D | Missing. Agent rules say use the platform credential manager; decide: own vault, OS keychain, or integrate with an existing manager (Bitwarden, 1Password). Also unblocks AGT-02 and PRV-08. |
+| BRW-13 | Autofill for addresses and contacts | Saved profiles for forms, with the same on-device storage as memory. | P1 | A I D | Shares work with AGT-02. |
+| BRW-14 | Import from other browsers | Bookmarks, history and (where the OS allows) passwords from Chrome, Edge, Firefox, Safari, Cốc Cốc; HTML bookmark file. | P1 | D | Missing. Decides whether people can switch in one afternoon. |
+| BRW-15 | Multiple windows | New window, drag a tab out to make one, private window. | P1 | D | Single window today. |
+| BRW-16 | Page zoom per site | Zoom keys exist now; remember the level for each site and show it in the address bar. | P1 | A I D | Keys work on the page (November 2026). Not remembered. |
+| BRW-17 | Built-in PDF and media handling | Open PDFs in the tab, play audio and video in the tab with the usual controls, picture-in-picture. | P1 | A I D | PDF is DL-06; PiP is DL-04. |
+| BRW-18 | Site permissions page | See and change camera, microphone, location, notifications and cookie decisions per site, with a reset. | P1 | A I D | Permissions ask once but cannot be reviewed or undone. |
+| BRW-19 | Full-screen and presentation | Full screen for a video or the whole window with the bar shown on hover. | P2 | A I D | Window full screen exists; page full screen not tested. |
+| BRW-20 | Reading list and tab groups | Save for later; group and name tabs, collapse. | P2 | A I D | Collections (MEM-02) may cover part of this. |
+| BRW-21 | Accessibility | Keyboard-only use of every control, screen-reader labels, high contrast, minimum font size, caret browsing. | P1 | A I D | Tooltips with shortcuts exist; a real audit has not been done. |
+| BRW-22 | Developer tools and view source | Open the inspector on the page (works, Alt+Cmd+I) and a View source command. | P2 | D | Inspector done; view source missing. |
+| BRW-23 | Context menu completeness | Open link in new tab or private tab, copy link, save image as, copy image, inspect, search the web for the selection. | **P0 · Done (desktop)** | A I D | Links: open in new tab or private tab, copy address. Images: open, save as, copy, copy address. Selection: copy, search the web, Lore AI. Page: back, forward, reload, find, inspect. |
+| BRW-24 | Crash and hang recovery | A crashed tab shows a "reload" page instead of a white tab; the app offers to restore. | P1 | A I D | Not checked. |
+
+Done in November 2026: BRW-01, BRW-04, BRW-05, BRW-06, BRW-23. Next: BRW-02 bookmarks, BRW-03 history page, BRW-07 security indicator, then the P1 group by how often people ask.
+
 ## 8. Explicitly out of scope for now
 - Social network or news feed inside the browser (content cost, conflicts with privacy positioning).
 - Crypto wallet, games, pay-to-browse rewards (legal risk, brand drift).
@@ -130,6 +163,8 @@ Known problems (fix before adding features):
 - **REL-01** The first macOS installers opened with no window: the Dock icon was read from a folder missing in the package. Fixed in code, not yet released. Lesson: nothing tests the packaged app.
 - **WEB-01** Sign-in on some sites loops (reported on Lovable after Google sign-in). Suspects: third-party cookie blocking applied to embedded frames, and pop-ups being turned into new tabs (the page loses `window.opener`, which OAuth pop-ups need). `LORE_DEBUG=1` prints navigations and refused cookies to find the cause.
 - The v0.1.0 release workflow failed on Windows; the workflow now uses the unsigned scripts, not yet confirmed on GitHub.
+
+Missing basics: bookmarks, history page, security indicator, search engine choice, default browser, password manager, import (section 7d). Done: find bar, downloads manager, session restore, tab management, full context menu.
 
 Not started: mobile apps, Rust core, VPN, sync, extensions, code signing (pipeline written, untested without certificates), auto-update.
 
@@ -162,4 +197,4 @@ Where Lore can stand apart:
 4. **Match the privacy-browser basics** (PRV-11 to PRV-14) so privacy users take Lore seriously.
 5. **Keep the Vietnamese advantage** (VN-01 to VN-03) for services other browsers will not build.
 
-Proposed next slice, in order: **WEB-01 and REL-01 first** (a browser that cannot sign in or cannot open is not worth new features), then MEM-04 with AI-08, AI-11, DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.
+Proposed next slice, in order: **WEB-01 and REL-01 first**, then the P0 browser basics in section 7d (BRW-01 to BRW-07, BRW-23), (a browser that cannot sign in or cannot open is not worth new features), then MEM-04 with AI-08, AI-11, DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.
