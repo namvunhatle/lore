@@ -25,7 +25,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test \"test/*.test.js\"",
-    "test:e2e": "electron test-e2e/run.js && electron test-e2e/pages.js && electron test-e2e/privacy.js && electron test-e2e/extract.js && electron test-e2e/shield.js && electron test-e2e/browser.js && electron test-e2e/offline.js && electron test-e2e/import.js && electron test-e2e/features.js",
+    "test:e2e": "electron test-e2e/run.js && electron test-e2e/pages.js && electron test-e2e/privacy.js && electron test-e2e/extract.js && electron test-e2e/shield.js && electron test-e2e/browser.js && electron test-e2e/offline.js && electron test-e2e/import.js && electron test-e2e/features.js && electron test-e2e/trail.js",
     "demo-portal": "node fixtures/portal.js",
     "filters": "node scripts/build-filters.js",
     "dist:win": "electron-builder --win nsis --x64 -c.win.signAndEditExecutable=false --publish never",
