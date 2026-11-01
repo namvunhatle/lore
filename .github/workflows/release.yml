@@ -63,7 +63,8 @@ jobs:
       - name: Record signing in the app
         if: ${{ env.SIGN == 'true' }}
         shell: bash
-        run: echo '{ "signed": true }' > src/build-info.json
+        run: |
+          echo '{ "signed": true }' > src/build-info.json
 
       # Compiles the bundled ad-block lists first (predist:*), then packages.
       # Unsigned builds use the plain dist:* scripts, which skip every signing tool (this is the path known to work).
