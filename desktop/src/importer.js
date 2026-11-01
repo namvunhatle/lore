@@ -16,10 +16,11 @@ const CHROMIUM = [
   { id: 'brave', name: 'Brave', mac: 'BraveSoftware/Brave-Browser', win: 'BraveSoftware/Brave-Browser/User Data', linux: 'BraveSoftware/Brave-Browser' },
   { id: 'vivaldi', name: 'Vivaldi', mac: 'Vivaldi', win: 'Vivaldi/User Data', linux: 'vivaldi' },
   { id: 'coccoc', name: 'Cốc Cốc', mac: 'Coccoc', win: 'CocCoc/Browser/User Data', linux: 'coccoc' },
-  // Mac only for now. Arc keeps its sidebar outside Chromium's Bookmarks file, so it brings history alone.
-  { id: 'arc', name: 'Arc', mac: 'Arc/User Data' },
+  // Arc on Windows is a Store (MSIX) app, so its data sits inside the package folder. Arc keeps its sidebar outside
+  // Chromium's Bookmarks file, so it brings history alone. Dia's Windows folder is not known yet; neither has Linux.
+  { id: 'arc', name: 'Arc', mac: 'Arc/User Data', win: 'Packages/TheBrowserCompany.Arc_ttt1ap7aakyb4/LocalCache/Local/Arc/User Data' },
   { id: 'dia', name: 'Dia', mac: 'Dia/User Data' },
-  { id: 'helium', name: 'Helium', mac: 'net.imput.helium' }
+  { id: 'helium', name: 'Helium', mac: 'net.imput.helium', win: 'imput/Helium/User Data', linux: 'net.imput.helium' }
 ];
 
 function roots({ platform, home, env }) {

@@ -75,9 +75,23 @@ test('Arc, Dia and Helium are found on a Mac in their own folders', () => {
   }
   const r = imp.detect({ platform: 'darwin', home, env: {} });
   assert.deepStrictEqual(r.map((b) => [b.id, b.name, b.kind]), [['arc', 'Arc', 'chromium'], ['dia', 'Dia', 'chromium'], ['helium', 'Helium', 'chromium']]);
-  // Neither has a folder we know of on these systems: they are skipped, not an error.
+  // None of these folders exist on other systems, and Dia has no known folder there: skipped, not an error.
   assert.deepStrictEqual(imp.detect({ platform: 'win32', home, env: {} }), []);
   assert.deepStrictEqual(imp.detect({ platform: 'linux', home, env: {} }), []);
+});
+
+test('Arc and Helium are found on Windows, and Helium on Linux', () => {
+  const home = tmp();
+  const local = path.join(home, 'AppData', 'Local');
+  for (const dir of ['Packages/TheBrowserCompany.Arc_ttt1ap7aakyb4/LocalCache/Local/Arc/User Data', 'imput/Helium/User Data']) {
+    fs.mkdirSync(path.join(local, dir, 'Default'), { recursive: true });
+    fs.writeFileSync(path.join(local, dir, 'Default', 'History'), '');
+  }
+  assert.deepStrictEqual(imp.detect({ platform: 'win32', home, env: { LOCALAPPDATA: local } }).map((b) => b.id), ['arc', 'helium']);
+  const lin = tmp();
+  fs.mkdirSync(path.join(lin, '.config', 'net.imput.helium', 'Default'), { recursive: true });
+  fs.writeFileSync(path.join(lin, '.config', 'net.imput.helium', 'Default', 'Bookmarks'), '{}');
+  assert.deepStrictEqual(imp.detect({ platform: 'linux', home: lin, env: {} }).map((b) => b.id), ['helium']);
 });
 
 test('a browser\'s internal profiles are left out, and it says whether it has bookmarks', () => {
