@@ -2356,7 +2356,7 @@ function buildMenu() {
       { label: T('eph.menu'), submenu: [5, 15, 60].map((n) => ({ label: T('eph.min', { n }), click: () => openEphemeral(n) })) },
       { label: T('alias.menu'), click: createAlias },
       { label: T('br.menu'), click: openBreach },
-      { label: T('pw.fill'), accelerator: 'CmdOrCtrl+Shift+\\', click: fillPassword },
+      { label: T('pw.fill'), accelerator: 'CmdOrCtrl+Alt+L', click: fillPassword },
       { label: T('pw.menu'), accelerator: 'CmdOrCtrl+Alt+P', click: async () => { if (await unlock()) openPasswords(); } },
       { label: T('rl.add'), accelerator: 'CmdOrCtrl+Shift+L', click: readLater },
       { label: T('menu.closeTab'), accelerator: 'CmdOrCtrl+W', click: () => active() && closeTab(activeId) },
