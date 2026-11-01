@@ -8,20 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  core:
-    runs-on: ubuntu-latest
-    if: ${{ hashFiles('core/Cargo.toml') != '' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - run: cargo fmt --check
-        working-directory: core
-      - run: cargo clippy --all-targets -- -D warnings
-        working-directory: core
-      - run: cargo test
-        working-directory: core
+  # The Rust core job comes back when core/Cargo.toml exists. (A job-level `if: hashFiles(...)` is not allowed by
+  # GitHub Actions: it makes the whole workflow invalid, so no job runs at all.)
 
   desktop:
     runs-on: ubuntu-latest
