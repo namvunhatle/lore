@@ -4,6 +4,9 @@
 // State arrives many times a second while pages load; rebuilding would drop hover and press states mid-gesture.
 const sideStore = { pins: new Map(), list: new Map() };
 let sideDrawn = false;
+// Tabs whose outline is open, and the newest state (the outline is redrawn when one is toggled).
+const tocOpen = new Set();
+let lastSide = null;
 let sideActive = 0;
 const EASE = 'cubic-bezier(.23,1,.32,1)';
 const calmSide = matchMedia('(prefers-reduced-motion: reduce)');
@@ -197,7 +200,18 @@ function rowItem(t, g, all, trail) {
       x.className = 'x';
       x.textContent = '×';
       x.addEventListener('click', (e) => { e.stopPropagation(); markPointer(); lore.send('tab:close', el._t.id); });
-      el.append(label, x);
+      // Outline toggle: only on a tab whose page has one, shown on the tab in use or under the pointer.
+      const tg = document.createElement('button');
+      tg.type = 'button';
+      tg.className = 'tg';
+      tg.innerHTML = CHEV;
+      tg.addEventListener('click', (e) => {
+        e.stopPropagation(); markPointer();
+        const id = el._t.id;
+        if (tocOpen.has(id)) tocOpen.delete(id); else tocOpen.add(id);
+        if (lastSide) renderSide(lastSide);
+      });
+      el.append(label, tg, x);
       tabPress(el);
       tabDrag(el, all);
       return el;
@@ -212,9 +226,47 @@ function rowItem(t, g, all, trail) {
       el.classList.toggle('is-private', !!t.private);
       const label = el.querySelector('.ttl');
       if (label.textContent !== t.title) label.textContent = t.title;
+      const tg = el.querySelector('.tg');
+      const open = tocOpen.has(t.id) && !!t.active;
+      tg.hidden = !(t.toc >= 3);
+      tg.classList.toggle('open', open);
+      tg.setAttribute('aria-expanded', String(open));
+      tg.setAttribute('aria-label', T(open ? 'toc.hide' : 'toc.show'));
       const x = el.querySelector('.x');
       x.setAttribute('aria-label', T('tab.close'));
       setFav(el, t);
+    }
+  };
+}
+
+// One heading of the open outline. Rows are keyed by position, so when the page adds sections only the text changes.
+function outlineItem(t, o, i, base, lv, enter) {
+  return {
+    key: 'o' + t.id + ':' + i,
+    enter,
+    make() {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'srow oi';
+      const dot = document.createElement('span');
+      dot.className = 'sk';
+      dot.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'ttl';
+      el.append(label, dot);
+      const go = (e) => { e.preventDefault(); markPointer(); lore.send(e.metaKey || e.ctrlKey || e.button === 1 ? 'outline:open' : 'outline:go', el._o.tab, el._o.i); };
+      el.addEventListener('click', go);
+      el.addEventListener('auxclick', (e) => { if (e.button === 1) go(e); });
+      return el;
+    },
+    update(el) {
+      el._o = { tab: t.id, i };
+      const label = el.querySelector('.ttl');
+      if (label.textContent !== o.text) label.textContent = o.text;
+      el.style.setProperty('--oi', (lv + 1) * 14 + Math.min(o.level - base, 2) * 10);
+      el.classList.toggle('skim', o.s === 1);
+      if (i === t.outline.cur) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+      el.setAttribute('aria-label', o.s === 1 ? o.text + ' (' + T('toc.skimmed') + ')' : o.text);
     }
   };
 }
@@ -265,6 +317,7 @@ function sideToggleBtn(s) {
 }
 
 function renderSide(s) {
+  lastSide = s;
   // The top row is rebuilt only when what it shows changes, so a button under the pointer keeps its hover and press.
   const topSig = [lang, s.sideOpen, s.tabs.length >= 3, s.profiles && s.profiles.length > 1 && s.profile ? s.profile.id + s.profile.name + s.profile.color : ''].join('|');
   const top = $('#side-top');
@@ -302,6 +355,11 @@ function renderSide(s) {
     // Rows revealed by opening a group come in one after another, so they read as belonging to it.
     if (animate) it.enter = it.enter || !!g;
     items.push(it);
+    // The outline of the tab in use, when its toggle is open: one row per heading, under the tab.
+    if (t.active && t.outline && tocOpen.has(t.id)) {
+      const base = Math.min(...t.outline.items.map((o) => o.level));
+      t.outline.items.forEach((o, i) => items.push(outlineItem(t, o, i, base, trailOf(t).level, !!animate)));
+    }
   }
   const anyEnter = items.some((it) => it.enter && !sideStore.list.has(it.key));
   keyed($('#slist'), sideStore.list, items, animate || (sideDrawn && anyEnter), animate ? droppedKey : '');

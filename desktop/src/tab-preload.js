@@ -84,3 +84,48 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('button, input[type=submit]');
   if (b && b.form && b.type !== 'button' && b.type !== 'reset') reportLogin(b.form);
 }, true);
+
+// The page's outline, for the sidebar (never for the page). Headings only (h1-h3, not in navigation), cut to short text,
+// sent to the browser, which keeps them in memory for as long as the tab shows this page. Nothing here reads the body text.
+// Private tabs and pages that are not on the web report nothing. The browser can also ask this page to scroll to a heading.
+if (!process.argv.includes('--lore-private=1')) {
+  const SKIP = 'nav, aside, footer, dialog, [role=navigation], [role=banner], [role=complementary], [aria-hidden=true], [hidden]';
+  let heads = [];
+  let lastSent = '';
+  let lastIdx = -2;
+  const scan = () => {
+    if (!/^https?:$/.test(location.protocol)) return;
+    try {
+      heads = [...document.querySelectorAll('h1, h2, h3')].filter((h) => !h.closest(SKIP) && h.getClientRects().length && (h.textContent || '').trim());
+      const items = heads.slice(0, 60).map((h) => ({
+        text: (h.textContent || '').replace(/\[edit\]/gi, '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        level: Number(h.tagName[1]),
+        id: h.id || (h.querySelector('[id]') || {}).id || ''
+      }));
+      heads = heads.slice(0, 60);
+      const sig = JSON.stringify(items);
+      if (sig !== lastSent) { lastSent = sig; ipcRenderer.send('outline:set', items); lastIdx = -2; }
+      report();
+    } catch { /* a page we cannot read */ }
+  };
+  // The heading at the reading line: the last one whose top is above 30% of the window height.
+  const report = () => {
+    if (!heads.length) return;
+    const line = innerHeight * 0.3;
+    let idx = -1;
+    for (let i = 0; i < heads.length; i++) { if (heads[i].getBoundingClientRect().top <= line) idx = i; else break; }
+    if (idx !== lastIdx) { lastIdx = idx; ipcRenderer.send('outline:at', idx); }
+  };
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    setTimeout(() => { ticking = false; report(); }, 120);
+  }, { passive: true, capture: true });
+  document.addEventListener('DOMContentLoaded', scan);
+  window.addEventListener('load', () => { scan(); setTimeout(scan, 1500); setTimeout(scan, 6000); });
+  ipcRenderer.on('outline:go', (_e, i) => {
+    const h = Number.isInteger(i) && heads[i];
+    if (h && h.isConnected) h.scrollIntoView({ block: 'start' });
+  });
+}

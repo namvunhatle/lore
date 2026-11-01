@@ -20,6 +20,7 @@ const { createLlm, listLocalModels, pullLocalModel, isLocalHost } = require('./l
 const { Settings } = require('./settings');
 const writing = require('./writing');
 const tabstate = require('./tabstate');
+const { Outline, sanitize: sanitizeOutline } = require('./outline');
 const { Bookmarks } = require('./bookmarks');
 const { ProfileList, dirFor, partitionFor } = require('./profiles');
 const importer = require('./importer');
@@ -300,7 +301,7 @@ function pushState() {
     lang: L(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
-      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, parent: x.parent || 0, depth: tabstate.depth(tabs, x.id), split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
+      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, parent: x.parent || 0, depth: tabstate.depth(tabs, x.id), toc: x.items ? x.items.length : 0, outline: x.id === activeId ? outlineView(x) : null, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
     })),
     profile: profiles ? { id: profiles.active, name: profiles.current.name, color: profiles.current.color } : null,
     profiles: profiles && profiles.items.length > 1 ? profiles.items.map((p) => ({ id: p.id, name: p.name, color: p.color })) : [],
@@ -476,7 +477,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   const view = new WebContentsView({
     webPreferences: {
       sandbox: true, contextIsolation: true, preload: TAB_PRELOAD, minimumFontSize: settings.get().minFont || 0,
-      additionalArguments: settings.get().privacy.reduceFingerprint ? ['--lore-fp=1'] : [],
+      additionalArguments: [...(settings.get().privacy.reduceFingerprint ? ['--lore-fp=1'] : []), ...(priv ? ['--lore-private=1'] : [])],
       ...(priv ? { partition: 'private-' + id } : partitionFor(profiles.active) ? { partition: partitionFor(profiles.active) } : {})
     }
   });
@@ -571,7 +572,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   wc.on('leave-html-full-screen', () => { tab.fs = false; if (tab.fsWindow) win.setFullScreen(false); tab.fsWindow = false; layout(); });
   // A page that crashed shows a page that says so, instead of a white tab.
   wc.on('render-process-gone', (_e, d) => { if (!tabs.includes(tab) || !win || win.isDestroyed() || wc.isDestroyed() || d.reason === 'clean-exit' || d.reason === 'killed' && tab.closing) return; tab.fs = false; tab.crashedUrl = tab.url; tab.isHome = true; wc.loadFile(NETERR, { query: { lang: L(), url: tab.crashedUrl, code: 'crash', search: searchUrl('%q').replace('%25q', '%s') } }); layout(); });
-  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); pushState(); });
+  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; resetOutline(tab); tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
     const url = wc.getURL();
@@ -708,13 +709,30 @@ function selectTab(id) {
   pushState();
 }
 
+// ---- Page outline (sidebar table of contents) ------------------------------------------------------------------------
+// The page reports its headings and which one is at the reading line; this keeps them in memory, per tab, for as long as
+// the tab shows that page. Never saved, never sent anywhere. Private tabs never report.
+function resetOutline(tab) { clearTimeout(tab.olTimer); tab.items = []; tab.ol = null; }
+function outlineOf(e) { const t = tabs.find((x) => x.view.webContents === e.sender); return t && !t.private && /^https?:/.test(t.url) ? t : null; }
+// What the sidebar draws for the tab in use: each heading with how far it was read (0 not seen, 1 skimmed, 2 read).
+function outlineView(tab) {
+  if (!tab.ol || tab.items.length < 3) return null;
+  const v = tab.ol.view(Date.now());
+  return { cur: v.cur, items: tab.items.map((it, i) => ({ text: it.text, level: it.level, s: v.status[i] })) };
+}
+function armOutline(tab) {
+  clearTimeout(tab.olTimer);
+  const ms = tab.ol && tab.ol.nextCheck(Date.now());
+  if (ms) tab.olTimer = setTimeout(() => { if (tabs.includes(tab)) pushState(); }, ms + 20);
+}
+
 function closeTab(id) {
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
   tabstate.release(tabs, id); // its children move up a level
   const [t] = tabs.splice(i, 1);
   for (const c of t.popups || []) { try { c.close(); } catch { /* gone */ } }
-  clearTimeout(t.ephemeral); clearTimeout(t.ephemeralWarn);
+  clearTimeout(t.ephemeral); clearTimeout(t.ephemeralWarn); clearTimeout(t.olTimer);
   closedTabs.push({ url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private });
   // Closing one half of a split leaves the other one on its own.
   const partner = split && (split.a === id || split.b === id) ? (split.a === id ? split.b : split.a) : null;
@@ -2328,6 +2346,37 @@ function wireIpc() {
   ipcMain.handle('intent:classify', (e, text) => (e.sender === win.webContents && typeof text === 'string' ? classify(text.slice(0, 300)).kind : ''));
   ipcMain.on('tab:new', () => openTab());
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
+  // Outline: the page reports its headings and the one at the reading line; the sidebar asks to go to one or open it.
+  ipcMain.on('outline:set', (e, raw) => {
+    const t = outlineOf(e);
+    if (!t) return;
+    const items = sanitizeOutline(raw);
+    if (!t.ol) t.ol = new Outline();
+    t.items = items;
+    t.ol.setTexts(items.map((i) => i.text));
+    armOutline(t);
+    pushState();
+  });
+  ipcMain.on('outline:at', (e, idx) => {
+    const t = outlineOf(e);
+    if (!t || !t.ol) return;
+    const before = t.ol.cur;
+    t.ol.at(idx, Date.now());
+    armOutline(t);
+    if (t.ol.cur !== before) pushState();
+  });
+  ipcMain.on('outline:go', (e, id, i) => {
+    const t = fromSidebar(e) && tabById(Number(id));
+    if (t && !t.private && Number.isInteger(i) && i >= 0 && i < (t.items || []).length) t.view.webContents.send('outline:go', i);
+  });
+  // Cmd-click on a heading: that part of the page as a child tab (needs the heading to have an address of its own).
+  ipcMain.on('outline:open', (e, id, i) => {
+    const t = fromSidebar(e) && tabById(Number(id));
+    if (!t || t.private || !Number.isInteger(i) || !t.items || !t.items[i]) return;
+    const it = t.items[i];
+    if (!it.id) return t.view.webContents.send('outline:go', i);
+    try { const u = new URL(t.url); u.hash = it.id; if (isAllowedNavigation(u.href)) openTab({ url: u.href }, { parent: t.id }); } catch { /* not an address */ }
+  });
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
   ipcMain.on('update:check', (e) => { if (e.sender === win.webContents) checkForUpdates(true); });
   ipcMain.on('update:open', (e) => { if (e.sender === win.webContents) handleUpdateAction(); });

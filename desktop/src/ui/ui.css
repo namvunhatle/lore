@@ -194,6 +194,17 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 .srow .x:active{transform:scale(.95)}
 .srow.in-g{--gi:12px}
 .srow.in-g,.srow.kid{margin-left:calc(var(--gi,0px) + var(--lv,0)*14px);width:calc(100% - var(--gi,0px) - var(--lv,0)*14px)}
+.srow .tg{width:22px;height:22px;border-radius:6px;flex:none;display:none;place-items:center;color:var(--muted);transition:transform 160ms cubic-bezier(.77,0,.175,1)}
+.srow[aria-selected="true"] .tg:not([hidden]){display:grid}
+.srow .tg.open{transform:rotate(180deg)}
+.srow .tg:active{transform:scale(.95)}
+.srow .tg.open:active{transform:rotate(180deg) scale(.95)}
+/* Outline rows: one per heading under the tab in use, a little smaller than tabs. A dot marks sections that were skimmed. */
+.srow.oi{height:28px;margin-left:calc(var(--oi,14)*1px);width:calc(100% - var(--oi,14)*1px);padding:0 8px 0 6px;font-weight:400;color:color-mix(in srgb,var(--ink) 72%,var(--muted));gap:6px}
+.srow.oi[aria-current="true"]{color:var(--ink);font-weight:500;background:color-mix(in srgb,var(--win) 70%,transparent)}
+.srow.oi .sk{width:6px;height:6px;border-radius:50%;flex:none;background:var(--accent);opacity:0}
+.srow.oi.skim .sk{opacity:1}
+@media (prefers-reduced-motion:reduce){.srow .tg{transition:none}}
 .srow.in-split::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:1px;background:var(--accent)}
 .snew{margin-top:4px;color:var(--muted);font-weight:400}
 .snew .fav{color:var(--muted);font-size:17px;font-weight:300}
@@ -203,6 +214,8 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
   .srow:not([aria-selected="true"]):hover,.pin:not([aria-selected="true"]):hover{background:color-mix(in srgb,var(--win) 70%,transparent)}
   .srow .x{opacity:0}
   .srow:hover .x,.srow[aria-selected="true"] .x{opacity:1}
+  .srow:hover .tg:not([hidden]){display:grid}
+  .srow .tg:hover{background:var(--hover);color:var(--ink)}
   .srow .x:hover{background:var(--hover);color:var(--ink)}
   .snew:hover{color:var(--ink)}
 }
