@@ -340,7 +340,18 @@ function resultView(task, r, values) {
     box.append(h('label', { class: 'f' }, h('span', null, T('res.text')), text), h('div', { class: 'acts' }, h('button', { class: 'btn acc', type: 'button', onclick: () => copy(text.value) }, T('act.copy')), saveBtn));
   }
   if (r.remote) box.append(h('p', { class: 'note' }, T('task.sentTo', { host: r.remote })));
+  if (r.truncated) box.append(h('p', { class: 'note warn' }, T('task.truncated')));
+  // The result is shown in full: the boxes grow with the text instead of hiding the rest behind a scroll bar.
+  const grow = () => box.querySelectorAll('textarea.big').forEach(fit);
+  box.querySelectorAll('textarea.big').forEach((t) => t.addEventListener('input', () => fit(t)));
+  requestAnimationFrame(() => requestAnimationFrame(grow));
+  window.addEventListener('resize', grow);
   return box;
+}
+
+function fit(t) {
+  t.style.height = 'auto';
+  t.style.height = Math.max(t.scrollHeight + 2, 180) + 'px';
 }
 
 // ---- Editor ----------------------------------------------------------------------------------------------------

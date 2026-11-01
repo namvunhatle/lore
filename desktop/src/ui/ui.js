@@ -40,7 +40,30 @@ function icon(t) {
   return wrap;
 }
 
-function groupChip(g) {
+// While a group name is being typed, the strip is not redrawn (it would throw the text box away); the latest state waits.
+let editingGroup = false;
+let waiting = null;
+
+// Where on a tab a drag lands: the outer thirds reorder, the middle one makes a group with that tab.
+function zone(e, r, t) {
+  const f = (e.clientX - r.left) / r.width;
+  if (t.pinned) return f < 0.5 ? 'l' : 'r';
+  return f < 0.3 ? 'l' : f > 0.7 ? 'r' : 'mid';
+}
+
+// A small + at the end of a group opens a new tab inside it.
+function groupPlus(g) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'gplus g-' + g.color;
+  b.textContent = '+';
+  b.setAttribute('aria-label', T('group.newTab', { name: g.name }));
+  b.dataset.tip = T('group.newTab', { name: g.name });
+  b.addEventListener('click', () => lore.send('group:newTab', g.id));
+  return b;
+}
+
+function groupChip(g, edit) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'grp g-' + g.color + (g.collapsed ? ' collapsed' : '');
@@ -48,24 +71,43 @@ function groupChip(g) {
   const dot = document.createElement('i');
   const label = document.createElement('span');
   label.textContent = g.name || T('group.unnamed');
-  b.append(dot, label);
+  const chev = document.createElement('em');
+  chev.textContent = g.collapsed ? '▸' : '▾';
+  chev.setAttribute('aria-hidden', 'true');
+  b.append(dot, label, chev);
   b.dataset.tip = T(g.collapsed ? 'group.expandTip' : 'group.collapseTip');
   b.addEventListener('click', () => lore.send('group:toggle', g.id));
   b.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('group:menu', g.id); });
-  // Double-click renames in place.
-  b.addEventListener('dblclick', (e) => {
-    e.preventDefault();
-    const input = document.createElement('input');
-    input.className = 'grp-edit'; input.value = g.name; input.maxLength = 30; input.setAttribute('aria-label', T('org.groupName'));
-    const finish = (save) => { if (save && input.value.trim()) lore.send('group:rename', g.id, input.value); else lore.send('group:toggle', 0); };
-    input.addEventListener('keydown', (k) => { if (k.key === 'Enter') finish(true); else if (k.key === 'Escape') finish(false); });
-    input.addEventListener('blur', () => finish(true));
-    b.replaceWith(input); input.focus(); input.select();
-  });
+  b.addEventListener('dblclick', (e) => { e.preventDefault(); startEdit(b, g); });
+  // Drop a tab on the group's name to add it.
+  b.addEventListener('dragover', (e) => { e.preventDefault(); b.classList.add('over'); });
+  b.addEventListener('dragleave', () => b.classList.remove('over'));
+  b.addEventListener('drop', (e) => { e.preventDefault(); b.classList.remove('over'); const id = Number(e.dataTransfer.getData('text/plain')); if (id) lore.send('tab:addToGroup', id, g.id); });
+  if (edit) setTimeout(() => startEdit(b, g), 0);
   return b;
 }
 
+function startEdit(b, g) {
+  if (!b.isConnected) return;
+  const input = document.createElement('input');
+  input.className = 'grp-edit g-' + g.color; input.value = g.name; input.maxLength = 30; input.setAttribute('aria-label', T('org.groupName')); input.placeholder = T('group.namePh');
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    editingGroup = false;
+    if (save && input.value.trim()) lore.send('group:rename', g.id, input.value); else lore.send('group:toggle', 0);
+    if (waiting) { const w = waiting; waiting = null; render(w); }
+  };
+  input.addEventListener('keydown', (k) => { if (k.key === 'Enter') finish(true); else if (k.key === 'Escape') finish(false); });
+  input.addEventListener('blur', () => finish(true));
+  editingGroup = true;
+  b.replaceWith(input);
+  input.focus(); input.select();
+}
+
 function render(s) {
+  if (editingGroup) { waiting = s; return; }
   if (s.lang !== lang) { lang = s.lang; LORE_I18N.apply(lang); tips(); resetPh(); }
   const active = s.tabs.find((t) => t.active);
   document.documentElement.toggleAttribute('data-private', !!(active && active.private));
@@ -76,7 +118,8 @@ function render(s) {
   let lastGroup = 0;
   for (const t of s.tabs) {
     const g = t.group ? gmap.get(t.group) : null;
-    if (g && g.id !== lastGroup) tabs.append(groupChip(g));
+    if (lastGroup && (!g || g.id !== lastGroup) && gmap.get(lastGroup)) tabs.append(groupPlus(gmap.get(lastGroup)));
+    if (g && g.id !== lastGroup) tabs.append(groupChip(g, s.editGroup === g.id));
     lastGroup = g ? g.id : 0;
     // A collapsed group shows only its header, unless the tab being used is inside it.
     if (g && g.collapsed && !t.active) continue;
@@ -93,24 +136,26 @@ function render(s) {
     // Drag to reorder: dropping on the left half of a tab puts the dragged tab before it, on the right half after it.
     el.draggable = true;
     el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(t.id)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
-    el.addEventListener('dragend', () => { el.classList.remove('dragging'); for (const x of tabs.children) x.classList.remove('over-l', 'over-r'); });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); for (const x of tabs.children) x.classList.remove('over-l', 'over-r', 'over-mid'); });
     el.addEventListener('dragover', (e) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const left = e.clientX < r.left + r.width / 2;
-      el.classList.toggle('over-l', left);
-      el.classList.toggle('over-r', !left);
+      const z = zone(e, r, t);
+      el.classList.toggle('over-l', z === 'l');
+      el.classList.toggle('over-r', z === 'r');
+      el.classList.toggle('over-mid', z === 'mid');
     });
-    el.addEventListener('dragleave', () => el.classList.remove('over-l', 'over-r'));
+    el.addEventListener('dragleave', () => el.classList.remove('over-l', 'over-r', 'over-mid'));
     el.addEventListener('drop', (e) => {
       e.preventDefault();
       const id = Number(e.dataTransfer.getData('text/plain'));
-      const r = el.getBoundingClientRect();
-      const left = e.clientX < r.left + r.width / 2;
+      const z = zone(e, el.getBoundingClientRect(), t);
       const i = s.tabs.findIndex((x) => x.id === t.id);
-      const before = left ? t.id : (s.tabs[i + 1] ? s.tabs[i + 1].id : null);
-      el.classList.remove('over-l', 'over-r');
-      if (id && id !== before) lore.send('tab:move', id, before);
+      const before = z === 'l' ? t.id : (s.tabs[i + 1] ? s.tabs[i + 1].id : null);
+      el.classList.remove('over-l', 'over-r', 'over-mid');
+      if (!id || id === t.id) return;
+      if (z === 'mid') lore.send('tab:groupWith', id, t.id);
+      else if (id !== before) lore.send('tab:move', id, before);
     });
     el.append(icon(t));
     const label = document.createElement('span');
@@ -124,6 +169,7 @@ function render(s) {
     el.append(label, x);
     tabs.append(el);
   }
+  if (lastGroup && gmap.get(lastGroup)) tabs.append(groupPlus(gmap.get(lastGroup)));
   const org = document.createElement('button');
   org.className = 'plus org';
   org.hidden = s.tabs.length < 3;

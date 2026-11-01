@@ -20,7 +20,12 @@ async function httpError(r) {
   return e;
 }
 const TEMP = 0.2;
-const MAX_TOKENS = 320;
+// Generous on purpose: a Vietnamese answer takes about twice the tokens of the same English one, and a cut-off sentence
+// is worse than a long one. Callers that want less ask for less.
+const MAX_TOKENS = 1200;
+// Ollama reads only the first 2048 to 4096 tokens of a prompt unless told otherwise, and drops the rest without a word.
+// A page of Vietnamese is easily more than that, so ask for room.
+const NUM_CTX = 8192;
 
 function ollama({ url, model }, f) {
   const base = trimSlash(url);
@@ -37,11 +42,12 @@ function ollama({ url, model }, f) {
     async chat(messages, { timeoutMs = 30000, maxTokens = MAX_TOKENS, temperature = TEMP } = {}) {
       const r = await f(base + '/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model, messages, stream: false, options: { temperature, num_predict: maxTokens } }),
+        body: JSON.stringify({ model, messages, stream: false, options: { temperature, num_predict: maxTokens, num_ctx: NUM_CTX } }),
         signal: AbortSignal.timeout(timeoutMs)
       });
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
+      this.truncated = j.done_reason === 'length';
       return String((j.message && j.message.content) || '').trim();
     }
   };
@@ -62,6 +68,7 @@ function openai({ baseUrl, model, key }, f) {
       });
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
+      this.truncated = !!(j.choices && j.choices[0] && j.choices[0].finish_reason === 'length');
       return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
     }
   };
@@ -81,6 +88,7 @@ function anthropic({ model, key }, f) {
       });
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
+      this.truncated = j.stop_reason === 'max_tokens';
       return String((j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('')).trim();
     }
   };

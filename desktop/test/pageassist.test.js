@@ -40,3 +40,29 @@ test('translation batching and parsing', async () => {
   const out = await translateBatch({ blocks: [{ i: 1, text: 'Hello' }, { i: 2, text: 'Bye' }], llm: llm('1|Xin chào\n2|Tạm biệt'), target: 'vi' });
   assert.deepStrictEqual(out, { 1: 'Xin chào', 2: 'Tạm biệt' });
 });
+
+test('a long page is read from its start, middle and end', () => {
+  const { samplePage } = require('../src/pageassist');
+  const t = 'A'.repeat(5000) + 'M'.repeat(5000) + 'Z'.repeat(5000);
+  const s = samplePage(t, 9000);
+  assert.ok(s.length <= 9100);
+  assert.ok(s.includes('A') && s.includes('M') && s.includes('Z'));
+  assert.strictEqual(samplePage('short', 9000), 'short');
+});
+
+test('an answer that ran out of room is cut at the last whole sentence', () => {
+  const { cutAtSentence } = require('../src/pageassist');
+  const cut = 'Xe điện đi được 400 km. Một số mẫu đi được hơn 600 km. Tuy nhiên điều này còn phụ thuộc vào thời tiết và khi trời';
+  assert.strictEqual(cutAtSentence(cut, true), 'Xe điện đi được 400 km. Một số mẫu đi được hơn 600 km.');
+  assert.strictEqual(cutAtSentence(cut, false), cut);
+  assert.strictEqual(cutAtSentence('Done.', true), 'Done.');
+});
+
+test('a summary drops a last bullet that was cut off, but only when the model ran out of room', async () => {
+  const mk = (truncated) => ({ available: async () => true, truncated, chat: async () => '- Điểm thứ nhất của bài viết.\n- Điểm thứ hai của bài viết.\n- Điểm thứ ba bị cắt giữa chừng và' });
+  const text = 'Câu một của bài viết. '.repeat(40);
+  const a = await require('../src/pageassist').summarize({ text, llm: mk(true), lang: 'vi' });
+  assert.strictEqual(a.bullets.length, 2);
+  const b = await require('../src/pageassist').summarize({ text, llm: mk(false), lang: 'vi' });
+  assert.strictEqual(b.bullets.length, 3);
+});

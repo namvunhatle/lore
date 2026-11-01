@@ -101,31 +101,61 @@ const MORE = { id: 'tasks', label: () => T('pg.alltasks'), run: () => agent.page
 const msgs = new Map(); // seq -> { root, card, body }
 let lastSeq = 0;
 
+const DESC = {
+  summarize: () => T('pg.summarize.d'), translate: () => T('pg.translate.d'), reader: () => T('pg.reader.d'),
+  facts: () => T('task.facts.d'), explain: () => T('task.explain.d'), decide: () => T('task.decide.d'),
+  'event-page': () => T('task.event-page.d'), 'share-email': () => T('task.share-email.d')
+};
+
 function fillActions() {
   const grid = $('#grid');
   const rail = $('#rail');
   grid.replaceChildren();
   rail.replaceChildren();
-  for (const a of [...ACTIONS, MORE]) {
+  // Summarize is the one most people want first, so it gets the big button.
+  const lead = $('#leadact');
+  const first = ACTIONS[0];
+  lead.replaceChildren();
+  lead.innerHTML = P(ICONS[first.id]); // fixed strings above
+  const lt = el('span', 'lt'); lt.append(el('b', '', first.label()));
+  const go = el('span', 'go'); go.innerHTML = P('<path d="M5 12h14M13 6l6 6-6 6"/>');
+  lead.append(lt, go);
+  lead.onclick = first.run;
+  let n = 0;
+  for (const a of [...ACTIONS.slice(1, 5), MORE]) {
     const b = el('button', a === MORE ? 'act wide' : 'act');
     b.type = 'button';
+    b.style.setProperty('--i', String(n++));
     b.innerHTML = P(ICONS[a.id]); // fixed strings above
-    b.append(document.createTextNode(a.label()));
+    const t = el('span', 'at'); t.append(el('b', '', a.label()));
+    b.append(t);
     b.addEventListener('click', a.run);
     grid.append(b);
+  }
+  for (const a of ACTIONS) {
     const c = el('button', 'chip', a.label());
     c.type = 'button';
     c.addEventListener('click', a.run);
     rail.append(c);
   }
-  const sugs = $('#sugs');
-  sugs.replaceChildren();
-  for (const k of ['pg.sug.1', 'pg.sug.2', 'pg.sug.3']) {
-    const b = el('button', 'chip', T(k));
-    b.type = 'button';
-    b.addEventListener('click', () => agent.pageDo('ask', T(k)));
-    sugs.append(b);
-  }
+  const c = el('button', 'chip', MORE.label());
+  c.type = 'button';
+  c.addEventListener('click', MORE.run);
+  rail.append(c);
+}
+
+// The opening state: which page this is, and what stays private.
+function fillHero(s) {
+  const p = s.page || {};
+  const host = p.host || '';
+  $('#pf').textContent = (host || '?').charAt(0).toUpperCase();
+  $('#pt').textContent = p.title || host;
+  $('#ph').textContent = host;
+  $('#pagechip').hidden = true;
+  $('#herotitle').textContent = T('pg.hero.h');
+  const trust = $('#trust');
+  trust.className = 'trust ' + (!s.modelReady ? 'none' : s.remote ? 'remote' : 'local');
+  trust.textContent = !s.modelReady ? T('pg.hero.none') : s.remote ? T('pg.hero.remote', { host: s.remote }) : T('pg.hero.local', { model: s.model });
 }
 
 function setMode(page) {
@@ -216,8 +246,14 @@ function body(s) {
     if (!s.found) b.append(el('p', '', T('pg.nofind')));
     else {
       if (s.answer) { b.append(el('p', '', s.answer)); copy = s.answer; }
-      const q = el('blockquote', '', s.passages[0]);
+      const q = el('blockquote', s.passages[0].length > 280 ? 'fold' : '', s.passages[0]);
       b.append(el('p', 'fine', T('pg.fromPage')), q);
+      if (q.classList.contains('fold')) {
+        const more = el('button', 'more', T('pg.more'));
+        more.type = 'button';
+        more.addEventListener('click', () => { const f = q.classList.toggle('fold'); more.textContent = T(f ? 'pg.more' : 'pg.less'); });
+        b.append(more);
+      }
       const show = el('button', 'small', T('pg.showInPage'));
       show.type = 'button';
       show.addEventListener('click', () => agent.pageShow(s.passages[0].slice(0, 80)));
@@ -250,6 +286,7 @@ function body(s) {
 function renderPage(s) {
   if (s.reset) reset();
   setTitle(T('pg.title'), s.page ? s.page.host : '');
+  if (s.state === 'idle') fillHero(s);
   if (s.state !== 'idle') {
     const m = msgFor(s);
     const { b, copy } = body(s);

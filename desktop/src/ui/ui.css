@@ -104,3 +104,10 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .tab.grouped{box-shadow:inset 0 -2px 0 var(--g)}
 .plus.org{color:var(--accent)}
 .plus.org[hidden]{display:none}
+
+.grp em{font-style:normal;font-size:10px;opacity:.7;margin-left:1px}
+.grp:hover{filter:brightness(1.12)}
+.grp.over,.tab.over-mid{outline:2px solid var(--accent);outline-offset:-2px}
+.gplus{-webkit-app-region:no-drag;flex:none;width:20px;height:20px;border-radius:50%;color:var(--g);font-size:15px;line-height:1;opacity:.7}
+.gplus:hover{opacity:1;background:color-mix(in srgb,var(--g) 20%,transparent)}
+.grp-edit{border-color:var(--g)}

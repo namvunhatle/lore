@@ -17,10 +17,13 @@
 
   <main id="feed">
     <section id="home" hidden>
-      <h4 data-i18n="pg.home.h"></h4>
+      <div class="hero">
+        <div class="pagechip" id="pagechip"><span class="pf" id="pf"></span><span class="pt"><b id="pt"></b><small id="ph"></small></span></div>
+        <h4 id="herotitle"></h4>
+        <p class="trust" id="trust"></p>
+      </div>
+      <button class="lead-act" id="leadact" type="button"></button>
       <div class="grid" id="grid"></div>
-      <p class="k" data-i18n="pg.try"></p>
-      <div class="sugs" id="sugs"></div>
     </section>
     <div id="thread" aria-live="polite"></div>
     <ol class="steps" id="steps"></ol>

@@ -98,8 +98,50 @@ blockquote{margin:10px 0 0;padding:2px 0 2px 12px;border-left:3px solid var(--ac
 .sz{color:var(--muted)}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.msg,.act{animation:none;transition:none}.act:hover{transform:none}.dots i,.st.running .mark{animation:none}#feed{scroll-behavior:auto}}
-blockquote{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+blockquote.fold{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.more{display:block;margin-top:4px;color:var(--accent);font-size:12.5px;font-weight:500}
+.more:hover{text-decoration:underline}
 
 .warnbox{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13px}
 .warnbox p{margin:6px 0 0}
 .warnbox blockquote{margin:8px 0 0;padding-left:10px;border-left:2px solid currentColor;font-size:12.5px;opacity:.85;word-break:break-word}
+
+/* ---- Opening state: plain, one accent, hairlines instead of cards ---------------------------------------------------- */
+.hero{margin:0 0 18px}
+.pagechip{display:flex;align-items:center;gap:10px;margin:0 0 14px;min-width:0}
+.pagechip .pf{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--hover);color:var(--muted);font:600 12px var(--f)}
+.pagechip .pt{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.pagechip b{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pagechip small{color:var(--muted);font-size:12px}
+#herotitle{margin:0 0 8px;font-size:20px;line-height:1.25;font-weight:500;letter-spacing:-.01em;text-wrap:balance;color:var(--ink)}
+.trust{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+.trust::before{content:"";flex:none;width:7px;height:7px;margin-top:6px;border-radius:50%;background:var(--muted)}
+.trust.local::before{background:#2fa36b}
+.trust.remote::before{background:var(--warn)}
+
+.lead-act{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 16px;margin:0 0 6px;border-radius:12px;text-align:left;color:var(--accent-ink);background:var(--accent);transition:opacity .15s}
+.lead-act:hover{opacity:.92}
+.lead-act>svg{flex:none;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lead-act .lt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.lead-act b{font-size:14px;font-weight:600}
+.lead-act small{font-size:12px;opacity:.8}
+.lead-act .go{display:none}
+
+.grid{display:flex;flex-direction:column;gap:0;margin:0 0 22px}
+.act{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 4px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;text-align:left;transition:background .15s}
+.act:hover{background:var(--hover);transform:none;border-color:var(--line)}
+.act svg{flex:none;width:20px;height:20px;padding:0;border-radius:0;background:none;fill:none;stroke:var(--muted);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.act:hover svg{stroke:var(--accent)}
+.act .at{display:flex;flex-direction:column;gap:1px;min-width:0}
+.act .at b{font-weight:500;font-size:13.5px}
+.act .at small{color:var(--muted);font-size:12px;line-height:1.35;font-weight:400;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.act.wide{justify-content:flex-start;min-height:44px;color:var(--muted);border-bottom:0}
+.act.wide .at b{font-weight:400}
+.k{margin:0 0 6px}
+.askform:focus-within{box-shadow:none}
+
+/* Less to read: the heading is one short line and the rows are just names. */
+.hero{margin:0 0 16px}
+#herotitle{font-size:22px;margin:0 0 6px}
+.lead-act{min-height:48px}
+.act{min-height:46px}

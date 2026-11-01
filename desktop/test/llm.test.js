@@ -94,3 +94,22 @@ test('remote model answers say where the question went', async () => {
   assert.match(r.meta, /sent to api\.example\.com/);
   assert.strictEqual(r.provider, 'api.example.com');
 });
+
+test('providers report when the answer stopped because it ran out of room', async () => {
+  const { createLlm } = require('../src/llm');
+  const reply = (body) => async () => ({ ok: true, json: async () => body });
+  const o = createLlm({ provider: 'local', local: { url: 'http://127.0.0.1:1', model: 'm' } }, { fetchImpl: reply({ message: { content: 'x' }, done_reason: 'length' }) });
+  await o.chat([{ role: 'user', content: 'hi' }]);
+  assert.strictEqual(o.truncated, true);
+  const a = createLlm({ provider: 'anthropic', anthropic: { model: 'm', key: 'k' } }, { fetchImpl: reply({ content: [{ type: 'text', text: 'x' }], stop_reason: 'end_turn' }) });
+  await a.chat([{ role: 'user', content: 'hi' }]);
+  assert.strictEqual(a.truncated, false);
+});
+
+test('Ollama is asked for a context window big enough for a whole page', async () => {
+  const { createLlm } = require('../src/llm');
+  let body;
+  const f = async (_u, o) => { body = JSON.parse(o.body); return { ok: true, json: async () => ({ message: { content: 'x' } }) }; };
+  await createLlm({ provider: 'local', local: { url: 'http://127.0.0.1:1', model: 'm' } }, { fetchImpl: f }).chat([{ role: 'user', content: 'hi' }]);
+  assert.ok(body.options.num_ctx >= 8192);
+});

@@ -70,6 +70,7 @@ const groups = new Map();  // tab groups: id -> { id, name, color, collapsed }
 let nextGroup = 1;
 const GROUP_COLORS = ['blue', 'green', 'amber', 'red', 'purple', 'grey'];
 let organizeWin = null;
+let pendingEdit = 0;       // the group whose name the strip should start editing
 let lastOrganize = null;   // what to put back if the person presses Undo
 let bookmarks = null;      // saved pages (BRW-02)
 let bookmarksWin = null;
@@ -146,6 +147,7 @@ function pushState() {
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0
     })),
+    editGroup: (() => { const e = pendingEdit; pendingEdit = 0; return e; })(),
     groups: [...groups.values()].filter((g) => tabs.some((x) => x.group === g.id)).map((g) => ({ id: g.id, name: g.name, color: g.color, collapsed: g.collapsed })),
     security: securityOf(t),
     starred: !!(t && bookmarks && !t.isHome && bookmarks.find(t.url)),
@@ -371,8 +373,9 @@ function pinTab(id) { const t = tabs.find((x) => x.id === id); if (t) setOrder(t
 function switchTab(next) { if (next) selectTab(next.id); }
 
 // ---- Tab groups ---------------------------------------------------------------------------------------------------------
-function newGroup(name, ids) {
+function newGroup(name, ids, { edit = false } = {}) {
   const id = nextGroup++;
+  if (edit) pendingEdit = id;
   groups.set(id, { id, name: String(name || T('group.default', { n: id })).slice(0, 30), color: GROUP_COLORS[(id - 1) % GROUP_COLORS.length], collapsed: false });
   if (ids && ids.length) setOrder(tabstate.assign(tabs, [{ groupId: id, ids }])); else pushState();
   return id;
@@ -424,7 +427,7 @@ function showTabMenu(id) {
     { label: T('tab.duplicate'), click: () => duplicateTab(id) },
     { label: t.pinned ? T('tab.unpin') : T('tab.pin'), click: () => pinTab(id) },
     ...(t.pinned ? [] : [{ label: T('group.add'), submenu: [
-      { label: T('group.new'), click: () => newGroup('', [id]) },
+      { label: T('group.new'), click: () => newGroup('', [id], { edit: true }) },
       ...[...groups.values()].filter((g) => g.id !== t.group).map((g) => ({ label: g.name || T('group.default', { n: g.id }), click: () => addToGroup(id, g.id) })),
       ...(t.group ? [{ type: 'separator' }, { label: T('group.remove'), click: () => removeFromGroup(id) }] : [])
     ] }]),
@@ -586,13 +589,14 @@ async function pageAssistant(action, question = '') {
 }
 
 // Opens the page tools without running anything, so the options are visible before the user asks for one.
-function openAssist() {
+async function openAssist() {
   const tab = active();
   if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
   const fresh = claimPanel(tab);
-  sendPage({ mode: 'idle', question: '', state: 'idle', reset: fresh, page: pageMeta(tab) });
+  const m = await modelInfo();
+  sendPage({ mode: 'idle', question: '', state: 'idle', reset: fresh, page: pageMeta(tab), modelReady: m.ready, remote: m.remote, model: m.model });
 }
 
 async function translatePage(tab, mine, meta, m, live) {
@@ -864,7 +868,7 @@ function wireTasksIpc() {
     let report = shield.prepare(out.selection).report;
     if (needPage && !out.selection) {
       const r = await within(pageRead(tab), 6000);
-      if (r && r.text != null) { out.page = clip(r.text, 6000); report = r.report; }
+      if (r && r.text != null) { out.page = pageassist.samplePage(r.text, 12000); report = r.report; }
     }
     out.safety = shield.worthWarning(report) ? report : null;
     out.content = out.selection || out.page || '';
@@ -882,16 +886,17 @@ function wireTasksIpc() {
     const m = await modelInfo();
     if (!m.ready) return { error: 'task.noModel' };
     const values = {};
-    for (const [k, v] of Object.entries(req.values || {})) if (/^\w{1,40}$/.test(k)) values[k] = clip(v);
+    for (const [k, v] of Object.entries(req.values || {})) if (/^\w{1,40}$/.test(k)) values[k] = clip(v, k === 'content' || k === 'page' ? 14000 : 6000);
     const lang = ['en', 'vi'].includes(req.lang) ? req.lang : 'auto';
     try {
-      const raw = await llm.chat(taskLib.buildMessages(task, values, { lang, uiLang: L(), now: Date.now() }), { maxTokens: 1200, timeoutMs: 90000, temperature: 0.4 });
-      const result = taskLib.parse(task.kind, raw);
+      const raw = await llm.chat(taskLib.buildMessages(task, values, { lang, uiLang: L(), now: Date.now() }), { maxTokens: task.kind === 'text' ? 2500 : 1500, timeoutMs: 120000, temperature: 0.4 });
+      const truncated = !!llm.truncated;
+      const result = taskLib.parse(task.kind, task.kind === 'text' ? pageassist.cutAtSentence(raw, truncated) : raw);
       const text = result.text || result.body || result.title || '';
       if (!String(text).trim()) return { error: 'task.err.empty' };
       const platform = taskLib.platformOf(task, values);
       if (task.id !== 'quick') taskStore.remember(task.id, values);
-      return { ok: true, result, platform, max: taskLib.PLATFORM[platform].max, remote: m.remote };
+      return { ok: true, result, platform, max: taskLib.PLATFORM[platform].max, remote: m.remote, truncated };
     } catch (err) { return { error: err && err.status === 401 ? 'llm.keyRejected' : 'task.err' }; }
   });
   // The only things Lore does with a draft: copy it, or open it in a new Lore tab (webmail, calendar, a social
@@ -1409,6 +1414,14 @@ function wireIpc() {
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
   ipcMain.on('tab:menu', (e, id) => { if (e.sender === win.webContents) showTabMenu(Number(id)); });
   ipcMain.on('tab:move', (e, id, beforeId) => { if (e.sender === win.webContents) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
+  ipcMain.on('tab:groupWith', (e, dragId, targetId) => {
+    if (e.sender !== win.webContents) return;
+    const a = tabs.find((t) => t.id === Number(dragId)), b = tabs.find((t) => t.id === Number(targetId));
+    if (!a || !b || a === b || a.pinned || b.pinned) return;
+    if (b.group) addToGroup(a.id, b.group); else newGroup('', [b.id, a.id], { edit: true });
+  });
+  ipcMain.on('tab:addToGroup', (e, id, gid) => { if (e.sender === win.webContents && groups.has(Number(gid)) && tabs.some((t) => t.id === Number(id) && !t.pinned)) addToGroup(Number(id), Number(gid)); });
+  ipcMain.on('group:newTab', (e, gid) => { if (e.sender === win.webContents && groups.has(Number(gid))) { const t = openTab(); setOrder(tabstate.assign(tabs, [{ groupId: Number(gid), ids: [t.id] }])); } });
   ipcMain.on('group:toggle', (e, id) => { if (e.sender === win.webContents && Number(id) === 0) return pushState(); if (e.sender === win.webContents && groups.has(Number(id))) { const g = groups.get(Number(id)); g.collapsed = !g.collapsed; pushState(); } });
   ipcMain.on('group:rename', (e, id, name) => { if (e.sender === win.webContents && groups.has(Number(id)) && typeof name === 'string') { groups.get(Number(id)).name = name.trim().slice(0, 30); pushState(); } });
   ipcMain.on('group:menu', (e, id) => { if (e.sender === win.webContents) showGroupMenu(Number(id)); });
@@ -1545,6 +1558,7 @@ function buildMenu() {
       { label: T('menu.newPrivate'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openTab(undefined, { private: true }) },
       { label: T('menu.closeTab'), accelerator: 'CmdOrCtrl+W', click: () => active() && closeTab(activeId) },
       { label: T('tab.reopen'), accelerator: 'CmdOrCtrl+Shift+T', click: reopenClosed },
+      { label: T('group.newFromTab'), accelerator: 'CmdOrCtrl+Shift+G', click: () => { const t = active(); if (t && !t.pinned) newGroup('', [t.id], { edit: true }); } },
       { label: T('tab.next'), accelerator: 'Ctrl+Tab', click: () => switchTab(tabstate.cycle(tabs, activeId, 1)) },
       { label: T('tab.prev'), accelerator: 'Ctrl+Shift+Tab', click: () => switchTab(tabstate.cycle(tabs, activeId, -1)) },
       { label: T('tab.goTo'), submenu: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ label: n === 9 ? T('tab.last') : T('tab.nth', { n }), accelerator: 'CmdOrCtrl+' + n, click: () => switchTab(tabstate.nth(tabs, n)) })) },

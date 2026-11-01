@@ -84,7 +84,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 /* Result */
 .res{margin-top:26px;padding-top:20px;border-top:1px solid var(--line)}
 .res h3{margin:0 0 14px;font-size:14px;font-weight:600;color:var(--muted)}
-.res textarea.big{min-height:180px}
+.res textarea.big{min-height:180px;overflow:hidden;resize:none}
+.note.warn{color:var(--warn)}
 .res .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .note{color:var(--muted);font-size:13px;margin:12px 0 0}
 .count{color:var(--muted);font-size:12.5px;text-align:right;margin-top:4px}
