@@ -300,7 +300,7 @@ function pushState() {
     lang: L(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
-      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
+      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, parent: x.parent || 0, depth: tabstate.depth(tabs, x.id), split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
     })),
     profile: profiles ? { id: profiles.active, name: profiles.current.name, color: profiles.current.color } : null,
     profiles: profiles && profiles.items.length > 1 ? profiles.items.map((p) => ({ id: p.id, name: p.name, color: p.color })) : [],
@@ -328,7 +328,7 @@ function pushState() {
 // ---- Session: reopen the tabs of the last run (BRW-05) ---------------------------------------------------------------
 function writeSession() {
   if (!sessionStore || !sessionReady) return;
-  const snap = tabstate.snapshot(tabs.map((t) => ({ id: t.id, url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private, group: t.group })), activeId, [...groups.values()]);
+  const snap = tabstate.snapshot(tabs.map((t) => ({ id: t.id, url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private, group: t.group, parent: t.parent })), activeId, [...groups.values()]);
   const json = JSON.stringify(snap);
   if (json === lastSession) return;
   lastSession = json;
@@ -344,6 +344,7 @@ function startTabs() {
     groups.clear();
     for (const g of saved.groups || []) { groups.set(g.id, { ...g, color: GROUP_COLORS.includes(g.color) ? g.color : GROUP_COLORS[0] }); nextGroup = Math.max(nextGroup, g.id + 1); }
     const made = saved.tabs.map((s) => openTab({ url: s.url }, { lazy: true, pinned: s.pinned, title: s.title, group: s.group }));
+    made.forEach((t, n) => { const p = saved.tabs[n].parent; if (p >= 0 && made[p]) t.parent = made[p].id; });
     selectTab(made[saved.active].id);
   } else openTab();
   sessionReady = true;
@@ -445,7 +446,8 @@ function popupHandler(tab, priv) {
   return ({ url, disposition, features }) => {
     if (!isAllowedNavigation(url)) return { action: 'deny' };
     const popup = disposition === 'new-window' && /(?:width|height)\s*=/i.test(features || '');
-    if (!popup) { openTab({ url }, { private: priv }); return { action: 'deny' }; }
+    // A tab opened from this one (⌘-click, middle-click, target=_blank, window.open) grows from it in the reading trail.
+    if (!popup) { openTab({ url }, { private: priv, parent: tab.id }); return { action: 'deny' }; }
     const num = (k, d) => { const m = new RegExp(k + '\\s*=\\s*(\\d+)', 'i').exec(features || ''); return m ? Math.min(Math.max(Number(m[1]), 320), 1200) : d; };
     return {
       action: 'allow',
@@ -465,10 +467,10 @@ function trackPopup(tab, child, priv) {
   // The window is only for web pages: it can send the person onward on the web, never to a file or an app address.
   wc.on('will-navigate', (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); });
   wc.on('will-redirect', (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); });
-  wc.setWindowOpenHandler(({ url }) => { if (isAllowedNavigation(url)) openTab({ url }, { private: priv }); return { action: 'deny' }; });
+  wc.setWindowOpenHandler(({ url }) => { if (isAllowedNavigation(url)) openTab({ url }, { private: priv, parent: tab.id }); return { action: 'deny' }; });
 }
 
-function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '', group = 0 } = {}) {
+function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '', group = 0, parent = 0 } = {}) {
   const id = nextId++;
   // A partition without the "persist:" prefix lives in memory only, so a private tab leaves nothing on disk.
   const view = new WebContentsView({
@@ -479,7 +481,13 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     }
   });
   const tab = { id, view, title: '', url: '', isHome: true, media: [], favicon: '', busy: false, private: priv, pinned, lazyUrl: '', group: pinned ? 0 : group };
-  tabs.push(tab);
+  tab.parent = 0;
+  const from = parent && !pinned ? tabById(parent) : null;
+  if (from && tabstate.canParent(from, tab)) {
+    // The new tab sits right under the last tab already below its parent, in the parent's group.
+    tab.parent = from.id; tab.group = from.group || 0;
+    tabs.splice(tabstate.childSlot(tabs, from.id), 0, tab);
+  } else tabs.push(tab);
   if (pinned) tabs.splice(0, tabs.length, ...tabstate.setPinned(tabs, id, true));
   const wc = view.webContents;
   hardenSession(wc.session, priv);
@@ -703,6 +711,7 @@ function selectTab(id) {
 function closeTab(id) {
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
+  tabstate.release(tabs, id); // its children move up a level
   const [t] = tabs.splice(i, 1);
   for (const c of t.popups || []) { try { c.close(); } catch { /* gone */ } }
   clearTimeout(t.ephemeral); clearTimeout(t.ephemeralWarn);
@@ -743,7 +752,7 @@ function duplicateTab(id) {
 }
 function closeOthers(id) { for (const t of tabs.slice()) if (t.id !== id && !t.pinned) closeTab(t.id); }
 function closeToRight(id) { const i = tabs.findIndex((t) => t.id === id); for (const t of tabs.slice(i + 1)) if (!t.pinned) closeTab(t.id); }
-function pinTab(id) { const t = tabs.find((x) => x.id === id); if (t) setOrder(tabstate.setPinned(tabs, id, !t.pinned)); }
+function pinTab(id) { const t = tabs.find((x) => x.id === id); if (t) { if (!t.pinned) tabstate.detach(tabs, id); } if (t) setOrder(tabstate.setPinned(tabs, id, !t.pinned)); }
 function switchTab(next) { if (next) selectTab(next.id); }
 
 // ---- Tab groups ---------------------------------------------------------------------------------------------------------
@@ -2336,7 +2345,7 @@ function wireIpc() {
   ipcMain.on('side:peek', (e, out) => { if (sideView && e.sender === sideView.webContents && peekOut !== !!out) { peekOut = !!out; layoutPeek(); } });
   ipcMain.on('profile:menu', (e, x, y) => { if (fromSidebar(e)) showProfileMenu(x, y); });
   ipcMain.on('tab:menu', (e, id) => { if (fromSidebar(e)) showTabMenu(Number(id)); });
-  ipcMain.on('tab:move', (e, id, beforeId) => { if (fromSidebar(e)) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
+  ipcMain.on('tab:move', (e, id, beforeId) => { if (fromSidebar(e)) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); if (next.findIndex((t) => t.id === Number(id)) !== tabs.findIndex((t) => t.id === Number(id))) tabstate.detach(next, Number(id)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
   ipcMain.on('tab:groupWith', (e, dragId, targetId) => {
     if (!fromSidebar(e)) return;
     const a = tabs.find((t) => t.id === Number(dragId)), b = tabs.find((t) => t.id === Number(targetId));

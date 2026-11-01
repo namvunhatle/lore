@@ -192,7 +192,8 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 .srow[aria-selected="true"]{background:var(--win);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.05)}
 .srow .x{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;color:var(--muted);font-size:15px;line-height:1;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
 .srow .x:active{transform:scale(.95)}
-.srow.in-g{margin-left:12px;width:calc(100% - 12px)}
+.srow.in-g{--gi:12px}
+.srow.in-g,.srow.kid{margin-left:calc(var(--gi,0px) + var(--lv,0)*14px);width:calc(100% - var(--gi,0px) - var(--lv,0)*14px)}
 .srow.in-split::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:1px;background:var(--accent)}
 .snew{margin-top:4px;color:var(--muted);font-weight:400}
 .snew .fav{color:var(--muted);font-size:17px;font-weight:300}

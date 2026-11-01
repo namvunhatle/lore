@@ -10,11 +10,12 @@ function snapshot(tabs, activeId, groups = []) {
   const kept = tabs.filter((t) => !t.private && isWeb(t.url)).slice(0, MAX_SAVED);
   const i = kept.findIndex((t) => t.id === activeId);
   const used = new Set(kept.map((t) => t.group).filter(Boolean));
+  const at = new Map(kept.map((t, n) => [t.id, n]));
   return {
     v: 2,
     active: i < 0 ? 0 : i,
     groups: groups.filter((g) => used.has(g.id)).map((g) => ({ id: g.id, name: String(g.name || '').slice(0, 30), color: String(g.color || ''), collapsed: !!g.collapsed })),
-    tabs: kept.map((t) => ({ url: t.url.slice(0, 2000), title: String(t.title || '').slice(0, 200), pinned: !!t.pinned, group: t.group || 0 }))
+    tabs: kept.map((t) => ({ url: t.url.slice(0, 2000), title: String(t.title || '').slice(0, 200), pinned: !!t.pinned, group: t.group || 0, parent: t.pinned || !at.has(t.parent) ? -1 : at.get(t.parent) }))
   };
 }
 
@@ -28,9 +29,47 @@ function restore(data) {
   const tabs = data.tabs
     .filter((t) => t && isWeb(t.url))
     .slice(0, MAX_SAVED)
-    .map((t) => ({ url: t.url.slice(0, 2000), title: typeof t.title === 'string' ? t.title.slice(0, 200) : '', pinned: !!t.pinned, group: known.has(t.group) ? t.group : 0 }));
+    .map((t) => ({ url: t.url.slice(0, 2000), title: typeof t.title === 'string' ? t.title.slice(0, 200) : '', pinned: !!t.pinned, group: known.has(t.group) ? t.group : 0, parent: t.parent }));
+  // A parent must be an earlier, unpinned tab: that rules out itself and loops.
+  tabs.forEach((t, n) => { const p = t.parent; t.parent = !t.pinned && Number.isInteger(p) && p >= 0 && p < n && !tabs[p].pinned ? p : -1; });
   const a = Number.isInteger(data.active) ? data.active : 0;
   return { tabs, groups, active: Math.min(Math.max(a, 0), Math.max(tabs.length - 1, 0)) };
+}
+
+// Reading trail: `parent` is the id of the tab a tab was opened from (0 = none). Normal tabs and private tabs never
+// share a tree, and pinned tabs are never part of one.
+const canParent = (parent, child) => !!parent && !!child && !parent.pinned && !child.pinned && !!parent.private === !!child.private;
+
+function depth(tabs, id) {
+  let d = 0;
+  for (let t = tabs.find((x) => x.id === id); t && t.parent && d < 50; d++) t = tabs.find((x) => x.id === t.parent);
+  return d;
+}
+
+const below = (tabs, t, id) => { for (let p = t, n = 0; p && p.parent && n < 50; n++) { if (p.parent === id) return true; p = tabs.find((x) => x.id === p.parent); } return false; };
+
+// Where a new child of `parentId` goes: just after the last tab already below it.
+function childSlot(tabs, parentId) {
+  const i = tabs.findIndex((t) => t.id === parentId);
+  if (i < 0) return tabs.length;
+  let end = i;
+  tabs.forEach((t, n) => { if (n > i && below(tabs, t, parentId)) end = n; });
+  return end + 1;
+}
+
+// Before a tab goes away: its children move up one level, to its own parent.
+function release(tabs, id) {
+  const t = tabs.find((x) => x.id === id);
+  if (t) for (const c of tabs) if (c.parent === id) c.parent = t.parent || 0;
+  return tabs;
+}
+
+// Cuts a tab out of the tree (dragged elsewhere, pinned); its children stay with its former parent.
+function detach(tabs, id) {
+  release(tabs, id);
+  const t = tabs.find((x) => x.id === id);
+  if (t) t.parent = 0;
+  return tabs;
 }
 
 // Recently closed tabs, newest last. Private tabs are not remembered.
@@ -113,4 +152,4 @@ function assign(tabs, plan) {
   return arrange(tabs);
 }
 
-module.exports = { arrange, settle, assign, snapshot, restore, ClosedTabs, reorder, setPinned, nextAfterClose, cycle, nth, isWeb, MAX_CLOSED };
+module.exports = { canParent, depth, childSlot, release, detach, arrange, settle, assign, snapshot, restore, ClosedTabs, reorder, setPinned, nextAfterClose, cycle, nth, isWeb, MAX_CLOSED };

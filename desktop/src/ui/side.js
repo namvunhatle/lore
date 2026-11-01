@@ -23,7 +23,7 @@ let lastPinSig = null;
 function keyed(box, store, items, animate, still) {
   // Where each row is on screen (mid-slide included) and where the layout puts it (offsetTop ignores transforms).
   const before = new Map();
-  if (animate) for (const [k, el] of store) if (el.isConnected) before.set(k, { top: el.getBoundingClientRect().top, slot: el.offsetTop });
+  if (animate) for (const [k, el] of store) if (el.isConnected) { const r = el.getBoundingClientRect(); before.set(k, { top: r.top, left: r.left, slot: el.offsetTop, indent: el.offsetLeft }); }
   const seen = new Set();
   const fresh = [];
   let prev = null;
@@ -53,19 +53,21 @@ function keyed(box, store, items, animate, still) {
     for (const [k, el] of store) {
       if (k === still || !before.has(k) || !el.isConnected) continue;
       const b = before.get(k);
-      // Same slot as before: a slide already under way keeps going. State arrives many times a second while a page
+      // Same slot and level as before: a slide already under way keeps going. State arrives many times a second while a page
       // loads; restarting every slide each time would cost two layouts per update and keep resetting the curve.
-      if (el.offsetTop === b.slot) continue;
+      if (el.offsetTop === b.slot && el.offsetLeft === b.indent) continue;
       // A new slot: stop the old slide (stacked slides fight, and the older one snaps the row back when the newer
       // ends) and start one from where the row is on screen right now.
       for (const a of el.getAnimations()) if (a.id === 'flip') a.cancel();
-      const d = b.top - el.getBoundingClientRect().top;
-      if (Math.abs(d) > 0.5) el.animate([{ transform: `translateY(${d}px)` }, { transform: 'none' }], { id: 'flip', duration: 200, easing: EASE });
+      // A row that changes level (its parent closed, it was dragged out of the trail) slides sideways with the same move.
+      const now = el.getBoundingClientRect();
+      const dx = b.left - now.left, dy = b.top - now.top;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { id: 'flip', duration: 200, easing: EASE });
     }
   }
   fresh.forEach((el, i) => {
     const delay = Math.min(i, 5) * 30;
-    el.animate(calmSide.matches ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateX(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, delay, easing: EASE, fill: 'backwards' });
+    el.animate(calmSide.matches ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: el.classList.contains('kid') ? 'translateY(-8px)' : 'translateX(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, delay, easing: EASE, fill: 'backwards' });
   });
 }
 
@@ -175,7 +177,11 @@ function pinItem(t, all) {
   };
 }
 
-function rowItem(t, g, all) {
+// How deep a tab sits in the reading trail: shown at most 3 levels deep, so a 240px sidebar is not squeezed.
+const TRAIL_MAX = 2;
+const trailOf = (t) => ({ level: Math.min(t.depth || 0, TRAIL_MAX) });
+
+function rowItem(t, g, all, trail) {
   return {
     key: 't' + t.id,
     // Only a tab that arrives in the background animates in; one opened to be used (Cmd+T, a click) is just there.
@@ -200,13 +206,14 @@ function rowItem(t, g, all) {
       el._t = t;
       el.setAttribute('aria-selected', String(t.active));
       el.classList.toggle('in-g', !!g);
+      el.classList.toggle('kid', trail.level > 0);
+      el.style.setProperty('--lv', trail.level);
       el.classList.toggle('in-split', !!t.split);
       el.classList.toggle('is-private', !!t.private);
       const label = el.querySelector('.ttl');
       if (label.textContent !== t.title) label.textContent = t.title;
       const x = el.querySelector('.x');
       x.setAttribute('aria-label', T('tab.close'));
-      x.dataset.tip = T('tab.close') + ' (' + key + 'W)';
       setFav(el, t);
     }
   };
@@ -237,7 +244,6 @@ function groupItem(g, edit) {
       b.className = 'sgrp g-' + g.color;
       b.setAttribute('aria-expanded', String(!g.collapsed));
       b.querySelector('span').textContent = g.name || T('group.unnamed');
-      b.dataset.tip = T(g.collapsed ? 'group.expandTip' : 'group.collapseTip');
       if (edit) setTimeout(() => startEdit(b, g), 0);
     }
   };
@@ -292,7 +298,7 @@ function renderSide(s) {
     lastGroup = g ? g.id : 0;
     // A collapsed group shows only its header, unless the tab being used is inside it.
     if (g && g.collapsed && !t.active) continue;
-    const it = rowItem(t, g, () => rest);
+    const it = rowItem(t, g, () => rest, trailOf(t));
     // Rows revealed by opening a group come in one after another, so they read as belonging to it.
     if (animate) it.enter = it.enter || !!g;
     items.push(it);
