@@ -143,6 +143,14 @@ function openTab(target, { private: priv = false } = {}) {
   // Web pages may only send the tab to web addresses (never file:, javascript:, data: or app schemes).
   const guard = (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); };
   wc.on('will-redirect', guard);
+  // LORE_DEBUG=1 prints every top-level navigation, so a redirect loop shows up as a repeating list of addresses.
+  if (process.env.LORE_DEBUG) {
+    const safe = (u) => { try { const x = new URL(u); return x.origin + x.pathname; } catch { return String(u).slice(0, 80); } };
+    wc.on('did-start-navigation', (_e, url, inPlace, isMain) => { if (isMain) console.log('[nav]', inPlace ? 'in-page' : 'load', safe(url)); });
+    wc.on('will-redirect', (_e, url) => console.log('[nav] redirect ->', safe(url)));
+    wc.on('did-fail-load', (_e, code, desc, url, isMain) => { if (isMain) console.log('[nav] FAILED', code, desc, safe(url)); });
+    wc.on('console-message', (e) => { if (e.level === 'error' || e.level === 'warning') console.log('[page]', String(e.message).slice(0, 160)); });
+  }
   wc.on('page-title-updated', (_e, title) => { tab.title = title; if (!tab.isHome && !priv) memory.setTitle(tab.url, title); pushState(); });
   // Cards on the New tab page navigate to lore-run:?q=..., which runs that text through the intent bar.
   // The blocked request fails with ERR_BLOCKED_BY_CLIENT; once it has, show the warning page in its place.
@@ -998,8 +1006,8 @@ function buildMenu() {
 }
 
 app.whenReady().then(() => {
-  // Packaged apps carry the icon in the bundle; this shows it when running from source too.
-  if (process.platform === 'darwin' && app.dock) app.dock.setIcon(path.join(__dirname, '..', 'build', 'icon.png'));
+  // A packaged app already carries its icon; this is only for `npm start`. A missing icon must never stop the window opening.
+  if (process.platform === 'darwin' && app.dock && !app.isPackaged) { try { app.dock.setIcon(path.join(__dirname, '..', 'build', 'icon.png')); } catch { /* keep the default icon */ } }
   settings = new Settings({
     ...fileStore(path.join(app.getPath('userData'), 'settings.bin'), safeStorage),
     persistent: safeStorage.isEncryptionAvailable()

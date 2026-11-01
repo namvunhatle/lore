@@ -3,6 +3,7 @@
 const { isThirdParty, permissionPolicy, withoutHeader } = require('./privacy');
 
 const done = new WeakSet();
+const safeHost = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
 
 function hardenSession(ses, deps) {
   if (done.has(ses)) return;
@@ -30,11 +31,15 @@ function hardenSession(ses, deps) {
 
   ses.webRequest.onBeforeSendHeaders((details, cb) => {
     let headers = { ...details.requestHeaders, 'Sec-GPC': '1' }; // Global Privacy Control: do not sell or share my data
-    if (thirdParty(details)) headers = withoutHeader(headers, 'Cookie');
+    if (thirdParty(details)) {
+      if (process.env.LORE_DEBUG && details.requestHeaders.Cookie) console.log('[cookie] not sent to', safeHost(details.url), 'on', safeHost(siteOf(details)));
+      headers = withoutHeader(headers, 'Cookie');
+    }
     cb({ requestHeaders: headers });
   });
 
   ses.webRequest.onHeadersReceived((details, cb) => {
+    if (process.env.LORE_DEBUG && thirdParty(details) && details.responseHeaders && (details.responseHeaders['set-cookie'] || details.responseHeaders['Set-Cookie'])) console.log('[cookie] refused from', safeHost(details.url), 'on', safeHost(siteOf(details)));
     cb(thirdParty(details) ? { responseHeaders: withoutHeader(details.responseHeaders, 'Set-Cookie') } : {});
     if (onResponse) onResponse(details);
   });
