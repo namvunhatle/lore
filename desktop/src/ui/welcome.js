@@ -50,6 +50,7 @@ function listBrowsers() {
     const opts = document.createElement('div'); opts.className = 'bopts';
     const mk = (key, label) => { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true; l.append(c, document.createTextNode(label)); opts.append(l); return c; };
     const bm = mk('bookmarks', T('wel.imp.bookmarks'));
+    if (!b.bookmarks) { bm.checked = false; bm.parentElement.hidden = true; }
     const hi = mk('history', T('wel.imp.history'));
     li.append(name, sel, opts);
     ul.append(li);

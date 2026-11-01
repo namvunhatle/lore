@@ -80,6 +80,18 @@ test('Arc, Dia and Helium are found on a Mac in their own folders', () => {
   assert.deepStrictEqual(imp.detect({ platform: 'linux', home, env: {} }), []);
 });
 
+test('a browser\'s internal profiles are left out, and it says whether it has bookmarks', () => {
+  const home = tmp();
+  const base = path.join(home, 'Library', 'Application Support', 'Arc', 'User Data');
+  for (const d of ['Default', 'Profile 2']) { fs.mkdirSync(path.join(base, d), { recursive: true }); fs.writeFileSync(path.join(base, d, 'History'), ''); }
+  fs.writeFileSync(path.join(base, 'Local State'), JSON.stringify({ profile: { info_cache: { Default: { name: 'Your Arc' }, 'Profile 2': { name: '__ARC_SYSTEM_PROFILE' } } } }));
+  const dia = path.join(home, 'Library', 'Application Support', 'Dia', 'User Data', 'Default');
+  fs.mkdirSync(dia, { recursive: true });
+  fs.writeFileSync(path.join(dia, 'Bookmarks'), '{}');
+  const r = imp.detect({ platform: 'darwin', home, env: {} });
+  assert.deepStrictEqual(r.map((b) => [b.id, b.profiles.map((p) => p.name), b.bookmarks]), [['arc', ['Your Arc'], false], ['dia', ['Default'], true]]);
+});
+
 test('only web addresses are accepted', () => {
   assert.ok(imp.isWeb('https://a.example'));
   assert.ok(!imp.isWeb('file:///x'));

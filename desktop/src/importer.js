@@ -42,12 +42,15 @@ function detect({ platform = process.platform, home = process.env.LORE_IMPORT_HO
     const local = readJson(path.join(base, 'Local State'));
     const names = (local && local.profile && local.profile.info_cache) || {};
     const profiles = dirs(base).filter((d) => /^(Default|Profile \d+)$/.test(d) && (fs.existsSync(path.join(base, d, 'Bookmarks')) || fs.existsSync(path.join(base, d, 'History'))))
-      .map((d) => ({ id: d, name: (names[d] && names[d].name) || d, dir: path.join(base, d) }));
-    if (profiles.length) found.push({ id: b.id, name: b.name, kind: 'chromium', profiles });
+      .map((d) => ({ id: d, name: (names[d] && names[d].name) || d, dir: path.join(base, d) }))
+      .filter((p) => !p.name.startsWith('__')); // a browser's own internal profile, such as Arc's __ARC_SYSTEM_PROFILE
+    // Arc has no Bookmarks file at all, so the window should not offer them.
+    const bookmarks = profiles.some((p) => fs.existsSync(path.join(p.dir, 'Bookmarks')));
+    if (profiles.length) found.push({ id: b.id, name: b.name, kind: 'chromium', bookmarks, profiles });
   }
   const ff = dirs(r.firefox).filter((d) => fs.existsSync(path.join(r.firefox, d, 'places.sqlite')))
     .map((d) => ({ id: d, name: d.replace(/^[a-z0-9]{8}\./i, ''), dir: path.join(r.firefox, d) }));
-  if (ff.length) found.push({ id: 'firefox', name: 'Firefox', kind: 'firefox', profiles: ff });
+  if (ff.length) found.push({ id: 'firefox', name: 'Firefox', kind: 'firefox', bookmarks: true, profiles: ff });
   return found;
 }
 
