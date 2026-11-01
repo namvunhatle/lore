@@ -16,6 +16,10 @@ app.whenReady().then(async () => {
   // "tracker" runs on localhost, the site on 127.0.0.1: different registrable domains, so it is third-party.
   const tracker = await listen((req, res) => {
     if (req.url.startsWith('/ad')) { seen.adHits++; res.end('x'); return; }
+    if (req.url.startsWith('/api')) {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*'); res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Set-Cookie', 'sid=1; Path=/; SameSite=None; Secure'); res.end('{}'); return;
+    }
     seen.trackerCookie = req.headers.cookie; seen.trackerGPC = req.headers['sec-gpc'];
     res.setHeader('Set-Cookie', 'uid=1; Path=/; SameSite=None; Secure');
     res.setHeader('content-type', 'image/gif'); res.end('GIF89a');
@@ -52,6 +56,9 @@ app.whenReady().then(async () => {
     const cookies = await ses.cookies.get({});
     assert.strictEqual(cookies.filter((c) => c.name === 'uid').length, 0, 'third-party Set-Cookie dropped');
     assert.strictEqual(seen.trackerCookie, undefined);
+    // Fetch keeps its cookies: an embedded app or a sign-in flow needs its session (otherwise the page reloads forever).
+    await win.webContents.executeJavaScript(`fetch('${tp}/api', { credentials: 'include' }).then((r) => r.text())`);
+    assert.ok((await ses.cookies.get({})).some((c) => c.name === 'sid'), 'cookie set by a third-party fetch is kept');
     const ua = await win.webContents.executeJavaScript('navigator.userAgent');
     assert.ok(/Electron\//.test(ua), 'user agent is left honest (Google rejects browsers that pose as Chrome): ' + ua);
 

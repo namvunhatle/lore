@@ -1,6 +1,6 @@
 // Per-session privacy hardening: ad blocking, third-party cookies, Global Privacy Control, permissions.
 // All app state comes in through `deps`, so this can be tested against a real Electron session.
-const { isThirdParty, permissionPolicy, withoutHeader } = require('./privacy');
+const { isThirdParty, stripsThirdPartyCookies, permissionPolicy, withoutHeader } = require('./privacy');
 
 const done = new WeakSet();
 const safeHost = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
@@ -26,7 +26,8 @@ function hardenSession(ses, deps) {
 
   const thirdParty = (details) => {
     const site = siteOf(details);
-    return privacy().blockThirdPartyCookies && details.resourceType !== 'mainFrame' && site && isThirdParty(details.url, site);
+    if (!privacy().blockThirdPartyCookies || details.resourceType === 'mainFrame' || !site || !isThirdParty(details.url, site)) return false;
+    return stripsThirdPartyCookies(details.resourceType, !!blocker && blocker.match(details.url, site, details.resourceType));
   };
 
   ses.webRequest.onBeforeSendHeaders((details, cb) => {

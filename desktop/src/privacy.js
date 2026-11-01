@@ -26,6 +26,12 @@ function isThirdParty(requestUrl, siteUrl) {
   return etld1(a) !== etld1(b);
 }
 
+// Third-party cookies are cut where they only serve tracking: images, pings, fonts and other passive loads, and anything on
+// the tracker lists. Frames, scripts, fetch and WebSocket keep theirs, because embedded apps and sign-in flows (an editor
+// that embeds its preview, an OAuth redirect) keep their session in them; cutting those makes a site reload forever.
+const PASSIVE = new Set(['image', 'media', 'font', 'stylesheet', 'ping', 'cspReport', 'object']);
+const stripsThirdPartyCookies = (resourceType, listed) => PASSIVE.has(resourceType) || !!listed;
+
 // Permissions a page may use without asking. Everything else is asked about, or refused.
 const SAFE = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
 const ASKABLE = new Set(['media', 'geolocation', 'notifications', 'clipboard-read', 'midi', 'midiSysex']);
@@ -65,4 +71,4 @@ function withoutHeader(headers, name) {
   return out;
 }
 
-module.exports = { etld1, isThirdParty, permissionPolicy, isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected, withoutHeader };
+module.exports = { etld1, isThirdParty, stripsThirdPartyCookies, permissionPolicy, isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected, withoutHeader };

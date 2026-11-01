@@ -60,3 +60,13 @@ test('before the engine loads, the small host list still blocks', () => {
   assert.ok(!b.ready);
   assert.ok(b.match('https://stats.doubleclick.net/x', 'https://a.vn/', 'script'));
 });
+
+test('third-party cookies are cut for passive loads and listed trackers, kept for frames and fetch', () => {
+  const { stripsThirdPartyCookies: cut } = require('../src/privacy');
+  assert.ok(cut('image', false));
+  assert.ok(cut('ping', false));
+  assert.ok(cut('script', true));
+  assert.ok(!cut('subFrame', false));
+  assert.ok(!cut('xhr', false));
+  assert.ok(!cut('webSocket', false));
+});

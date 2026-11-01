@@ -1,6 +1,6 @@
 # Lore feature backlog
 
-Source: planning conversation with the owner (Thanh, Tevo JSC). Read `CLAUDE.md` first for positioning, moat, and agent safety rules. This file is a prioritized backlog, not a committed scope. Priorities are proposals; confirm with the owner before building anything marked P2 or later.
+Source: planning conversation with the owner (Thanh, Tevo). Positioning, moat and agent safety rules are in the project brief (`CLAUDE.md`, kept out of the public repository). This file is a prioritized backlog, not a committed scope. Priorities are proposals; confirm with the owner before building anything marked P2 or later.
 
 ## How to use this file
 - Every feature must pass one gate: **does it make personal memory or the agent better, or does it protect the user visibly?** If not, defer it.
@@ -108,6 +108,15 @@ Source: planning conversation with the owner (Thanh, Tevo JSC). Read `CLAUDE.md`
 | WRK-02 | Right-click Lore AI | Rewrite, fix, shorten, expand, tone, translate, explain, summarize on selected text or in a text box. | **Done (desktop)** | D | Next: a small bar that appears on selection. |
 | WRK-03 | Mail and calendar awareness | Read the open webmail message (with the user's selection) and the open calendar day, to draft replies and propose free slots. | P2 | D | Needs sign-in inside Lore, which Google may refuse in embedded browsers. Outlook and others first. |
 
+## 7c. Quality and release (added November 2026)
+
+| ID | Feature | Behavior | Pri | Platform | Notes |
+|---|---|---|---|---|---|
+| WEB-01 | Sign-in compatibility | Google, Microsoft, Apple and other OAuth sign-ins complete on popular sites (Lovable, Notion, Figma, GitHub). Pop-ups keep `window.opener` when they are sign-in windows; third-party cookies stay blocked except on a sign-in flow, with a visible per-site exception. | **P0** | D | Today's blocking is all-or-nothing. A site that cannot sign in makes users leave, so this outranks new AI features. Test with a list of 10 real sites. |
+| REL-01 | Smoke test the packaged app | CI launches the built app on each OS and checks that a window opens and a page loads, before publishing. | **P0** | D | Would have caught the empty-window release. |
+| REL-02 | macOS ad-hoc signature, then Developer ID | Ad-hoc sign now so Gatekeeper's "damaged" message is avoided where possible; notarize when a certificate exists. | P1 | D | Document `xattr -cr` as the workaround meanwhile. |
+| REL-03 | Auto-update | Check for a signed update and install on restart. | P1 | D | Needs signing first. |
+
 ## 8. Explicitly out of scope for now
 - Social network or news feed inside the browser (content cost, conflicts with privacy positioning).
 - Crypto wallet, games, pay-to-browse rewards (legal risk, brand drift).
@@ -115,8 +124,13 @@ Source: planning conversation with the owner (Thanh, Tevo JSC). Read `CLAUDE.md`
 
 ## 9. Status snapshot (desktop prototype, November 2026)
 
-Done: MEM-01, MEM-03, AI-01, AI-02, AI-03, AI-04, AI-05, AI-06, PRV-01, PRV-02, PRV-03, PRV-10 (including private tabs), VN-01, WRK-01, WRK-02, favicons in memory, Linux/macOS/Windows packaging.
+Done: AI-10 (desktop), MEM-01, MEM-03, AI-01, AI-02, AI-03, AI-04, AI-05, AI-06, PRV-01, PRV-02, PRV-03, PRV-10 (including private tabs), VN-01, WRK-01, WRK-02, favicons in memory, Linux/macOS/Windows packaging.
 Partly done: AGT-01 (confirm-first engine and browser driver exist, tested against a local demo portal only; **no real service yet**), DL-01 (plain files and HLS, no DASH, resume or ffmpeg merge).
+Known problems (fix before adding features):
+- **REL-01** The first macOS installers opened with no window: the Dock icon was read from a folder missing in the package. Fixed in code, not yet released. Lesson: nothing tests the packaged app.
+- **WEB-01** Sign-in on some sites loops (reported on Lovable after Google sign-in). Suspects: third-party cookie blocking applied to embedded frames, and pop-ups being turned into new tabs (the page loses `window.opener`, which OAuth pop-ups need). `LORE_DEBUG=1` prints navigations and refused cookies to find the cause.
+- The v0.1.0 release workflow failed on Windows; the workflow now uses the unsigned scripts, not yet confirmed on GitHub.
+
 Not started: mobile apps, Rust core, VPN, sync, extensions, code signing (pipeline written, untested without certificates), auto-update.
 
 ## 9b. Suggested first slice (original MVP, P0)
@@ -148,4 +162,4 @@ Where Lore can stand apart:
 4. **Match the privacy-browser basics** (PRV-11 to PRV-14) so privacy users take Lore seriously.
 5. **Keep the Vietnamese advantage** (VN-01 to VN-03) for services other browsers will not build.
 
-Proposed next slice, in order: AI-10, MEM-04 with AI-08, AI-11, DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.
+Proposed next slice, in order: **WEB-01 and REL-01 first** (a browser that cannot sign in or cannot open is not worth new features), then MEM-04 with AI-08, AI-11, DL-06 with AI-12, AGT-03 with MEM-05, then PRV-11 to PRV-14.
