@@ -40,6 +40,31 @@ function icon(t) {
   return wrap;
 }
 
+function groupChip(g) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'grp g-' + g.color + (g.collapsed ? ' collapsed' : '');
+  b.setAttribute('aria-expanded', String(!g.collapsed));
+  const dot = document.createElement('i');
+  const label = document.createElement('span');
+  label.textContent = g.name || T('group.unnamed');
+  b.append(dot, label);
+  b.dataset.tip = T(g.collapsed ? 'group.expandTip' : 'group.collapseTip');
+  b.addEventListener('click', () => lore.send('group:toggle', g.id));
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('group:menu', g.id); });
+  // Double-click renames in place.
+  b.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    const input = document.createElement('input');
+    input.className = 'grp-edit'; input.value = g.name; input.maxLength = 30; input.setAttribute('aria-label', T('org.groupName'));
+    const finish = (save) => { if (save && input.value.trim()) lore.send('group:rename', g.id, input.value); else lore.send('group:toggle', 0); };
+    input.addEventListener('keydown', (k) => { if (k.key === 'Enter') finish(true); else if (k.key === 'Escape') finish(false); });
+    input.addEventListener('blur', () => finish(true));
+    b.replaceWith(input); input.focus(); input.select();
+  });
+  return b;
+}
+
 function render(s) {
   if (s.lang !== lang) { lang = s.lang; LORE_I18N.apply(lang); tips(); resetPh(); }
   const active = s.tabs.find((t) => t.active);
@@ -47,9 +72,16 @@ function render(s) {
   $('#bar').classList.toggle('loading', !!(active && active.loading));
   const tabs = $('#tabs');
   tabs.replaceChildren();
+  const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
+  let lastGroup = 0;
   for (const t of s.tabs) {
+    const g = t.group ? gmap.get(t.group) : null;
+    if (g && g.id !== lastGroup) tabs.append(groupChip(g));
+    lastGroup = g ? g.id : 0;
+    // A collapsed group shows only its header, unless the tab being used is inside it.
+    if (g && g.collapsed && !t.active) continue;
     const el = document.createElement('div');
-    el.className = 'tab';
+    el.className = 'tab' + (g ? ' grouped g-' + g.color : '');
     el.setAttribute('role', 'tab');
     el.setAttribute('aria-selected', String(t.active));
     if (t.private) el.classList.add('is-private');
@@ -92,13 +124,20 @@ function render(s) {
     el.append(label, x);
     tabs.append(el);
   }
+  const org = document.createElement('button');
+  org.className = 'plus org';
+  org.hidden = s.tabs.length < 3;
+  org.setAttribute('aria-label', T('org.menu'));
+  org.dataset.tip = T('org.tip', { k: key });
+  org.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
+  org.addEventListener('click', () => lore.send('organize:open'));
   const plus = document.createElement('button');
   plus.className = 'plus';
   plus.textContent = '+';
   plus.setAttribute('aria-label', T('tab.open'));
   plus.dataset.tip = T('tip.newTab', { k: key });
   plus.addEventListener('click', () => lore.send('tab:new'));
-  tabs.append(plus);
+  tabs.append(plus, org);
 
   const dlb = $('#downloads');
   dlb.hidden = !s.downloads || !s.downloads.count;

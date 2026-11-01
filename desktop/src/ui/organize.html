@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Organize</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="organize.css">
+</head>
+<body>
+<header>
+  <h1 id="h"></h1>
+  <p class="lead" id="lead"></p>
+</header>
+<main id="main">
+  <div class="wait" id="wait"><span class="dots"><i></i><i></i><i></i></span><span id="wait-t"></span></div>
+</main>
+<footer id="foot" hidden>
+  <span class="note" id="note"></span>
+  <button class="btn" id="cancel" type="button" data-i18n="set.priv.cancel"></button>
+  <button class="btn pri" id="apply" type="button"></button>
+</footer>
+<script src="i18n.js"></script>
+<script src="organize.js"></script>
+</body>
+</html>

@@ -25,12 +25,12 @@ li{display:flex;gap:12px;align-items:center;padding:9px 10px;margin:0 -10px;bord
 li:hover{background:var(--hover)}
 .ico{flex:none;width:28px;height:28px;border-radius:7px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font:600 12px var(--f);text-transform:uppercase;overflow:hidden}
 .ico img{width:18px;height:18px;object-fit:contain}
-.body{flex:1;min-width:0;text-align:left}
-.t{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.body{flex:1 1 0;min-width:0;text-align:left}
+.t{display:block;max-width:100%;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .t:hover{text-decoration:underline}
 .u{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.time{flex:none;color:var(--muted);font-size:12px}
-.acts{flex:none;display:flex;gap:10px;opacity:0}
+.time{flex:none;min-width:64px;text-align:right;color:var(--muted);font-size:12px;white-space:nowrap}
+.acts{flex:none;display:flex;gap:10px;opacity:0;white-space:nowrap}
 li:hover .acts,li:focus-within .acts{opacity:1}
 .acts button{color:var(--muted);font-size:12.5px}
 .acts button:hover{color:var(--accent)}
@@ -38,14 +38,15 @@ li:hover .acts,li:focus-within .acts{opacity:1}
 .edit{display:flex;flex-direction:column;gap:6px;flex:1}
 .edit input{height:32px;border-radius:8px;border:1px solid var(--line);background:var(--win);color:var(--ink);padding:0 10px;font:400 13.5px var(--f)}
 .edit .row{display:flex;gap:10px}
-.btn{height:34px;padding:0 16px;border-radius:17px;border:1px solid var(--line);font-weight:500;font-size:13px}
+.btn{flex:none;height:34px;padding:0 16px;border-radius:17px;border:1px solid var(--line);font-weight:500;font-size:13px;line-height:1;white-space:nowrap}
 .btn:hover{background:var(--hover)}
 .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .link{color:var(--accent);font-size:13px;font-weight:500}
 .empty{max-width:420px;margin:80px auto;text-align:center;color:var(--muted)}
 .empty p{margin:0 0 4px;color:var(--ink);font-weight:500}
-footer{flex:none;display:flex;align-items:center;gap:12px;padding:12px 32px;border-top:1px solid var(--line)}
-footer .note{color:var(--muted);font-size:12.5px}
+footer{flex:none;display:flex;align-items:center;gap:16px;padding:12px 32px;border-top:1px solid var(--line)}
+footer .note{flex:1 1 0;min-width:0;color:var(--muted);font-size:12.5px;line-height:1.45;text-wrap:pretty}
 footer .grow{flex:1}
+.note2{color:var(--ink);opacity:.8;font-size:12.5px;margin-top:2px;line-height:1.4}
 li.day{display:block;padding:0;margin:0}
 li.day:hover{background:none}

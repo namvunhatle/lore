@@ -22,6 +22,8 @@ const writing = require('./writing');
 const tabstate = require('./tabstate');
 const { Bookmarks } = require('./bookmarks');
 const secure = require('./security');
+const organize = require('./organize');
+const aibookmark = require('./aibookmark');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
@@ -64,6 +66,11 @@ let sessionTimer = null;
 let lastSession = '';
 let downloads = null;      // every file saved by the browser (BRW-04)
 let downloadsWin = null;
+const groups = new Map();  // tab groups: id -> { id, name, color, collapsed }
+let nextGroup = 1;
+const GROUP_COLORS = ['blue', 'green', 'amber', 'red', 'purple', 'grey'];
+let organizeWin = null;
+let lastOrganize = null;   // what to put back if the person presses Undo
 let bookmarks = null;      // saved pages (BRW-02)
 let bookmarksWin = null;
 let historyWin = null;
@@ -137,8 +144,9 @@ function pushState() {
     lang: L(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
-      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned
+      loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0
     })),
+    groups: [...groups.values()].filter((g) => tabs.some((x) => x.group === g.id)).map((g) => ({ id: g.id, name: g.name, color: g.color, collapsed: g.collapsed })),
     security: securityOf(t),
     starred: !!(t && bookmarks && !t.isHome && bookmarks.find(t.url)),
     bar: bookmarks && bookmarks.bar ? { on: true, items: bookmarks.barItems().map((b) => (b.type === 'link' ? { ...b, icon: favicons ? favicons.get(hostOfUrl(b.url)) : '' } : b)) } : { on: false, items: [] },
@@ -157,7 +165,7 @@ function pushState() {
 // ---- Session: reopen the tabs of the last run (BRW-05) ---------------------------------------------------------------
 function writeSession() {
   if (!sessionStore || !sessionReady) return;
-  const snap = tabstate.snapshot(tabs.map((t) => ({ id: t.id, url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private })), activeId);
+  const snap = tabstate.snapshot(tabs.map((t) => ({ id: t.id, url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private, group: t.group })), activeId, [...groups.values()]);
   const json = JSON.stringify(snap);
   if (json === lastSession) return;
   lastSession = json;
@@ -170,13 +178,15 @@ function scheduleSessionSave() {
 function startTabs() {
   const saved = settings.get().startup === 'restore' && sessionStore ? tabstate.restore(sessionStore.load()) : { tabs: [], active: 0 };
   if (saved.tabs.length) {
-    const made = saved.tabs.map((s) => openTab({ url: s.url }, { lazy: true, pinned: s.pinned, title: s.title }));
+    groups.clear();
+    for (const g of saved.groups || []) { groups.set(g.id, { ...g, color: GROUP_COLORS.includes(g.color) ? g.color : GROUP_COLORS[0] }); nextGroup = Math.max(nextGroup, g.id + 1); }
+    const made = saved.tabs.map((s) => openTab({ url: s.url }, { lazy: true, pinned: s.pinned, title: s.title, group: s.group }));
     selectTab(made[saved.active].id);
   } else openTab();
   sessionReady = true;
 }
 
-function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '' } = {}) {
+function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '', group = 0 } = {}) {
   const id = nextId++;
   // A partition without the "persist:" prefix lives in memory only, so a private tab leaves nothing on disk.
   const view = new WebContentsView({
@@ -186,7 +196,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
       ...(priv ? { partition: 'private-' + id } : {})
     }
   });
-  const tab = { id, view, title: '', url: '', isHome: true, media: [], favicon: '', busy: false, private: priv, pinned, lazyUrl: '' };
+  const tab = { id, view, title: '', url: '', isHome: true, media: [], favicon: '', busy: false, private: priv, pinned, lazyUrl: '', group: pinned ? 0 : group };
   tabs.push(tab);
   if (pinned) tabs.splice(0, tabs.length, ...tabstate.setPinned(tabs, id, true));
   const wc = view.webContents;
@@ -315,6 +325,7 @@ function selectTab(id) {
   const t = active();
   win.contentView.addChildView(t.view);
   closeFind();
+  if (t.group && groups.has(t.group)) groups.get(t.group).collapsed = false;
   if (t.lazyUrl) { const u = t.lazyUrl; t.lazyUrl = ''; t.view.webContents.loadURL(u); }
   layout();
   pushState();
@@ -359,6 +370,50 @@ function closeToRight(id) { const i = tabs.findIndex((t) => t.id === id); for (c
 function pinTab(id) { const t = tabs.find((x) => x.id === id); if (t) setOrder(tabstate.setPinned(tabs, id, !t.pinned)); }
 function switchTab(next) { if (next) selectTab(next.id); }
 
+// ---- Tab groups ---------------------------------------------------------------------------------------------------------
+function newGroup(name, ids) {
+  const id = nextGroup++;
+  groups.set(id, { id, name: String(name || T('group.default', { n: id })).slice(0, 30), color: GROUP_COLORS[(id - 1) % GROUP_COLORS.length], collapsed: false });
+  if (ids && ids.length) setOrder(tabstate.assign(tabs, [{ groupId: id, ids }])); else pushState();
+  return id;
+}
+function addToGroup(tabId, groupId) { setOrder(tabstate.assign(tabs, [{ groupId, ids: [tabId] }])); }
+function removeFromGroup(tabId) { const t = tabs.find((x) => x.id === tabId); if (t) { t.group = 0; setOrder(tabstate.arrange(tabs)); } }
+function ungroup(groupId) { for (const t of tabs) if (t.group === groupId) t.group = 0; groups.delete(groupId); pushState(); }
+function closeGroup(groupId) { for (const t of tabs.slice()) if (t.group === groupId) closeTab(t.id); groups.delete(groupId); pushState(); }
+function groupBookmarks(groupId) {
+  const g = groups.get(groupId);
+  const members = tabs.filter((t) => t.group === groupId && !t.private && /^https?:/.test(t.lazyUrl || t.url));
+  if (!g || !bookmarks || !members.length) return 0;
+  let n = 0;
+  for (const t of members) if (bookmarks.add({ url: t.lazyUrl || t.url, title: t.title, folder: g.name })) n++;
+  notifyBookmarks();
+  pushState();
+  return n;
+}
+function openFolderAsGroup(folder) {
+  const items = bookmarks.list({ folder }).sort((a, b) => a.ts - b.ts);
+  if (!items.length) return;
+  const made = items.map((b) => openTab({ url: b.url }, { lazy: true, title: b.title }));
+  const gid = newGroup(folder, made.map((t) => t.id));
+  selectTab(made[0].id);
+  return gid;
+}
+function showGroupMenu(groupId) {
+  const g = groups.get(groupId);
+  if (!g) return;
+  Menu.buildFromTemplate([
+    { label: g.collapsed ? T('group.expand') : T('group.collapse'), click: () => { g.collapsed = !g.collapsed; pushState(); } },
+    { label: T('group.color'), submenu: GROUP_COLORS.map((c) => ({ label: T('group.c.' + c), type: 'radio', checked: g.color === c, click: () => { g.color = c; pushState(); } })) },
+    { type: 'separator' },
+    { label: T('group.saveBookmarks'), click: () => { const n = groupBookmarks(groupId); toast({ text: T('group.saved', { n, name: g.name }), action: 'bookmarks', actionLabel: T('bm.edit') }); } },
+    { label: T('group.saveClose'), click: () => { const n = groupBookmarks(groupId); if (n) { toast({ text: T('group.savedClosed', { n, name: g.name }), action: 'bookmarks', actionLabel: T('bm.edit') }); closeGroup(groupId); } } },
+    { type: 'separator' },
+    { label: T('group.ungroup'), click: () => ungroup(groupId) },
+    { label: T('group.close'), click: () => closeGroup(groupId) }
+  ]).popup({ window: win });
+}
+
 function showTabMenu(id) {
   const t = tabs.find((x) => x.id === id);
   if (!t) return;
@@ -368,6 +423,11 @@ function showTabMenu(id) {
     { label: T('nav.reload'), enabled: web, click: () => { if (t.lazyUrl) selectTab(t.id); else t.view.webContents.reload(); } },
     { label: T('tab.duplicate'), click: () => duplicateTab(id) },
     { label: t.pinned ? T('tab.unpin') : T('tab.pin'), click: () => pinTab(id) },
+    ...(t.pinned ? [] : [{ label: T('group.add'), submenu: [
+      { label: T('group.new'), click: () => newGroup('', [id]) },
+      ...[...groups.values()].filter((g) => g.id !== t.group).map((g) => ({ label: g.name || T('group.default', { n: g.id }), click: () => addToGroup(id, g.id) })),
+      ...(t.group ? [{ type: 'separator' }, { label: T('group.remove'), click: () => removeFromGroup(id) }] : [])
+    ] }]),
     { type: 'separator' },
     { label: T('tab.closeTab'), click: () => closeTab(id) },
     { label: T('tab.closeOthers'), enabled: tabs.some((x) => x !== t && !x.pinned), click: () => closeOthers(id) },
@@ -1022,13 +1082,112 @@ function wireFindIpc() {
   ipcMain.on('find:close', (e) => { if (ok(e)) closeFind(); });
 }
 
+// ---- AI organize: tabs and bookmarks (AI-13) --------------------------------------------------------------------------
+function openOrganize(source) {
+  if (organizeWin && !organizeWin.isDestroyed()) { organizeWin.close(); organizeWin = null; }
+  organizeWin = new BrowserWindow({
+    width: 620, height: 680, minWidth: 460, minHeight: 420, title: T('org.title'), parent: win, modal: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'organize-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  organizeWin.setMenuBarVisibility(false);
+  organizeWin.loadFile(path.join(__dirname, 'ui', 'organize.html'), { query: { lang: L(), source } });
+  organizeWin.on('closed', () => { organizeWin = null; });
+}
+function wireOrganizeIpc() {
+  const trusted = (e) => organizeWin && e.sender === organizeWin.webContents;
+  const hostOf = (u) => hostOfUrl(u).replace(/^www\./, '');
+  const source = (e) => (new URL(e.sender.getURL()).searchParams.get('source') === 'bookmarks' ? 'bookmarks' : 'tabs');
+
+  ipcMain.handle('organize:propose', async (e) => {
+    if (!trusted(e)) return null;
+    const src = source(e);
+    const m = await modelInfo();
+    let items;
+    if (src === 'tabs') items = tabs.filter((t) => !t.private && !t.isHome && /^https?:/.test(t.lazyUrl || t.url) && !isSensitiveHost(hostOf(t.lazyUrl || t.url))).map((t) => ({ id: t.id, title: t.title, url: t.lazyUrl || t.url }));
+    else items = bookmarks.items.filter((b) => !b.folder).map((b) => ({ id: b.id, title: b.title, url: b.url }));
+    const existing = src === 'tabs' ? [...groups.values()].map((g) => g.name) : bookmarks.folders();
+    const r = await organize.propose({ items, llm: m.ready ? llm : null, lang: L(), existing, noun: src === 'tabs' ? 'tab' : 'bookmark' });
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const show = (id) => { const i = byId.get(id); return { id, title: i.title || i.url, host: hostOf(i.url) }; };
+    return {
+      source: src, ai: r.ai, remote: m.ready ? m.remote : '', model: m.model, considered: r.considered, skipped: r.skipped, modelReady: m.ready,
+      groups: r.groups.map((g) => ({ name: g.name, items: g.ids.map(show) })),
+      ungrouped: r.ungrouped.map(show),
+      duplicates: r.duplicates.map((d) => ({ ...show(d.id), of: byId.get(d.of) ? byId.get(d.of).title : '' }))
+    };
+  });
+
+  ipcMain.handle('organize:apply', (e, plan) => {
+    if (!trusted(e) || !plan || typeof plan !== 'object' || !Array.isArray(plan.groups)) return { ok: false };
+    const src = source(e);
+    const clean = plan.groups.slice(0, 12).map((g) => ({ name: String(g && g.name || '').trim().slice(0, 30), ids: [...new Set((g && g.ids || []).map(Number))].slice(0, 60) })).filter((g) => g.name && g.ids.length);
+    if (src === 'bookmarks') {
+      const before = bookmarks.items.map((b) => ({ id: b.id, folder: b.folder }));
+      let n = 0;
+      for (const g of clean) for (const id of g.ids) if (bookmarks.items.some((b) => b.id === id) && bookmarks.update(id, { folder: g.name })) n++;
+      lastOrganize = { source: 'bookmarks', before };
+      notifyBookmarks(); pushState();
+      return { ok: true, moved: n };
+    }
+    const live = new Set(tabs.map((t) => t.id));
+    const before = { order: tabs.map((t) => t.id), group: tabs.map((t) => [t.id, t.group]), groups: [...groups.values()].map((g) => ({ ...g })) };
+    const dupes = (Array.isArray(plan.closeDuplicates) ? plan.closeDuplicates : []).map(Number).filter((id) => live.has(id) && id !== activeId);
+    let n = 0;
+    for (const g of clean) {
+      const ids = g.ids.filter((id) => live.has(id) && !dupes.includes(id) && !tabs.find((t) => t.id === id).private);
+      if (ids.length < 2) continue;
+      const found = [...groups.values()].find((x) => x.name.toLowerCase() === g.name.toLowerCase());
+      const gid = found ? found.id : newGroup(g.name, null);
+      setOrder(tabstate.assign(tabs, [{ groupId: gid, ids }]));
+      n += ids.length;
+    }
+    for (const id of dupes) closeTab(id);
+    lastOrganize = { source: 'tabs', before, closed: dupes.length };
+    pushState();
+    return { ok: true, moved: n, closed: dupes.length };
+  });
+
+  ipcMain.on('settings:open-from-organize', (e) => { if (trusted(e)) openSettings(); });
+  ipcMain.handle('organize:undo', (e) => {
+    if (!trusted(e) || !lastOrganize) return false;
+    const u = lastOrganize;
+    lastOrganize = null;
+    if (u.source === 'bookmarks') { for (const b of u.before) bookmarks.update(b.id, { folder: b.folder }); notifyBookmarks(); pushState(); return true; }
+    const gmap = new Map(u.before.group);
+    for (const t of tabs) t.group = gmap.has(t.id) ? gmap.get(t.id) : 0;
+    groups.clear();
+    for (const g of u.before.groups) groups.set(g.id, g);
+    const pos = new Map(u.before.order.map((id, i) => [id, i]));
+    setOrder(tabs.slice().sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : 1e6) - (pos.has(b.id) ? pos.get(b.id) : 1e6)));
+    return true;
+  });
+}
+
+// AI bookmark: after the star is pressed, a model suggests a clean title, a folder and a one-line note.
+async function aiBookmark(tab, item) {
+  const m = await modelInfo();
+  if (!m.ready || !bookmarks || tab.private || isSensitiveHost(hostOfUrl(tab.url))) return;
+  const { text } = await pageRead(tab);
+  const r = await aibookmark.suggest({ llm, title: tab.title, url: tab.url, text, folders: bookmarks.folders(), lang: L() }).catch(() => null);
+  const live = r && bookmarks.items.find((b) => b.id === item.id);
+  if (!live) return;
+  bookmarks.update(item.id, {
+    title: aibookmark.poorTitle(live.title, live.url) && r.title ? r.title : undefined,
+    folder: !live.folder && r.folder ? r.folder : undefined,
+    note: r.note || undefined
+  });
+  notifyBookmarks(); pushState();
+  toast({ text: r.folder ? T('bm.aiSaved', { folder: r.folder }) : T('bm.aiNoted'), action: 'bookmarks', actionLabel: T('bm.edit') });
+}
+
 // ---- Bookmarks (BRW-02), history (BRW-03) and the lock area (BRW-07) ------------------------------------------------
 const notifyBookmarks = () => { if (bookmarksWin && !bookmarksWin.isDestroyed()) bookmarksWin.webContents.send('bookmarks:changed'); };
 function toggleBookmark() {
   const t = active();
   if (!t || t.isHome || !/^https?:/.test(t.url) || !bookmarks) return;
   const r = bookmarks.toggle(t.url, t.title);
-  if (r.added) toast({ text: T('bm.saved'), action: 'bookmarks', actionLabel: T('bm.edit') });
+  if (r.added) { toast({ text: T('bm.saved'), action: 'bookmarks', actionLabel: T('bm.edit') }); aiBookmark(t, r.item).catch(() => {}); }
   else toast({ text: T('bm.removed') });
   notifyBookmarks();
   pushState();
@@ -1071,6 +1230,7 @@ function wireBrowserDataIpc() {
   ipcMain.on('bookmark:folder', (e, title, x, y) => {
     if (!fromChrome(e) || !bookmarks) return;
     const items = bookmarks.list({ folder: String(title) }).sort((a, b) => a.ts - b.ts).map((b) => ({ label: (b.title || b.url).slice(0, 60), click: () => openFromBar(b.url, false) }));
+    if (items.length > 1) items.unshift({ label: T('bm.openAll', { n: items.length }), click: () => openFolderAsGroup(String(title)) }, { type: 'separator' });
     if (items.length) Menu.buildFromTemplate(items).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
   });
   ipcMain.on('bookmarks:open', (e) => { if (fromChrome(e)) openBookmarks(); });
@@ -1111,6 +1271,7 @@ function wireBrowserDataIpc() {
     return !!r;
   });
   ipcMain.handle('bookmarks:remove', (e, id) => { if (!bmTrusted(e)) return false; const r = bookmarks.remove(Number(id)); pushState(); return r; });
+  ipcMain.on('bookmarks:openAll', (e, folder) => { if (bmTrusted(e) && typeof folder === 'string') openFolderAsGroup(folder); });
   ipcMain.on('bookmarks:go', (e, id) => { if (!bmTrusted(e)) return; const b = bookmarks.items.find((x) => x.id === Number(id)); if (b) openTab({ url: b.url }); });
   ipcMain.handle('bookmarks:export', async (e) => {
     if (!bmTrusted(e)) return false;
@@ -1247,7 +1408,11 @@ function wireIpc() {
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
   ipcMain.on('tab:menu', (e, id) => { if (e.sender === win.webContents) showTabMenu(Number(id)); });
-  ipcMain.on('tab:move', (e, id, beforeId) => { if (e.sender === win.webContents) setOrder(tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId))); });
+  ipcMain.on('tab:move', (e, id, beforeId) => { if (e.sender === win.webContents) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
+  ipcMain.on('group:toggle', (e, id) => { if (e.sender === win.webContents && Number(id) === 0) return pushState(); if (e.sender === win.webContents && groups.has(Number(id))) { const g = groups.get(Number(id)); g.collapsed = !g.collapsed; pushState(); } });
+  ipcMain.on('group:rename', (e, id, name) => { if (e.sender === win.webContents && groups.has(Number(id)) && typeof name === 'string') { groups.get(Number(id)).name = name.trim().slice(0, 30); pushState(); } });
+  ipcMain.on('group:menu', (e, id) => { if (e.sender === win.webContents) showGroupMenu(Number(id)); });
+  ipcMain.on('organize:open', (e) => { if (e.sender === win.webContents || (bookmarksWin && e.sender === bookmarksWin.webContents)) openOrganize(e.sender === win.webContents ? 'tabs' : 'bookmarks'); });
   ipcMain.on('nav:submit', (_e, text) => submit(String(text)));
   ipcMain.on('nav:back', () => active().view.webContents.navigationHistory.goBack());
   ipcMain.on('nav:forward', () => active().view.webContents.navigationHistory.goForward());
@@ -1384,6 +1549,7 @@ function buildMenu() {
       { label: T('tab.prev'), accelerator: 'Ctrl+Shift+Tab', click: () => switchTab(tabstate.cycle(tabs, activeId, -1)) },
       { label: T('tab.goTo'), submenu: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ label: n === 9 ? T('tab.last') : T('tab.nth', { n }), accelerator: 'CmdOrCtrl+' + n, click: () => switchTab(tabstate.nth(tabs, n)) })) },
       { type: 'separator' },
+      { label: T('org.menu'), accelerator: 'CmdOrCtrl+Alt+O', click: () => openOrganize('tabs') },
       { label: T('menu.find'), accelerator: 'CmdOrCtrl+F', click: openFind },
       { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
       { label: T('menu.focus'), accelerator: 'CmdOrCtrl+L', click: focus }
@@ -1443,6 +1609,7 @@ app.whenReady().then(() => {
   wireFindIpc();
   wireDownloadsIpc();
   wireBrowserDataIpc();
+  wireOrganizeIpc();
   statsFile = path.join(app.getPath('userData'), 'stats.json');
   loadStats();
   blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });

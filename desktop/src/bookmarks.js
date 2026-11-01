@@ -9,7 +9,7 @@ class Bookmarks {
     const d = load ? load() : null;
     const raw = d && !Array.isArray(d) && Array.isArray(d.items) ? d.items : [];
     this.items = raw.filter((b) => b && isWeb(b.url)).slice(0, MAX).map((b) => ({
-      id: Number(b.id) || 0, url: b.url.slice(0, 2000), title: String(b.title || '').slice(0, 300), folder: String(b.folder || '').slice(0, 60), ts: Number(b.ts) || Date.now()
+      id: Number(b.id) || 0, url: b.url.slice(0, 2000), title: String(b.title || '').slice(0, 300), folder: String(b.folder || '').slice(0, 60), note: String(b.note || '').slice(0, 240), ts: Number(b.ts) || Date.now()
     }));
     this.bar = !!(d && !Array.isArray(d) && d.bar);
     this.seq = this.items.reduce((m, b) => Math.max(m, b.id), 0);
@@ -20,12 +20,12 @@ class Bookmarks {
 
   find(url) { return this.items.find((b) => b.url === url) || null; }
 
-  add({ url, title = '', folder = '' }) {
+  add({ url, title = '', folder = '', note = '' }) {
     if (!isWeb(url)) return null;
     const had = this.find(url);
     if (had) return had;
     if (this.items.length >= MAX) return null;
-    const b = { id: ++this.seq, url: url.slice(0, 2000), title: String(title || url).slice(0, 300), folder: String(folder || '').slice(0, 60), ts: Date.now() };
+    const b = { id: ++this.seq, url: url.slice(0, 2000), title: String(title || url).slice(0, 300), folder: String(folder || '').slice(0, 60), note: String(note || '').slice(0, 240), ts: Date.now() };
     this.items.push(b);
     this._persist();
     return b;
@@ -44,6 +44,7 @@ class Bookmarks {
     if (!b) return null;
     if (typeof patch.title === 'string') b.title = patch.title.trim().slice(0, 300) || b.title;
     if (typeof patch.folder === 'string') b.folder = patch.folder.trim().slice(0, 60);
+    if (typeof patch.note === 'string') b.note = patch.note.trim().slice(0, 240);
     if (typeof patch.url === 'string' && isWeb(patch.url)) b.url = patch.url.slice(0, 2000);
     this._persist();
     return b;
@@ -64,7 +65,7 @@ class Bookmarks {
   list({ q = '', folder } = {}) {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     return this.items
-      .filter((b) => (folder === undefined || b.folder === folder) && words.every((w) => (b.title + ' ' + b.url + ' ' + b.folder).toLowerCase().includes(w)))
+      .filter((b) => (folder === undefined || b.folder === folder) && words.every((w) => (b.title + ' ' + b.url + ' ' + b.folder + ' ' + b.note).toLowerCase().includes(w)))
       .sort((a, b) => b.ts - a.ts);
   }
 
@@ -78,7 +79,7 @@ class Bookmarks {
   // Netscape bookmark file, understood by Chrome, Edge, Firefox and Safari.
   exportHtml() {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const row = (b) => `    <DT><A HREF="${esc(b.url)}" ADD_DATE="${Math.floor(b.ts / 1000)}">${esc(b.title)}</A>`;
+    const row = (b) => `    <DT><A HREF="${esc(b.url)}" ADD_DATE="${Math.floor(b.ts / 1000)}">${esc(b.title)}</A>` + (b.note ? `\n    <DD>${esc(b.note)}` : '');
     const out = ['<!DOCTYPE NETSCAPE-Bookmark-file-1>', '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">', '<TITLE>Bookmarks</TITLE>', '<H1>Bookmarks</H1>', '<DL><p>'];
     for (const b of this.items.filter((x) => !x.folder)) out.push(row(b));
     for (const f of this.folders()) {
