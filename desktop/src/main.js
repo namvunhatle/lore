@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -92,8 +92,9 @@ const allowedScam = new Set(); // hosts the user chose to open despite a warning
 const WARNING = path.join(__dirname, 'ui', 'warning.html');
 const SIGNIN = path.join(__dirname, 'ui', 'signin.html');
 const CERTERR = path.join(__dirname, 'ui', 'certerror.html');
+const NETERR = path.join(__dirname, 'ui', 'neterror.html');
 // Pages that sit between the user and a destination and may send them onward (warning and sign-in explainer).
-const isOurWarning = (url) => url.startsWith('file:') && /\/ui\/(warning|signin|certerror)\.html/.test(decodeURI(url));
+const isOurWarning = (url) => url.startsWith('file:') && /\/ui\/(warning|signin|certerror|neterror)\.html/.test(decodeURI(url));
 const tabForWc = (id) => tabs.find((t) => t.view.webContents.id === id);
 let agentLog;
 let panel;          // trusted side panel (own preload); web pages never get this bridge
@@ -154,7 +155,7 @@ function pushState() {
     bar: bookmarks && bookmarks.bar ? { on: true, items: bookmarks.barItems().map((b) => (b.type === 'link' ? { ...b, icon: favicons ? favicons.get(hostOfUrl(b.url)) : '' } : b)) } : { on: false, items: [] },
     downloads: downloads ? { count: downloads.items.length, active: downloads.active } : { count: 0, active: 0 },
     // While a page is loading, keep showing what the user asked for instead of the old (or empty) address.
-    url: t ? t.pending || (!t.isHome ? t.url : '') : '',
+    url: t ? t.pending || (!t.isHome ? t.url : (t.errorUrl || '')) : '',
     canBack: !!wc && wc.navigationHistory.canGoBack(),
     canForward: !!wc && wc.navigationHistory.canGoForward(),
     blocked: S.blocked,
@@ -228,7 +229,13 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     if (isMainFrame) { tab.pending = ''; pushState(); }
     const why = isMainFrame && secure.certReason(code);
     if (why) return wc.loadFile(CERTERR, { query: { lang: L(), url: failedUrl, reason: why } });
-    if (!isMainFrame || !tab.pendingScam) return;
+    if (!isMainFrame) return;
+    // Anything else that stops a page from loading gets a page that says so (and a game when there is no connection).
+    if (!tab.pendingScam) {
+      if (code === -3 || code === -20 || !/^https?:/i.test(failedUrl || '')) return;
+      tab.errorUrl = failedUrl;
+      return wc.loadFile(NETERR, { query: { lang: L(), url: failedUrl, code: String(code), offline: net.isOnline() ? '0' : '1' } });
+    }
     const { url, v } = tab.pendingScam;
     tab.pendingScam = null;
     wc.loadFile(WARNING, { query: { lang: L(), url, reason: v.reason, brand: v.brand || '' } });
@@ -241,6 +248,12 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
       // Only the sign-in page may hand an address to the system browser, and only a Google sign-in address.
       if (url.startsWith('lore-external:')) { if (target && isGoogleSignIn(target)) shell.openExternal(target); return; }
       if (target && isAllowedNavigation(target)) { (new URL(url).searchParams.get('cert') === '1' ? allowedCert : allowedScam).add(new URL(target).hostname.toLowerCase()); wc.loadURL(target); }
+      return;
+    }
+    if (url.startsWith('lore-retry:') && isOurWarning(wc.getURL())) {
+      e.preventDefault();
+      const target = new URL(url).searchParams.get('u');
+      if (target && isAllowedNavigation(target)) { tab.pending = target; pushState(); wc.loadURL(target); }
       return;
     }
     if (url.startsWith('lore-do:')) {
@@ -256,7 +269,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   });
   wc.on('page-favicon-updated', (_e, icons) => { tab.favicon = icons[0] || ''; pushState(); if (!priv && !tab.isHome) saveFavicon(wc, tab.url, icons); });
   wc.on('did-start-navigation', (_e, _u, inPlace, isMain) => { if (isMain && !inPlace && tab.id === activeId) closeFind(); });
-  wc.on('did-navigate', (_e, url) => { tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv) memory.add({ url, title: tab.title }); pushState(); });
+  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv) memory.add({ url, title: tab.title }); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
     const url = wc.getURL();
@@ -309,7 +322,11 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   }
   selectTab(tab.id);
   if (target && target.url) wc.loadURL(target.url);
-  else loadHome(wc, target || {});
+  else {
+    loadHome(wc, target || {});
+    // The page loads after the box is shown, and loading takes the focus: take it back once it is ready.
+    wc.once('did-finish-load', () => { if (tab.id === activeId && tab.isHome) focusIntent(); });
+  }
   return tab;
 }
 
@@ -327,6 +344,7 @@ function selectTab(id) {
   const t = active();
   win.contentView.addChildView(t.view);
   closeFind();
+  if (t.isHome && !t.lazyUrl) focusIntent();
   if (t.group && groups.has(t.group)) groups.get(t.group).collapsed = false;
   if (t.lazyUrl) { const u = t.lazyUrl; t.lazyUrl = ''; t.view.webContents.loadURL(u); }
   layout();
@@ -806,6 +824,8 @@ async function saveFavicon(wc, pageUrl, icons) {
 
 // ---- Writing help: Tasks window, right-click Lore AI menu, toasts ---------------------------------------------------
 
+// A new tab is for typing: the cursor goes straight into the address and ask box.
+const focusIntent = () => { if (win && !win.isDestroyed()) { win.webContents.focus(); win.webContents.send('focus-intent'); } };
 const toast = (t) => { if (win && !win.isDestroyed()) win.webContents.send('toast', t); };
 
 function openTasks(req) {
