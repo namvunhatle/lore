@@ -106,6 +106,52 @@ function render(s) {
   $('#downloads .badge').textContent = s.downloads ? s.downloads.active : 0;
   $('#downloads .badge').hidden = !(s.downloads && s.downloads.active);
 
+  // Lock area: what kind of connection this page has. Plain http and an ignored certificate error are called out.
+  const sec = $('#sec');
+  const st = s.security === 'local' ? '' : s.security;
+  sec.hidden = !st;
+  sec.dataset.state = st;
+  sec.replaceChildren();
+  if (st) {
+    sec.insertAdjacentHTML('beforeend', st === 'https'
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/></svg>');
+    if (st !== 'https') { const l = document.createElement('span'); l.textContent = T(st === 'cert' ? 'sec.certShort' : 'sec.httpShort'); sec.append(l); }
+    sec.dataset.tip = T('sec.' + st);
+  }
+  const star = $('#star');
+  star.hidden = !s.reader;
+  star.setAttribute('aria-pressed', String(!!s.starred));
+  star.dataset.tip = T(s.starred ? 'bm.remove' : 'tip.star', { k: key });
+
+  // Bookmarks bar
+  const barOn = !!(s.bar && s.bar.on);
+  document.documentElement.classList.toggle('with-bar', barOn);
+  const bar = $('#bmbar');
+  bar.hidden = !barOn;
+  bar.replaceChildren();
+  if (barOn) {
+    for (const b of s.bar.items) {
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'bm' + (b.type === 'folder' ? ' dir' : '');
+      if (b.type === 'link') {
+        const f = document.createElement('span'); f.className = 'fav';
+        if (b.icon) { const img = document.createElement('img'); img.alt = ''; img.src = b.icon; f.append(img); } else { f.classList.add('ph'); f.textContent = (b.title || '?').trim().charAt(0).toUpperCase(); }
+        const t = document.createElement('span'); t.textContent = b.title;
+        x.append(f, t);
+        x.addEventListener('click', (e) => lore.send('bookmark:open', b.id, e.metaKey || e.ctrlKey));
+        x.addEventListener('auxclick', (e) => { if (e.button === 1) lore.send('bookmark:open', b.id, true); });
+      } else {
+        const t = document.createElement('span'); t.textContent = b.title + ' ▾';
+        x.append(t);
+        x.addEventListener('click', () => { const r = x.getBoundingClientRect(); lore.send('bookmark:folder', b.title, Math.round(r.left), Math.round(r.bottom)); });
+      }
+      bar.append(x);
+    }
+    if (!s.bar.items.length) { const h = document.createElement('span'); h.className = 'hint'; h.textContent = T('bm.barEmpty'); bar.append(h); }
+  }
+
   $('#reader').hidden = !s.reader;
   $('#media').hidden = !s.media;
   $('#media .badge').textContent = s.media;
@@ -229,3 +275,5 @@ $('#memory').addEventListener('click', () => lore.send('memory:open'));
 $('#settings').addEventListener('click', () => lore.send('settings:open'));
 $('#media').addEventListener('click', () => lore.send('media:open'));
 $('#downloads').addEventListener('click', () => lore.send('downloads:open'));
+$('#star').addEventListener('click', () => lore.send('bookmark:toggle'));
+$('#sec').addEventListener('click', () => { const r = $('#sec').getBoundingClientRect(); lore.send('security:menu', Math.round(r.left), Math.round(r.bottom)); });

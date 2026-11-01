@@ -72,3 +72,23 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 #downloads[hidden]{display:none}
 #downloads .badge[hidden]{display:none}
 #downloads.busy{color:var(--accent)}
+
+/* Lock area and star, inside the address field. */
+.sec{flex:none;display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 6px;margin-left:-6px;border-radius:12px;color:var(--muted);font:500 12px var(--f)}
+.sec:hover{background:var(--line)}
+.sec[hidden],.star[hidden]{display:none}
+.sec[data-state="http"],.sec[data-state="cert"]{color:var(--warn);background:var(--warn-soft)}
+.star{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.star svg{fill:none;stroke:currentColor}
+.star:hover{background:var(--line)}
+.star[aria-pressed="true"]{color:var(--accent)}
+.star[aria-pressed="true"] svg{fill:currentColor}
+/* Bookmarks bar: one more row under the toolbar. */
+.with-bar,.with-bar body{height:122px}
+.bmbar{display:flex;align-items:center;gap:2px;height:34px;padding:0 12px;border-bottom:1px solid var(--line);overflow:hidden}
+.bmbar[hidden]{display:none}
+.bm{display:inline-flex;align-items:center;gap:6px;max-width:180px;height:26px;padding:0 8px;border-radius:7px;font-size:12.5px;color:var(--ink);flex:none}
+.bm:hover{background:var(--hover)}
+.bm span:not(.fav){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bm.dir{color:var(--muted)}
+.bmbar .hint{color:var(--muted);font-size:12px;padding:0 6px}

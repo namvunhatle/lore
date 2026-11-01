@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Connection not private</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<script src="early.js"></script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="warning.css">
+</head>
+<body>
+<main>
+  <div class="shield" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 14.5v2"/></svg></div>
+  <h1 data-i18n="certerr.title"></h1>
+  <p class="why" id="why"></p>
+  <p class="addr"><small data-i18n="warn.address"></small><code id="addr"></code></p>
+  <div class="btns">
+    <a class="btn pri" id="back" href="lore-back:" data-i18n="warn.back"></a>
+    <a class="link" id="go" data-i18n="certerr.proceed"></a>
+  </div>
+</main>
+<script src="i18n.js"></script>
+<script src="certerror.js"></script>
+</body>
+</html>

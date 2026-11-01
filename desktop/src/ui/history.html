@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="list.css">
+</head>
+<body>
+<header class="top">
+  <div class="titles"><h1 data-i18n="hist.title"></h1><p class="lead" data-i18n="hist.lead"></p></div>
+  <form class="search" role="search" onsubmit="return false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="q" type="search" data-i18n-ph="hist.search" autocomplete="off" spellcheck="false" autofocus>
+  </form>
+  <div class="filters"><div class="chips" id="ranges" role="group" data-i18n-aria="mem.timeRange"></div></div>
+</header>
+<main>
+  <ul id="list"></ul>
+  <div class="empty" id="empty" hidden><p id="empty-t"></p></div>
+</main>
+<footer>
+  <span class="note" data-i18n="hist.sharedNote"></span>
+  <span class="grow"></span>
+  <button class="btn" id="clear" type="button" data-i18n="hist.clear"></button>
+</footer>
+<script src="i18n.js"></script>
+<script src="history.js"></script>
+</body>
+</html>

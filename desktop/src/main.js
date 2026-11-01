@@ -20,6 +20,8 @@ const { createLlm, listLocalModels, pullLocalModel, isLocalHost } = require('./l
 const { Settings } = require('./settings');
 const writing = require('./writing');
 const tabstate = require('./tabstate');
+const { Bookmarks } = require('./bookmarks');
+const secure = require('./security');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
@@ -45,7 +47,9 @@ const realWorkflows = require('./workflows').real;
 const { classifyResponse, isDeniedSite } = require('./media');
 const downloader = require('./downloader');
 
-const CHROME_HEIGHT = 88;
+const CHROME_BASE = 88;
+const BAR_H = 34; // the bookmarks bar, when it is shown
+const chromeHeight = () => CHROME_BASE + (bookmarks && bookmarks.bar ? BAR_H : 0);
 const HOME = path.join(__dirname, 'ui', 'home.html');
 const READER = path.join(__dirname, 'ui', 'reader.html');
 const TAB_PRELOAD = path.join(__dirname, 'tab-preload.js');
@@ -60,6 +64,10 @@ let sessionTimer = null;
 let lastSession = '';
 let downloads = null;      // every file saved by the browser (BRW-04)
 let downloadsWin = null;
+let bookmarks = null;      // saved pages (BRW-02)
+let bookmarksWin = null;
+let historyWin = null;
+const allowedCert = new Set(); // hosts whose certificate error the user chose to ignore, for this run only
 let findView = null;       // the find-in-page bar (BRW-01)
 let activeId = null;
 const S = { blocked: 0, adsOn: true };
@@ -75,8 +83,9 @@ let scamList;
 const allowedScam = new Set(); // hosts the user chose to open despite a warning, for this run only
 const WARNING = path.join(__dirname, 'ui', 'warning.html');
 const SIGNIN = path.join(__dirname, 'ui', 'signin.html');
+const CERTERR = path.join(__dirname, 'ui', 'certerror.html');
 // Pages that sit between the user and a destination and may send them onward (warning and sign-in explainer).
-const isOurWarning = (url) => url.startsWith('file:') && /\/ui\/(warning|signin)\.html/.test(decodeURI(url));
+const isOurWarning = (url) => url.startsWith('file:') && /\/ui\/(warning|signin|certerror)\.html/.test(decodeURI(url));
 const tabForWc = (id) => tabs.find((t) => t.view.webContents.id === id);
 let agentLog;
 let panel;          // trusted side panel (own preload); web pages never get this bridge
@@ -94,8 +103,8 @@ function layout() {
   if (!win || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  t.view.setBounds({ x: 0, y: CHROME_HEIGHT, width: w - pw, height: h - CHROME_HEIGHT });
-  if (panel && pw) panel.setBounds({ x: w - pw, y: CHROME_HEIGHT, width: pw, height: h - CHROME_HEIGHT });
+  t.view.setBounds({ x: 0, y: chromeHeight(), width: w - pw, height: h - chromeHeight() });
+  if (panel && pw) panel.setBounds({ x: w - pw, y: chromeHeight(), width: pw, height: h - chromeHeight() });
   layoutFind();
 }
 
@@ -110,6 +119,15 @@ function paintTitleBar(priv) {
   win.setTitleBarOverlay({ color: priv ? '#1A1330' : dark ? '#10151E' : '#FFFFFF', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
 }
 
+const hostOfUrl = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
+
+// What the lock area next to the address says: https, http, https with an ignored certificate error, or nothing.
+function securityOf(t) {
+  if (!t || t.pending || t.isHome) return '';
+  const c = secure.connectionOf(t.lazyUrl || t.url);
+  return c === 'https' && allowedCert.has(hostOfUrl(t.url)) ? 'cert' : c;
+}
+
 function pushState() {
   scheduleSessionSave();
   const t = active();
@@ -121,6 +139,9 @@ function pushState() {
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned
     })),
+    security: securityOf(t),
+    starred: !!(t && bookmarks && !t.isHome && bookmarks.find(t.url)),
+    bar: bookmarks && bookmarks.bar ? { on: true, items: bookmarks.barItems().map((b) => (b.type === 'link' ? { ...b, icon: favicons ? favicons.get(hostOfUrl(b.url)) : '' } : b)) } : { on: false, items: [] },
     downloads: downloads ? { count: downloads.items.length, active: downloads.active } : { count: 0, active: 0 },
     // While a page is loading, keep showing what the user asked for instead of the old (or empty) address.
     url: t ? t.pending || (!t.isHome ? t.url : '') : '',
@@ -191,8 +212,10 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   wc.on('page-title-updated', (_e, title) => { tab.title = title; if (!tab.isHome && !priv) memory.setTitle(tab.url, title); pushState(); });
   // Cards on the New tab page navigate to lore-run:?q=..., which runs that text through the intent bar.
   // The blocked request fails with ERR_BLOCKED_BY_CLIENT; once it has, show the warning page in its place.
-  wc.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
+  wc.on('did-fail-load', (_e, code, _desc, failedUrl, isMainFrame) => {
     if (isMainFrame) { tab.pending = ''; pushState(); }
+    const why = isMainFrame && secure.certReason(code);
+    if (why) return wc.loadFile(CERTERR, { query: { lang: L(), url: failedUrl, reason: why } });
     if (!isMainFrame || !tab.pendingScam) return;
     const { url, v } = tab.pendingScam;
     tab.pendingScam = null;
@@ -205,7 +228,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
       const target = new URL(url).searchParams.get('u');
       // Only the sign-in page may hand an address to the system browser, and only a Google sign-in address.
       if (url.startsWith('lore-external:')) { if (target && isGoogleSignIn(target)) shell.openExternal(target); return; }
-      if (target && isAllowedNavigation(target)) { allowedScam.add(new URL(target).hostname.toLowerCase()); wc.loadURL(target); }
+      if (target && isAllowedNavigation(target)) { (new URL(url).searchParams.get('cert') === '1' ? allowedCert : allowedScam).add(new URL(target).hostname.toLowerCase()); wc.loadURL(target); }
       return;
     }
     if (url.startsWith('lore-do:')) {
@@ -959,7 +982,7 @@ function layoutFind() {
   if (!findView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  findView.setBounds({ x: Math.max(0, w - pw - FIND_W - 12), y: CHROME_HEIGHT + 8, width: FIND_W, height: 46 });
+  findView.setBounds({ x: Math.max(0, w - pw - FIND_W - 12), y: chromeHeight() + 8, width: FIND_W, height: 46 });
 }
 function openFind() {
   const t = active();
@@ -997,6 +1020,127 @@ function wireFindIpc() {
     t.view.webContents.findInPage(q, { forward: forward !== false, findNext: !!next });
   });
   ipcMain.on('find:close', (e) => { if (ok(e)) closeFind(); });
+}
+
+// ---- Bookmarks (BRW-02), history (BRW-03) and the lock area (BRW-07) ------------------------------------------------
+const notifyBookmarks = () => { if (bookmarksWin && !bookmarksWin.isDestroyed()) bookmarksWin.webContents.send('bookmarks:changed'); };
+function toggleBookmark() {
+  const t = active();
+  if (!t || t.isHome || !/^https?:/.test(t.url) || !bookmarks) return;
+  const r = bookmarks.toggle(t.url, t.title);
+  if (r.added) toast({ text: T('bm.saved'), action: 'bookmarks', actionLabel: T('bm.edit') });
+  else toast({ text: T('bm.removed') });
+  notifyBookmarks();
+  pushState();
+}
+function openFromBar(url, newTab) {
+  const t = active();
+  if (!isAllowedNavigation(url)) return;
+  if (newTab || !t) return openTab({ url });
+  t.pending = url; pushState();
+  t.view.webContents.loadURL(url);
+}
+function openBookmarks() {
+  if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.focus();
+  bookmarksWin = new BrowserWindow({
+    width: 780, height: 700, minWidth: 520, minHeight: 420, title: T('bm.title'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'bookmarks-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  bookmarksWin.setMenuBarVisibility(false);
+  bookmarksWin.loadFile(path.join(__dirname, 'ui', 'bookmarks.html'), { query: { lang: L() } });
+  bookmarksWin.on('closed', () => { bookmarksWin = null; });
+}
+function openHistory() {
+  if (historyWin && !historyWin.isDestroyed()) return historyWin.focus();
+  historyWin = new BrowserWindow({
+    width: 780, height: 720, minWidth: 520, minHeight: 420, title: T('hist.title'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'history-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  historyWin.setMenuBarVisibility(false);
+  historyWin.loadFile(path.join(__dirname, 'ui', 'history.html'), { query: { lang: L() } });
+  historyWin.on('closed', () => { historyWin = null; });
+}
+
+function wireBrowserDataIpc() {
+  const fromChrome = (e) => e.sender === win.webContents;
+  ipcMain.on('bookmark:toggle', (e) => { if (fromChrome(e)) toggleBookmark(); });
+  ipcMain.on('bookmark:bar', (e) => { if (!fromChrome(e) || !bookmarks) return; bookmarks.setBar(!bookmarks.bar); layout(); pushState(); });
+  ipcMain.on('bookmark:open', (e, id, newTab) => { if (!fromChrome(e) || !bookmarks) return; const b = bookmarks.items.find((x) => x.id === Number(id)); if (b) openFromBar(b.url, !!newTab); });
+  ipcMain.on('bookmark:folder', (e, title, x, y) => {
+    if (!fromChrome(e) || !bookmarks) return;
+    const items = bookmarks.list({ folder: String(title) }).sort((a, b) => a.ts - b.ts).map((b) => ({ label: (b.title || b.url).slice(0, 60), click: () => openFromBar(b.url, false) }));
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
+  });
+  ipcMain.on('bookmarks:open', (e) => { if (fromChrome(e)) openBookmarks(); });
+  ipcMain.on('history:open', (e) => { if (fromChrome(e)) openHistory(); });
+
+  // The lock area: what the connection is, and the two things a person can do about it.
+  ipcMain.on('security:menu', (e, x, y) => {
+    if (!fromChrome(e)) return;
+    const t = active();
+    if (!t || t.isHome) return;
+    const state = securityOf(t);
+    const host = hostOfUrl(t.url);
+    const label = { https: T('sec.https'), http: T('sec.http'), local: T('sec.local'), cert: T('sec.cert'), '': '' }[state];
+    const up = state === 'http' ? secure.httpsVersion(t.url) : null;
+    Menu.buildFromTemplate([
+      { label, enabled: false },
+      { label: host, enabled: false },
+      { type: 'separator' },
+      ...(up ? [{ label: T('sec.tryHttps'), click: () => openFromBar(up, false) }] : []),
+      { label: T('sec.clearSite'), enabled: !!host, click: async () => {
+        try { await t.view.webContents.session.clearStorageData({ origin: new URL(t.url).origin }); t.view.webContents.reload(); toast({ text: T('sec.cleared', { host }) }); } catch { /* page gone */ }
+      } }
+    ]).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
+  });
+
+  // -- bookmarks window
+  const bmTrusted = (e) => bookmarksWin && e.sender === bookmarksWin.webContents;
+  ipcMain.handle('bookmarks:list', (e, { q = '', folder } = {}) => {
+    if (!bmTrusted(e)) return { items: [], folders: [] };
+    const items = bookmarks.list({ q: String(q).slice(0, 200), folder: typeof folder === 'string' ? folder : undefined }).slice(0, 1000)
+      .map((b) => ({ ...b, host: hostOfUrl(b.url), icon: favicons.get(hostOfUrl(b.url)) }));
+    return { items, folders: bookmarks.folders(), total: bookmarks.items.length };
+  });
+  ipcMain.handle('bookmarks:update', (e, id, patch) => {
+    if (!bmTrusted(e) || !patch || typeof patch !== 'object') return false;
+    const r = bookmarks.update(Number(id), { title: patch.title, folder: patch.folder });
+    pushState();
+    return !!r;
+  });
+  ipcMain.handle('bookmarks:remove', (e, id) => { if (!bmTrusted(e)) return false; const r = bookmarks.remove(Number(id)); pushState(); return r; });
+  ipcMain.on('bookmarks:go', (e, id) => { if (!bmTrusted(e)) return; const b = bookmarks.items.find((x) => x.id === Number(id)); if (b) openTab({ url: b.url }); });
+  ipcMain.handle('bookmarks:export', async (e) => {
+    if (!bmTrusted(e)) return false;
+    const r = await dialog.showSaveDialog(bookmarksWin, { defaultPath: path.join(app.getPath('downloads'), 'lore-bookmarks.html'), filters: [{ name: 'HTML', extensions: ['html'] }] });
+    if (r.canceled || !r.filePath) return false;
+    fs.writeFileSync(r.filePath, bookmarks.exportHtml());
+    return true;
+  });
+
+  // -- history window: the same visits Memory keeps, shown by day. Deleting here deletes them from Memory too.
+  const hiTrusted = (e) => historyWin && e.sender === historyWin.webContents;
+  ipcMain.handle('history:list', (e, { q = '', range = 'all' } = {}) => {
+    if (!hiTrusted(e)) return { items: [] };
+    const from = RANGES[range] ? Date.now() - RANGES[range] : undefined;
+    const words = String(q).toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+    const items = memory.list({ from })
+      .filter((i) => words.every((w) => ((i.title || '') + ' ' + i.url).toLowerCase().includes(w)))
+      .sort((a, b) => b.ts - a.ts).slice(0, 800)
+      .map((i) => ({ url: i.url, title: i.title, ts: i.ts, host: hostOfUrl(i.url), icon: favicons.get(hostOfUrl(i.url)) }));
+    return { items, total: memory.size };
+  });
+  ipcMain.handle('history:remove', (e, url) => (hiTrusted(e) ? memory.remove(String(url)) : false));
+  ipcMain.handle('history:clear', async (e, range) => {
+    if (!hiTrusted(e) || !(range === 'all' || RANGES[range])) return false;
+    const ok = (await dialog.showMessageBox(historyWin, { type: 'warning', buttons: [T('hist.clearGo'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('hist.clearAsk.' + range), detail: T('hist.clearDetail') })).response === 0;
+    if (!ok) return false;
+    memory.removeSince(range);
+    return true;
+  });
+  ipcMain.on('history:go', (e, url) => { if (hiTrusted(e) && isAllowedNavigation(String(url))) openTab({ url: String(url) }); });
 }
 
 // ---- Downloads window (BRW-04) ---------------------------------------------------------------------------------------
@@ -1145,6 +1289,8 @@ function wireIpc() {
       { type: 'separator' },
       { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
       { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
+      { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
+      { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
       { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
       { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
       { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings },
@@ -1242,6 +1388,13 @@ function buildMenu() {
       { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
       { label: T('menu.focus'), accelerator: 'CmdOrCtrl+L', click: focus }
     ] },
+    { label: T('menu.bookmarks'), submenu: [
+      { label: T('bm.toggle'), accelerator: 'CmdOrCtrl+D', click: toggleBookmark },
+      { label: T('bm.bar'), accelerator: 'CmdOrCtrl+Shift+B', click: () => { if (bookmarks) { bookmarks.setBar(!bookmarks.bar); layout(); pushState(); } } },
+      { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
+      { type: 'separator' },
+      { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory }
+    ] },
     { role: 'editMenu' },
     // Not the stock viewMenu: its Reload (Cmd/Ctrl+R) reloads the browser's own window, which empties the tab strip.
     { label: T('menu.view'), submenu: [
@@ -1271,6 +1424,8 @@ app.whenReady().then(() => {
   favicons = new Favicons(fileStore(path.join(app.getPath('userData'), 'favicons.bin'), safeStorage));
   taskStore = new taskLib.TaskStore(fileStore(path.join(app.getPath('userData'), 'tasks.bin'), safeStorage));
   sessionStore = fileStore(path.join(app.getPath('userData'), 'session.bin'), safeStorage);
+  const bmStore = fileStore(path.join(app.getPath('userData'), 'bookmarks.bin'), safeStorage);
+  bookmarks = new Bookmarks({ load: () => bmStore.load(), save: (d) => bmStore.save(d) });
   downloads = new DownloadList({ dir: app.getPath('downloads'), onChange: (rec, isNew) => {
     pushState();
     if (downloadsWin && !downloadsWin.isDestroyed()) downloadsWin.webContents.send('downloads:update', downloads.view());
@@ -1287,6 +1442,7 @@ app.whenReady().then(() => {
   wireTasksIpc();
   wireFindIpc();
   wireDownloadsIpc();
+  wireBrowserDataIpc();
   statsFile = path.join(app.getPath('userData'), 'stats.json');
   loadStats();
   blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
@@ -1299,6 +1455,10 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
+});
+// A certificate Chromium cannot trust is refused, unless the person chose to continue to that host (see the warning page).
+app.on('certificate-error', (event, _wc, url, _error, _cert, callback) => {
+  if (allowedCert.has(hostOfUrl(url))) { event.preventDefault(); callback(true); } else callback(false);
 });
 app.on('before-quit', () => { if (memory) memory.flush(); saveStats(); writeSession(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
