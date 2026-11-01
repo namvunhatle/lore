@@ -1574,7 +1574,7 @@ function wireWelcomeIpc() {
   ipcMain.handle('welcome:init', (e) => {
     if (!trusted(e)) return reject();
     welcomeSources = importer.detect();
-    return { profile: { name: profiles.current.name, color: profiles.current.color }, browsers: welcomeSources.map((b) => ({ id: b.id, name: b.name, profiles: b.profiles.map((p) => ({ id: p.id, name: p.name })) })), def: defaultStatus() };
+    return { profile: { name: profiles.current.name, color: profiles.current.color }, browsers: welcomeSources.map((b) => ({ id: b.id, name: b.name, bookmarks: b.bookmarks, profiles: b.profiles.map((p) => ({ id: p.id, name: p.name })) })), def: defaultStatus() };
   });
   ipcMain.handle('welcome:profile', (e, name, color) => {
     if (!trusted(e)) return reject();

@@ -51,7 +51,7 @@ The installers are **not signed** yet, so Windows SmartScreen and macOS Gatekeep
 - **Private by default.** Ad and tracker blocking (EasyList, EasyPrivacy and a Vietnam list), third-party cookies blocked, Global Privacy Control, reduced fingerprinting, cookie-banner dismissal, a warning for look-alike bank and e-wallet sites, permissions that ask once, and private tabs that leave nothing behind.
 - **Your AI, your choice.** Run a model on your machine through [Ollama](https://ollama.com), or bring your own key for any OpenAI-compatible service or Claude. Or turn AI off: everything that does not need a model still works.
 - **The basics.** Bookmarks with a bar, a history page, find in page, a downloads manager, tabs that come back after a restart, pinned tabs, drag to reorder, reopen closed tabs, a lock indicator with a clear certificate warning, and a full right-click menu.
-- **Profiles, split view and a gentle start.** Keep work and personal apart with profiles (own logins, tabs, memory, bookmarks), put two pages side by side, and on first run bring bookmarks and history over from Chrome, Edge, Brave, Vivaldi, Cốc Cốc or Firefox and make Lore your default browser.
+- **Profiles, split view and a gentle start.** Keep work and personal apart with profiles (own logins, tabs, memory, bookmarks), put two pages side by side, and on first run bring bookmarks and history over from Chrome, Edge, Brave, Vivaldi, Cốc Cốc, Arc, Dia, Helium or Firefox and make Lore your default browser.
 - **Vietnamese and English.** The interface and the intent bar understand both, with or without diacritics.
 - **Video download** for media you are allowed to save (plain files and HLS streams). Encrypted streams and platforms such as YouTube and Netflix are never offered.
 

@@ -66,6 +66,46 @@ test('browsers are found on a Mac by their folders, with profile names', () => {
   assert.deepStrictEqual(imp.detect({ platform: 'darwin', home: tmp(), env: {} }), []);
 });
 
+test('Arc, Dia and Helium are found on a Mac in their own folders', () => {
+  const home = tmp();
+  for (const dir of ['Arc/User Data', 'Dia/User Data', 'net.imput.helium']) {
+    const prof = path.join(home, 'Library', 'Application Support', dir, 'Default');
+    fs.mkdirSync(prof, { recursive: true });
+    fs.writeFileSync(path.join(prof, 'History'), '');
+  }
+  const r = imp.detect({ platform: 'darwin', home, env: {} });
+  assert.deepStrictEqual(r.map((b) => [b.id, b.name, b.kind]), [['arc', 'Arc', 'chromium'], ['dia', 'Dia', 'chromium'], ['helium', 'Helium', 'chromium']]);
+  // None of these folders exist on other systems, and Dia has no known folder there: skipped, not an error.
+  assert.deepStrictEqual(imp.detect({ platform: 'win32', home, env: {} }), []);
+  assert.deepStrictEqual(imp.detect({ platform: 'linux', home, env: {} }), []);
+});
+
+test('Arc and Helium are found on Windows, and Helium on Linux', () => {
+  const home = tmp();
+  const local = path.join(home, 'AppData', 'Local');
+  for (const dir of ['Packages/TheBrowserCompany.Arc_ttt1ap7aakyb4/LocalCache/Local/Arc/User Data', 'imput/Helium/User Data']) {
+    fs.mkdirSync(path.join(local, dir, 'Default'), { recursive: true });
+    fs.writeFileSync(path.join(local, dir, 'Default', 'History'), '');
+  }
+  assert.deepStrictEqual(imp.detect({ platform: 'win32', home, env: { LOCALAPPDATA: local } }).map((b) => b.id), ['arc', 'helium']);
+  const lin = tmp();
+  fs.mkdirSync(path.join(lin, '.config', 'net.imput.helium', 'Default'), { recursive: true });
+  fs.writeFileSync(path.join(lin, '.config', 'net.imput.helium', 'Default', 'Bookmarks'), '{}');
+  assert.deepStrictEqual(imp.detect({ platform: 'linux', home: lin, env: {} }).map((b) => b.id), ['helium']);
+});
+
+test('a browser\'s internal profiles are left out, and it says whether it has bookmarks', () => {
+  const home = tmp();
+  const base = path.join(home, 'Library', 'Application Support', 'Arc', 'User Data');
+  for (const d of ['Default', 'Profile 2']) { fs.mkdirSync(path.join(base, d), { recursive: true }); fs.writeFileSync(path.join(base, d, 'History'), ''); }
+  fs.writeFileSync(path.join(base, 'Local State'), JSON.stringify({ profile: { info_cache: { Default: { name: 'Your Arc' }, 'Profile 2': { name: '__ARC_SYSTEM_PROFILE' } } } }));
+  const dia = path.join(home, 'Library', 'Application Support', 'Dia', 'User Data', 'Default');
+  fs.mkdirSync(dia, { recursive: true });
+  fs.writeFileSync(path.join(dia, 'Bookmarks'), '{}');
+  const r = imp.detect({ platform: 'darwin', home, env: {} });
+  assert.deepStrictEqual(r.map((b) => [b.id, b.profiles.map((p) => p.name), b.bookmarks]), [['arc', ['Your Arc'], false], ['dia', ['Default'], true]]);
+});
+
 test('only web addresses are accepted', () => {
   assert.ok(imp.isWeb('https://a.example'));
   assert.ok(!imp.isWeb('file:///x'));
