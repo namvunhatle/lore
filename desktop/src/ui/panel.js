@@ -1,0 +1,253 @@
+const $ = (s) => document.querySelector(s);
+let lang = 'en';
+let last = null; // last thing rendered, so a language change can redraw it
+const T = (k, v) => LORE_I18N.t(lang, k, v);
+const setTitle = (t, sub = '') => { $('#title').textContent = t; $('#sub').textContent = sub; };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+
+function render(s) {
+  setTitle(s.title);
+  const ol = $('#steps');
+  ol.replaceChildren();
+  for (const st of s.steps) {
+    const li = el('li', 'st ' + st.status);
+    li.append(el('span', 'mark', st.status === 'done' ? '✓' : ''), el('span', '', st.text));
+    ol.append(li);
+  }
+  const box = $('#box');
+  box.replaceChildren();
+  if (s.state === 'awaiting' && s.confirm) {
+    const c = s.confirm;
+    const card = el('div', 'conf');
+    card.append(el('p', 'k', T('panel.confirm')), el('div', '', c.item), el('div', 'amount', c.amount), el('small', '', c.meta));
+    const btns = el('div', 'btns');
+    const ok = el('button', 'btn acc', c.cta);
+    const no = el('button', 'btn', T('panel.cancel'));
+    ok.addEventListener('click', () => agent.decide(true));
+    no.addEventListener('click', () => agent.decide(false));
+    btns.append(ok, no);
+    card.append(btns);
+    box.append(card);
+    ok.focus();
+  } else if (s.state === 'running') {
+    box.append(el('div', 'conf hold', T('panel.hold')));
+  } else {
+    const label = { done: T('panel.result'), cancelled: T('panel.cancelled'), failed: T('panel.failed') }[s.state];
+    const card = el('div', 'conf');
+    card.append(el('p', 'k', label), el('div', '', s.result || (s.state === 'cancelled' ? T('panel.nothingSent') : '')));
+    box.append(card);
+  }
+}
+
+function size(n) { return n ? (n / 1048576 >= 1 ? Math.round(n / 1048576) + ' MB' : Math.round(n / 1024) + ' KB') : ''; }
+
+function renderDl(s) {
+  setTitle(T('dl.title'));
+  $('#steps').replaceChildren();
+  const box = $('#box');
+  box.replaceChildren();
+  const card = el('div', 'conf');
+  if (s.state === 'loading') card.append(el('p', 'k', T('dl.reading')));
+  else if (s.state === 'choose') {
+    card.append(el('p', 'k', s.title));
+    s.options.forEach((o, i) => {
+      const b = el('button', 'opt');
+      b.append(el('span', '', o.label), el('span', 'sz', size(o.size)));
+      b.addEventListener('click', () => agent.dlStart(i));
+      card.append(b);
+    });
+  } else if (s.state === 'running') {
+    card.append(el('p', 'k', T('dl.downloading')), el('div', '', s.title));
+    const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round(s.pct * 100) + '%'; bar.append(fill);
+    card.append(bar, el('small', '', Math.round(s.pct * 100) + '%'));
+  } else if (s.state === 'done') {
+    card.append(el('p', 'k', T('dl.saved')), el('div', '', T('dl.savedTo')));
+    const b = el('button', 'btn', T(agent.platform === 'darwin' ? 'dl.show' : 'dl.showWin'));
+    b.addEventListener('click', () => agent.dlReveal());
+    const w = el('div', 'btns'); w.append(b); card.append(w);
+  } else card.append(el('p', 'k', T('dl.failed')), el('div', '', s.error));
+  box.append(card);
+  box.append(el('p', 'note', T('dl.legal')));
+}
+
+// ---- Page assistant: a conversation about the current page -----------------------------------------------------
+
+const P = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  summarize: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  translate: '<path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M12 5c0 4-3 7-6 8M13 21l4-10 4 10M14.5 18h5"/>',
+  reader: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/>',
+  facts: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  decide: '<path d="M12 4v16M6 20h12M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
+  'share-email': '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>',
+  'page-post': '<path d="M4 5h16v11H9l-5 4z"/>',
+  explain: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  'event-page': '<path d="M5 6h14v14H5zM5 10h14M9 3v4M15 3v4"/>',
+  tasks: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
+  ask: '<path d="M4 5h16v11H9l-5 4z"/>'
+};
+const ACTIONS = [
+  { id: 'summarize', label: () => T('pg.summarize'), run: () => agent.pageDo('summarize') },
+  { id: 'translate', label: () => T('pg.translate'), run: () => agent.pageDo('translate') },
+  { id: 'reader', label: () => T('pg.reader'), run: () => agent.pageDo('reader') },
+  { id: 'facts', label: () => T('task.facts.name'), run: () => agent.pageDo('task', 'facts') },
+  { id: 'explain', label: () => T('task.explain.name'), run: () => agent.pageDo('task', 'explain') },
+  { id: 'decide', label: () => T('task.decide.name'), run: () => agent.pageDo('task', 'decide') },
+  { id: 'event-page', label: () => T('task.event-page.name'), run: () => agent.pageDo('task', 'event-page') },
+  { id: 'share-email', label: () => T('task.share-email.name'), run: () => agent.pageDo('task', 'share-email') }
+];
+const MORE = { id: 'tasks', label: () => T('pg.alltasks'), run: () => agent.pageDo('tasks') };
+
+const msgs = new Map(); // seq -> { root, card, body }
+let lastSeq = 0;
+
+function fillActions() {
+  const grid = $('#grid');
+  const rail = $('#rail');
+  grid.replaceChildren();
+  rail.replaceChildren();
+  for (const a of [...ACTIONS, MORE]) {
+    const b = el('button', a === MORE ? 'act wide' : 'act');
+    b.type = 'button';
+    b.innerHTML = P(ICONS[a.id]); // fixed strings above
+    b.append(document.createTextNode(a.label()));
+    b.addEventListener('click', a.run);
+    grid.append(b);
+    const c = el('button', 'chip', a.label());
+    c.type = 'button';
+    c.addEventListener('click', a.run);
+    rail.append(c);
+  }
+  const sugs = $('#sugs');
+  sugs.replaceChildren();
+  for (const k of ['pg.sug.1', 'pg.sug.2', 'pg.sug.3']) {
+    const b = el('button', 'chip', T(k));
+    b.type = 'button';
+    b.addEventListener('click', () => agent.pageDo('ask', T(k)));
+    sugs.append(b);
+  }
+}
+
+function setMode(page) {
+  $('#home').hidden = !page || msgs.size > 0;
+  $('#thread').hidden = !page;
+  $('#composer').hidden = !page;
+  $('#rail').hidden = msgs.size === 0;
+  for (const id of ['steps', 'box']) $('#' + id).hidden = page;
+  if (page) { $('.note').style.display = 'none'; $('.sim').style.display = 'none'; }
+}
+
+function reset() {
+  msgs.clear();
+  $('#thread').replaceChildren();
+  lastSeq = 0;
+}
+
+function bottom() { const f = $('#feed'); f.scrollTop = f.scrollHeight; }
+
+// One message per action: a card that is filled in as the work progresses.
+function msgFor(s) {
+  let m = msgs.get(s.seq);
+  if (m) return m;
+  const root = el('article', 'msg');
+  if (s.mode === 'ask' && s.question) root.append(el('div', 'me', s.question));
+  const card = el('div', 'card');
+  root.append(card);
+  $('#thread').append(root);
+  m = { root, card };
+  msgs.set(s.seq, m);
+  return m;
+}
+
+const TITLE = { summarize: () => T('pg.summary'), translate: () => T('pg.translate'), ask: () => T('pg.answer'), sel: () => T('ai.result') };
+
+function head(s, copyText) {
+  const h = el('div', 'ch');
+  h.innerHTML = P(ICONS[s.mode === 'sel' ? 'ask' : s.mode] || ICONS.ask); // fixed strings above
+  h.append(document.createTextNode((TITLE[s.mode] || TITLE.sel)()));
+  h.append(el('span', 'sp'));
+  if (copyText) {
+    const c = el('button', 'cp', T('act.copy'));
+    c.type = 'button';
+    c.addEventListener('click', () => { agent.copy(copyText); c.textContent = T('act.copied'); setTimeout(() => { c.textContent = T('act.copy'); }, 1600); });
+    h.append(c);
+  }
+  return h;
+}
+
+function body(s) {
+  const b = el('div', 'cb');
+  const extra = [];
+  if (s.state === 'working') {
+    if (s.mode === 'translate' && s.total) {
+      b.append(el('p', '', T('pg.translating', { done: s.done, total: s.total })));
+      const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round((s.done / s.total) * 100) + '%'; bar.append(fill); b.append(bar);
+    } else {
+      const w = el('div', 'wait');
+      const d = el('span', 'dots'); d.append(el('i'), el('i'), el('i'));
+      w.append(d, el('span', '', T('pg.working')));
+      b.append(w);
+    }
+    return { b, copy: '' };
+  }
+  if (s.state === 'error') { b.append(el('p', 'err', T(s.error, { lang: s.target || '' }))); return { b, copy: '' }; }
+  let copy = '';
+  if (s.mode === 'sel') { b.append(el('p', '', s.answer)); b.firstChild.style.whiteSpace = 'pre-wrap'; copy = s.answer; }
+  else if (s.mode === 'summarize') {
+    const ul = el('ul', 'pts');
+    for (const x of s.bullets) ul.append(el('li', '', x));
+    b.append(ul);
+    copy = s.bullets.map((x) => '- ' + x).join('\n');
+    extra.push(s.ai ? T('pg.byModel', { m: s.model }) : T('pg.extractive'));
+  } else if (s.mode === 'ask') {
+    if (!s.found) b.append(el('p', '', T('pg.nofind')));
+    else {
+      if (s.answer) { b.append(el('p', '', s.answer)); copy = s.answer; }
+      const q = el('blockquote', '', s.passages[0]);
+      b.append(el('p', 'fine', T('pg.fromPage')), q);
+      const show = el('button', 'small', T('pg.showInPage'));
+      show.type = 'button';
+      show.addEventListener('click', () => agent.pageShow(s.passages[0].slice(0, 80)));
+      b.append(show);
+      if (s.ai) extra.push(T('pg.byModel', { m: s.model }));
+    }
+  } else if (s.mode === 'translate') {
+    b.append(el('p', '', T('pg.translated', { n: s.translated, lang: s.target })));
+    const seg = el('div', 'seg');
+    for (const v of ['both', 'translation', 'original']) {
+      const x = el('button', '', T('pg.view.' + v));
+      x.type = 'button';
+      x.setAttribute('aria-pressed', String(v === 'both'));
+      x.addEventListener('click', () => { agent.pageView(v); seg.querySelectorAll('button').forEach((y) => y.setAttribute('aria-pressed', String(y === x))); });
+      seg.append(x);
+    }
+    b.append(seg);
+  }
+  if (s.remote && (s.ai || s.mode === 'translate')) extra.push(T('pg.sentTo', { host: s.remote }));
+  for (const t of extra) b.append(el('p', 'fine', t));
+  return { b, copy };
+}
+
+function renderPage(s) {
+  if (s.reset) reset();
+  setTitle(T('pg.title'), s.page ? s.page.host : '');
+  if (s.state !== 'idle') {
+    const m = msgFor(s);
+    const { b, copy } = body(s);
+    m.card.replaceChildren(head(s, copy), b);
+    lastSeq = s.seq;
+  }
+  setMode(true);
+  if (s.state !== 'idle') { bottom(); } else $('#feed').scrollTop = 0;
+  if (!$('#composer').hidden && s.state === 'idle') $('#askq').focus();
+}
+
+agent.onPage((s) => { lang = s.lang || lang; LORE_I18N.apply(lang); last = { fn: renderPage, s }; renderPage(s); });
+$('#askform').addEventListener('submit', (e) => { e.preventDefault(); const q = $('#askq').value.trim(); if (!q) return; $('#askq').value = ''; agent.pageDo('ask', q); });
+
+agent.onState((s) => { setMode(false); last = { fn: render, s }; $('.note').style.display = ''; $('.sim').style.display = ''; render(s); });
+agent.onDl((s) => { setMode(false); last = { fn: renderDl, s }; $('.note').style.display = 'none'; $('.sim').style.display = 'none'; renderDl(s); });
+agent.onLang((l) => { lang = l; LORE_I18N.apply(lang); fillActions(); });
+$('#close').addEventListener('click', () => agent.close());
+LORE_I18N.apply(lang);
+fillActions();

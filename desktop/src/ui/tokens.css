@@ -1,0 +1,18 @@
+:root{
+  --bg:#E9ECF0; --win:#FFFFFF; --ink:#12161C; --muted:#677080; --line:#E7EAEF; --hover:#F3F5F8;
+  --accent:#4726B8; --accent-ink:#FFFFFF; --accent-soft:#ECE8FA; --warn:#8A4A06; --warn-soft:#FDEBD0;
+  --f:'Google Sans','Google Sans Flex','Product Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light dark;
+}
+/* Private tabs: a deep violet world of their own, so you can tell at a glance without reading anything. */
+:root[data-private]{
+  --bg:#0E0A1C; --win:#1A1330; --ink:#F1ECFF; --muted:#A99FCB; --line:#2E2450; --hover:#251C42;
+  --accent:#B9A7FF; --accent-ink:#170E40; --accent-soft:#33265E; --warn:#F5B454; --warn-soft:#3A2A10;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#090D14; --win:#10151E; --ink:#E9EDF3; --muted:#8B95A7; --line:#202938; --hover:#171E2A;
+    --accent:#B9A7FF; --accent-ink:#170E40; --accent-soft:#261C52; --warn:#F5B454; --warn-soft:#3A2A10;
+  }
+}

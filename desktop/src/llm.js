@@ -1,0 +1,126 @@
+// Model providers behind one interface: { label, model, remote, host, available(), chat(messages) }.
+//   local      Ollama on this machine (nothing leaves the device)
+//   openai     any OpenAI-compatible endpoint (OpenAI, OpenRouter, Groq, LM Studio, ...)
+//   anthropic  Anthropic Messages API
+// Remote providers send the user's question to that host, and answerQuery says so in the UI.
+
+const hostOf = (u) => { try { return new URL(u).host; } catch { return ''; } };
+const isLocalHost = (u) => { try { return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(u).hostname); } catch { return false; } };
+const trimSlash = (u) => u.replace(/\/+$/, '');
+// Errors carry an i18n key as the message; the UI translates it.
+// The API's own explanation ("model: not found", ...) is what makes a 400 fixable, so keep it.
+async function httpError(r) {
+  const e = new Error(r.status === 401 ? 'llm.keyRejected' : 'llm.http');
+  e.status = r.status;
+  try {
+    const j = await r.json();
+    const m = j && (j.error && (j.error.message || j.error) || j.message);
+    if (typeof m === 'string') e.detail = m.slice(0, 240);
+  } catch { /* no readable body */ }
+  return e;
+}
+const TEMP = 0.2;
+const MAX_TOKENS = 320;
+
+function ollama({ url, model }, f) {
+  const base = trimSlash(url);
+  return {
+    label: 'On-device AI', model, remote: false, host: hostOf(base),
+    async available() {
+      try {
+        const r = await f(base + '/api/tags', { signal: AbortSignal.timeout(700) });
+        if (!r.ok) return false;
+        const j = await r.json();
+        return (j.models || []).some((m) => (model.includes(':') ? m.name === model : m.name.startsWith(model + ':')));
+      } catch { return false; }
+    },
+    async chat(messages, { timeoutMs = 30000, maxTokens = MAX_TOKENS, temperature = TEMP } = {}) {
+      const r = await f(base + '/api/chat', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model, messages, stream: false, options: { temperature, num_predict: maxTokens } }),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      if (!r.ok) throw await httpError(r);
+      const j = await r.json();
+      return String((j.message && j.message.content) || '').trim();
+    }
+  };
+}
+
+function openai({ baseUrl, model, key }, f) {
+  const base = trimSlash(baseUrl);
+  const remote = !isLocalHost(base);
+  return {
+    label: hostOf(base), model, remote, host: hostOf(base),
+    async available() { return !!model && (!!key || !remote); },
+    async chat(messages, { timeoutMs = 30000, maxTokens = MAX_TOKENS, temperature = TEMP } = {}) {
+      const headers = { 'content-type': 'application/json' };
+      if (key) headers.authorization = 'Bearer ' + key;
+      const r = await f(base + '/chat/completions', {
+        method: 'POST', headers, signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens })
+      });
+      if (!r.ok) throw await httpError(r);
+      const j = await r.json();
+      return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+    }
+  };
+}
+
+function anthropic({ model, key }, f) {
+  return {
+    label: 'api.anthropic.com', model, remote: true, host: 'api.anthropic.com',
+    async available() { return !!model && !!key; },
+    async chat(messages, { timeoutMs = 30000, maxTokens = MAX_TOKENS } = {}) {
+      const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+      const r = await f('https://api.anthropic.com/v1/messages', {
+        method: 'POST', signal: AbortSignal.timeout(timeoutMs),
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        // No temperature (newer Claude models reject it) and no empty system block (the API returns 400 for it).
+        body: JSON.stringify({ model, max_tokens: maxTokens, ...(system ? { system } : {}), messages: messages.filter((m) => m.role !== 'system') })
+      });
+      if (!r.ok) throw await httpError(r);
+      const j = await r.json();
+      return String((j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('')).trim();
+    }
+  };
+}
+
+function createLlm(cfg, { fetchImpl = fetch } = {}) {
+  if (cfg.provider === 'local') return ollama(cfg.local, fetchImpl);
+  if (cfg.provider === 'openai') return openai(cfg.openai, fetchImpl);
+  if (cfg.provider === 'anthropic') return anthropic(cfg.anthropic, fetchImpl);
+  return null;
+}
+
+// Ollama-only helpers for the settings page.
+async function listLocalModels(url, fetchImpl = fetch) {
+  const r = await fetchImpl(trimSlash(url) + '/api/tags', { signal: AbortSignal.timeout(1500) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return ((await r.json()).models || []).map((m) => m.name);
+}
+
+// Streams `ollama pull`, reporting 0..1 progress. Throws if Ollama is unreachable or the model is unknown.
+async function pullLocalModel(url, model, onProgress, fetchImpl = fetch) {
+  const r = await fetchImpl(trimSlash(url) + '/api/pull', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model, stream: true })
+  });
+  if (!r.ok) throw new Error('Ollama returned HTTP ' + r.status);
+  let buf = '';
+  const dec = new TextDecoder();
+  for await (const chunk of r.body) {
+    buf += typeof chunk === 'string' ? chunk : dec.decode(chunk, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line) continue;
+      const j = JSON.parse(line);
+      if (j.error) throw new Error(j.error);
+      onProgress(j.total ? j.completed / j.total : 0, j.status || '');
+    }
+  }
+  onProgress(1, 'success');
+}
+
+module.exports = { createLlm, listLocalModels, pullLocalModel, isLocalHost };

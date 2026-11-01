@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tasks</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<script src="early.js"></script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="dropdown.css">
+<link rel="stylesheet" href="tasks.css">
+</head>
+<body>
+<header class="top">
+  <button class="back" id="back" type="button" hidden data-i18n-aria="task.back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <h1 id="title" data-i18n="task.title"></h1>
+  <span class="spacer"></span>
+  <button class="btn sm acc" id="new" type="button" data-i18n="task.new"></button>
+</header>
+<main id="main"></main>
+<script src="i18n.js"></script>
+<script src="dropdown.js"></script>
+<script src="tasks.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New tab</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<script src="early.js"></script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<div class="col">
+  <h1 id="h1" data-i18n="home.h1"></h1>
+  <p class="sub" id="sub" data-i18n="home.sub"></p>
+
+  <div class="note" id="note" role="status"><span id="msg"></span><small id="soon"></small></div>
+  <div id="hits"></div>
+
+  <div id="ans" hidden>
+    <p class="ask" id="ask"></p>
+    <p class="lead" id="lead"></p>
+    <div id="srcs"></div>
+    <p class="meta" id="meta"></p>
+    <a class="btn" id="web" data-i18n="ans.web"></a>
+  </div>
+
+  <section id="cards" aria-label="Suggestions">
+    <div class="cards">
+      <a class="card" id="c-ask"><span class="tag" data-i18n="card.ask.tag"></span><b data-i18n="card.ask.q"></b></a>
+      <a class="card" id="c-do"><span class="tag" data-i18n="card.do.tag"></span><b data-i18n="card.do.q"></b></a>
+      <a class="card" id="c-dl"><span class="tag" data-i18n="card.dl.tag"></span><b data-i18n="card.dl.q"></b></a>
+      <a class="card" id="c-mem"><span class="tag" data-i18n="card.mem.tag"></span><b data-i18n="card.mem.q"></b></a>
+    </div>
+  </section>
+  <section id="tools" aria-label="Tools">
+    <div class="chips">
+      <a class="chip" id="t-tasks" data-i18n="tool.tasks"></a>
+      <a class="chip" id="t-private" data-i18n="tool.private"></a>
+      <a class="chip" id="t-memory" data-i18n="tool.memory"></a>
+      <a class="chip" id="t-settings" data-i18n="tool.settings"></a>
+    </div>
+  </section>
+  <p class="foot" id="stats"></p>
+</div>
+<script src="i18n.js"></script>
+<script src="home.js"></script>
+</body>
+</html>

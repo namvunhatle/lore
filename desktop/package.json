@@ -1,0 +1,95 @@
+{
+  "name": "lore-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lore: the private, AI-assisted browser that remembers you, and only you",
+  "license": "MIT",
+  "author": "Tevo",
+  "homepage": "https://tevo-web.github.io/lore/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tevo-web/lore.git",
+    "directory": "desktop"
+  },
+  "bugs": {
+    "url": "https://github.com/tevo-web/lore/issues"
+  },
+  "keywords": [
+    "browser",
+    "privacy",
+    "ai",
+    "electron",
+    "vietnamese"
+  ],
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "electron test-e2e/run.js && electron test-e2e/pages.js && electron test-e2e/privacy.js && electron test-e2e/reader.js && electron test-e2e/features.js",
+    "demo-portal": "node fixtures/portal.js",
+    "dist:win": "electron-builder --win nsis --x64",
+    "filters": "node scripts/build-filters.js",
+    "predist:win": "npm run filters",
+    "predist:mac": "npm run filters",
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64",
+    "check:electron": "node scripts/check-electron.js"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "productName": "Lore",
+  "build": {
+    "appId": "app.tevo.lore",
+    "productName": "Lore",
+    "copyright": "Tevo",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/*.test.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "Lore-win-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Lore"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "Lore-mac-${arch}.${ext}",
+      "identity": null
+    }
+  },
+  "dependencies": {
+    "@ghostery/adblocker": "^2.20.3",
+    "@mozilla/readability": "^0.6.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

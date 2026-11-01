@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lore AI</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<script src="early.js"></script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header class="ph">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span>
+    <div class="ttl"><h3 id="title" data-i18n="pg.title"></h3><p id="sub"></p></div>
+    <button class="x" id="close" data-i18n-aria="panel.close" type="button">×</button>
+  </header>
+
+  <main id="feed">
+    <section id="home" hidden>
+      <h4 data-i18n="pg.home.h"></h4>
+      <div class="grid" id="grid"></div>
+      <p class="k" data-i18n="pg.try"></p>
+      <div class="sugs" id="sugs"></div>
+    </section>
+    <div id="thread" aria-live="polite"></div>
+    <ol class="steps" id="steps"></ol>
+    <div id="box"></div>
+    <p class="note" data-i18n="panel.note"></p>
+    <p class="sim" data-i18n="panel.sim"></p>
+  </main>
+
+  <footer id="composer" hidden>
+    <div class="rail" id="rail" role="toolbar"></div>
+    <form class="askform" id="askform">
+      <input id="askq" type="text" data-i18n-ph="pg.askph" autocomplete="off" spellcheck="false">
+      <button class="send" type="submit" data-i18n-aria="pg.ask"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6"/></svg></button>
+    </form>
+  </footer>
+  <script src="i18n.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

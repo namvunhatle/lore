@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warning</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<script src="early.js"></script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="warning.css">
+</head>
+<body>
+<main>
+  <div class="shield" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M12 8v5M12 16.5v.01"/></svg></div>
+  <h1 data-i18n="warn.title"></h1>
+  <p class="why" id="why"></p>
+  <p class="addr"><small data-i18n="warn.address"></small><code id="addr"></code></p>
+  <div class="btns">
+    <a class="btn pri" id="back" href="lore-back:" data-i18n="warn.back"></a>
+    <a class="link" id="go" data-i18n="warn.proceed"></a>
+  </div>
+</main>
+<script src="i18n.js"></script>
+<script src="warning.js"></script>
+</body>
+</html>

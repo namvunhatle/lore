@@ -1,0 +1,379 @@
+<title>Lore Browser Desktop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: one calm browser window on a quiet ground. Slim tab row, one toolbar, an icon rail, a single reading column. One typeface, one accent. */
+:root{
+  --bg:#E9ECF0; --win:#FFFFFF; --ink:#12161C; --muted:#677080; --line:#E7EAEF; --hover:#F3F5F8;
+  --accent:#4726B8; --accent-ink:#FFFFFF; --accent-soft:#ECE8FA;
+  --warn:#8A4A06; --warn-soft:#FDEBD0;
+  --shadow:0 24px 60px -28px rgba(18,28,44,.35);
+  --f:'Google Sans','Google Sans Flex','Product Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#090D14; --win:#10151E; --ink:#E9EDF3; --muted:#8B95A7; --line:#202938; --hover:#171E2A;
+    --accent:#B9A7FF; --accent-ink:#170E40; --accent-soft:#261C52;
+    --warn:#F5B454; --warn-soft:#3A2A10; --shadow:0 24px 60px -28px rgba(0,0,0,.8); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#090D14; --win:#10151E; --ink:#E9EDF3; --muted:#8B95A7; --line:#202938; --hover:#171E2A;
+  --accent:#B9A7FF; --accent-ink:#170E40; --accent-soft:#261C52;
+  --warn:#F5B454; --warn-soft:#3A2A10; --shadow:0 24px 60px -28px rgba(0,0,0,.8); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--f); font-size:14px; line-height:1.5;
+  padding-block:24px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  font-variant-numeric:tabular-nums;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{max-width:1120px;margin:0 auto}
+.cap{display:flex;gap:10px;align-items:center;margin:0 4px 12px;color:var(--muted);font-size:13px}
+.cap b{color:var(--ink);font-weight:600;font-size:16px}
+.logo{width:22px;height:22px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:13px}
+
+.win{position:relative;height:clamp(560px,calc(100svh - 140px),720px);display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.tabs{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-bottom:1px solid var(--line)}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:var(--line)}
+.tab{display:flex;align-items:center;max-width:260px;min-width:0;height:28px;padding:0 12px;border-radius:8px;background:var(--hover);font-size:12.5px;font-weight:500}
+.tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plus{width:28px;height:28px;border-radius:8px;color:var(--muted);font-size:18px;line-height:1}
+.plus:hover,.ib:hover{background:var(--hover)}
+.bar{display:flex;align-items:center;gap:6px;padding:8px 12px}
+.ib{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--muted);flex:none;position:relative}
+.ib:disabled{opacity:.35;cursor:default}
+.ib:disabled:hover{background:none}
+.omni{flex:1;min-width:0;max-width:620px;margin:0 auto;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:19px;background:var(--hover);border:1px solid transparent}
+.omni:focus-within{background:var(--win);border-color:var(--accent)}
+.omni svg{color:var(--muted);flex:none}
+#intent{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--ink);font:400 14px var(--f);outline:0}
+#intent::placeholder{color:var(--muted)}
+kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 6px;line-height:18px}
+.badge{position:absolute;top:3px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font:600 9.5px/16px var(--f);text-align:center}
+.vpn{height:32px;padding:0 12px;border-radius:16px;color:var(--muted);font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px;flex:none}
+.vpn i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.vpn:hover{background:var(--hover)}
+.vpn[aria-pressed="true"]{color:var(--accent)}
+.vpn[aria-pressed="true"] i{background:var(--accent)}
+
+.body{flex:1;min-height:0;display:flex;position:relative;border-top:1px solid var(--line)}
+.rail{width:56px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0;border-right:1px solid var(--line)}
+.rail button{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
+.rail button:hover{background:var(--hover)}
+.rail button[aria-current="true"]{background:var(--accent-soft);color:var(--accent)}
+.main{flex:1;min-width:0;overflow-y:auto}
+.col{max-width:720px;margin:0 auto;padding:56px 32px 40px}
+@media (max-width:700px){
+  .body{flex-direction:column-reverse}
+  .rail{width:auto;flex-direction:row;justify-content:space-around;padding:6px 8px;border-right:0;border-top:1px solid var(--line)}
+  .col{padding:28px 16px 24px}
+  .tab{max-width:160px}
+  .vpn span{display:none}
+  kbd{display:none}
+}
+
+.greet{font-weight:500;font-size:clamp(30px,4.4vw,44px);line-height:1.1;letter-spacing:-.02em;margin:0 0 8px;text-wrap:balance}
+.sub{color:var(--muted);font-size:16px;margin:0 0 32px}
+.list{list-style:none;margin:0 0 32px;padding:0}
+.list li{border-top:1px solid var(--line)}
+.list li:last-child{border-bottom:1px solid var(--line)}
+.rowbtn{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:15px 4px;text-align:left;font-size:15px;min-width:0}
+.rowbtn span{min-width:0;overflow-wrap:anywhere}
+.rowbtn svg{color:var(--muted);flex:none;transition:transform .15s}
+.rowbtn:hover svg{transform:translateX(3px);color:var(--accent)}
+.foot{color:var(--muted);font-size:13px;margin:0}
+.ask{color:var(--muted);margin:0 0 14px;font-size:13px;overflow-wrap:anywhere}
+.lead{font-size:21px;line-height:1.4;font-weight:500;letter-spacing:-.01em;margin:0 0 24px;text-wrap:pretty}
+.lead b{font-weight:600;color:var(--accent)}
+.opt{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;align-items:baseline;padding:14px 0;border-top:1px solid var(--line)}
+.opt:last-of-type{border-bottom:1px solid var(--line)}
+.opt time{color:var(--muted)}
+.opt small{color:var(--muted);margin-left:8px;font-size:12.5px}
+.opt b{font-weight:600}
+.meta{color:var(--muted);font-size:13px;margin:14px 0 0}
+.tag{display:inline-block;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:10px;background:var(--accent-soft);color:var(--accent);margin-left:6px}
+.tag.ex{background:var(--warn-soft);color:var(--warn);margin:0}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.btn{height:40px;padding:0 18px;border-radius:20px;border:1px solid var(--line);font-weight:500}
+.btn:hover{background:var(--hover)}
+.btn.pri{background:var(--ink);color:var(--win);border-color:var(--ink)}
+.btn.pri:hover{opacity:.88}
+.btn.acc{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.acc:hover{opacity:.9}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px;align-items:start}
+.h3{font-weight:500;font-size:22px;letter-spacing:-.01em;margin:0 0 20px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
+.st{display:flex;gap:12px;align-items:center}
+.mark{width:20px;height:20px;flex:none;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--line)}
+.st.done .mark{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.st.wait{color:var(--muted)}
+.spin{width:20px;height:20px;flex:none;border-radius:50%;border:1.5px solid var(--line);border-top-color:var(--accent);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.conf{border:1px solid var(--line);border-radius:14px;padding:20px}
+.conf .k{color:var(--muted);font-size:12.5px;margin:0 0 6px}
+.amount{font-size:34px;font-weight:500;letter-spacing:-.02em;margin:4px 0 2px}
+.conf .btns{margin-top:18px}
+.conf .btn{flex:1;white-space:nowrap}
+.hold{color:var(--muted);border-style:dashed}
+.note{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);margin:28px 0 0}
+.note svg{flex:none;color:var(--accent);margin-top:2px}
+.hit{padding:18px 0;border-top:1px solid var(--line)}
+.hit:last-of-type{border-bottom:1px solid var(--line)}
+.hit b{display:block;font-size:16px;font-weight:500;margin-bottom:2px}
+.hit small{display:block;color:var(--muted);font-size:13px}
+.mock-head{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:13px;margin:0 0 12px}
+.player{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:12px;background:linear-gradient(135deg,#1B1148,#4726B8);display:grid;place-items:center;color:#fff}
+.dlpill{position:absolute;right:14px;bottom:14px;height:36px;padding:0 14px;border-radius:18px;background:#fff;color:#0E1626;font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+.line{height:10px;border-radius:5px;background:var(--hover);margin:12px 0}
+
+.panel{position:absolute;top:0;right:0;bottom:0;width:340px;max-width:100%;background:var(--win);border-left:1px solid var(--line);box-shadow:-18px 0 40px -28px rgba(0,0,0,.4);padding:20px;overflow-y:auto;transform:translateX(105%);transition:transform .22s;z-index:3}
+.panel.on{transform:none}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.ph h3{margin:0;font-size:18px;font-weight:500}
+.x{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:20px;line-height:1}
+.x:hover{background:var(--hover)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.row small{display:block;color:var(--muted);font-size:12.5px}
+.switch{width:38px;height:22px;flex:none;border-radius:11px;background:var(--line);position:relative}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"]::after{transform:translateX(16px)}
+.dlopt{width:100%;display:flex;justify-content:space-between;gap:10px;text-align:left;padding:14px 4px;border-top:1px solid var(--line)}
+.dlopt:hover b{color:var(--accent)}
+.dlopt span{color:var(--muted)}
+.bar2{height:4px;border-radius:2px;background:var(--hover);overflow:hidden;margin:16px 0 8px}
+.bar2 i{display:block;height:100%;background:var(--accent);width:0}
+
+.try{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 4px 0;color:var(--muted);font-size:13px}
+.try button{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px;text-align:left}
+.try button:hover{text-decoration-color:var(--accent)}
+.fine{margin:10px 4px 0;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}.panel,.switch::after,.rowbtn svg{transition:none}}
+</style>
+
+<div class="stage">
+  <p class="cap"><span class="logo" aria-hidden="true">L</span><b>Lore</b><span>by Tevo · bản desktop · mockup</span></p>
+
+  <div class="win" id="win">
+    <div class="tabs">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="tab"><span id="tabtxt">Trang mới</span></div>
+      <button class="plus" type="button" data-go="home" aria-label="Mở tab mới">+</button>
+    </div>
+    <div class="bar">
+      <button class="ib" type="button" data-go="home" aria-label="Quay lại"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="ib" type="button" disabled aria-label="Tiến tới"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      <form class="omni" id="omni" autocomplete="off">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16l-4-4"/></svg>
+        <input id="intent" name="intent" type="text" placeholder="Nói bạn muốn gì, hoặc dán địa chỉ" aria-label="Ô nhập ý định">
+        <kbd>/</kbd>
+      </form>
+      <button class="ib" type="button" data-act="shield" aria-label="Mở bảng bảo vệ riêng tư"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span class="badge" id="badge">214</span></button>
+      <button class="vpn" id="vpnchip" type="button" data-act="vpn" aria-pressed="false"><i></i><span id="vpntxt">VPN</span></button>
+    </div>
+    <div class="body">
+      <nav class="rail" id="nav" aria-label="Điều hướng"></nav>
+      <main class="main" id="view"></main>
+      <aside class="panel" id="panel" aria-label="Bảng chi tiết"></aside>
+    </div>
+  </div>
+
+  <div class="try">
+    <span>Thử:</span>
+    <button type="button" data-go="flight" data-q="giá vé Hà Nội đi Đà Nẵng cuối tuần này">giá vé Hà Nội đi Đà Nẵng cuối tuần này</button>
+    <button type="button" data-go="agent" data-kind="bill" data-q="đóng tiền điện tháng này giúp tôi">đóng tiền điện tháng này</button>
+    <button type="button" data-go="memory" data-q="tìm lại bài báo tuần trước về xe điện">tìm lại bài báo về xe điện</button>
+    <button type="button" data-go="video" data-q="tải video bài giảng này">tải video bài giảng</button>
+  </div>
+  <p class="fine">Giá, số liệu và tên trang chỉ để minh họa. Chưa kết nối với hãng bay, ví điện tử hay trang nào.</p>
+</div>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var view=$('#view'), panel=$('#panel'), intent=$('#intent');
+  var S={view:'home',panel:null,vpn:false,blocked:214,ag:null,dl:null,tog:{ads:true,wipe:true,ai:true}};
+  var timers=[];
+
+  function ic(p,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+p+'"/></svg>'}
+  var P={
+    home:'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+    clock:'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+    tasks:'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2',
+    dl:'M12 4v11m0 0l-4-4m4 4l4-4M5 20h14',
+    check:'M5 12l5 5 9-10',
+    arrow:'M5 12h14m0 0l-5-5m5 5l-5 5',
+    lock:'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z',
+    play:'M8 5v14l11-7z'
+  };
+  function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function norm(s){return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').toLowerCase()}
+  function fmt(n){return n.toLocaleString('vi-VN')}
+
+  var AG={
+    bill:{title:'Đóng tiền điện tháng 10',steps:['Mở cổng thanh toán của điện lực','Đăng nhập bằng tài khoản đã lưu trên máy','Tìm hóa đơn kỳ 10/2026'],
+      conf:'Hóa đơn điện kỳ 10/2026',amt:'842.000₫',meta:'Trả từ ví đã liên kết · phí 0₫',ok:'Đã thanh toán (mô phỏng). Biên lai được lưu vào Trí nhớ.',cta:'Xác nhận thanh toán'},
+    flight:{title:'Đặt vé Hà Nội → Đà Nẵng',steps:['Mở trang đặt vé của hãng','Chọn chuyến 06:10, thứ Bảy 7/11','Điền thông tin hành khách đã lưu'],
+      conf:'Vietjet Air · 1 người lớn · 06:10 thứ Bảy',amt:'790.000₫',meta:'Hành lý xách tay 7 kg · chưa gồm ký gửi',ok:'Đã giữ chỗ (mô phỏng). Mã đặt chỗ được lưu vào Trí nhớ.',cta:'Xác nhận đặt vé'}
+  };
+  var TAB={home:'Trang mới',flight:'Vé Hà Nội – Đà Nẵng',memory:'Trí nhớ',video:'Bài 3 · Nhập môn Flutter',unknown:'Kết quả'};
+
+  function item(v,q,k){return '<li><button class="rowbtn" type="button" data-go="'+v+'" data-q="'+esc(q)+'"'+(k?' data-kind="'+k+'"':'')+'><span>'+q+'</span>'+ic(P.arrow,18)+'</button></li>'}
+  function ask(){var q=intent.value.trim();return q?'<p class="ask">Bạn hỏi: '+esc(q)+'</p>':''}
+  function opt(t,a,s,p,best){return '<div class="opt"><time>'+t+'</time><div>'+a+(best?'<span class="tag">rẻ nhất</span>':'')+'<small>'+s+'</small></div><b>'+p+'</b></div>'}
+  function hit(t,m,s){return '<div class="hit"><b>'+t+'</b><small>'+m+'</small><small>'+s+'</small></div>'}
+  function lockNote(t){return '<p class="note">'+ic(P.lock,15)+'<span>'+t+'</span></p>'}
+
+  var V={
+    home:function(){return '<div class="col">'+
+      '<h2 class="greet">Bạn muốn làm gì?</h2><p class="sub">Gõ như đang nói. Không cần nhớ tên miền.</p>'+
+      '<ul class="list">'+
+        item('flight','giá vé Hà Nội đi Đà Nẵng cuối tuần này')+
+        item('agent','đóng tiền điện tháng này giúp tôi','bill')+
+        item('memory','tìm lại bài báo tuần trước về xe điện')+
+        item('video','tải video bài giảng này')+
+      '</ul>'+
+      '<p class="foot">'+fmt(S.blocked)+' quảng cáo và tracker đã bị chặn hôm nay · '+fmt(Math.round(S.blocked*0.18))+' MB tiết kiệm · 0 B lịch sử gửi về máy chủ</p></div>';},
+    flight:function(){return '<div class="col">'+ask()+
+      '<p class="lead">Cuối tuần này (thứ Bảy 7/11 và Chủ nhật 8/11), vé một chiều Hà Nội → Đà Nẵng dao động khoảng <b>790.000₫ đến 1.650.000₫</b>. Rẻ nhất là chuyến 06:10 sáng thứ Bảy. Giá thường nhích lên vào chiều Chủ nhật.</p>'+
+      '<div>'+opt('06:10','Vietjet Air','Bay thẳng · 1h20','790.000₫',true)+opt('09:45','Vietravel Airlines','Bay thẳng · 1h25','1.090.000₫')+opt('18:30','Vietnam Airlines','Bay thẳng · 1h20','1.650.000₫')+'</div>'+
+      '<p class="meta">Nguồn: vietjetair.com · vietravelairlines.com · vietnamairlines.com <span class="tag ex">dữ liệu minh họa</span></p>'+
+      '<div class="btns"><button class="btn pri" type="button" data-go="agent" data-kind="flight" data-q="đặt vé 06:10 thứ Bảy rẻ nhất">Nhờ Lore đặt vé rẻ nhất</button><button class="btn" type="button" data-act="close">Mở trang gốc</button></div></div>';},
+    agent:function(){
+      var A=AG[S.ag.kind],n=A.steps.length,st=S.ag.step,h='<div class="col">'+ask()+'<div class="grid2"><div><h3 class="h3">'+A.title+'</h3><ol class="steps">';
+      A.steps.forEach(function(t,i){
+        if(i<st) h+='<li class="st done"><span class="mark">'+ic(P.check,12)+'</span><span>'+t+'</span></li>';
+        else if(i===st) h+='<li class="st"><span class="spin"></span><span>'+t+'</span></li>';
+        else h+='<li class="st wait"><span class="mark"></span><span>'+t+'</span></li>';
+      });
+      if(S.ag.done) h+='<li class="st done"><span class="mark">'+ic(P.check,12)+'</span><span>Hoàn tất</span></li>';
+      else if(st>=n) h+='<li class="st"><span class="mark" style="border-color:var(--accent)"></span><span>Đang chờ bạn xác nhận</span></li>';
+      else h+='<li class="st wait"><span class="mark"></span><span>Chờ bạn xác nhận</span></li>';
+      h+='</ol></div><div>';
+      if(S.ag.done) h+='<div class="conf"><p class="k">Kết quả</p><div>'+A.ok+'</div></div>';
+      else if(st>=n) h+='<div class="conf"><p class="k">Cần bạn xác nhận</p><div>'+A.conf+'</div><div class="amount">'+A.amt+'</div><small style="color:var(--muted)">'+A.meta+'</small><div class="btns"><button class="btn acc" type="button" data-act="confirm">'+A.cta+'</button><button class="btn" type="button" data-act="cancel">Hủy</button></div></div>';
+      else h+='<div class="conf hold"><p class="k" style="margin:0">Lore sẽ dừng lại ở đây để bạn xác nhận trước khi trả tiền hay gửi đi.</p></div>';
+      h+='</div></div>'+lockNote('Nội dung trên trang web không thể ra lệnh cho trợ lý. Mọi bước nhạy cảm đều cần bạn đồng ý.')+'<p class="meta"><span class="tag ex">mô phỏng</span></p></div>';
+      return h;},
+    memory:function(){return '<div class="col">'+ask()+
+      hit('Thị trường xe điện Việt Nam: những con số đáng chú ý','vnexpress.net · xem 3 ngày trước','Bạn đã đọc 6 phút và đánh dấu đoạn về trạm sạc.')+
+      hit('So sánh chi phí sử dụng xe điện và xe xăng sau 5 năm','tuoitre.vn · xem 5 ngày trước','Bảng so sánh chi phí bảo dưỡng.')+
+      hit('Chính sách ưu đãi lệ phí trước bạ cho xe điện','thanhnien.vn · xem 6 ngày trước','Bạn đã lưu trang này vào bộ sưu tập Xe.')+
+      '<p class="meta">Tìm trong 1.284 trang đã xem <span class="tag ex">dữ liệu minh họa</span></p>'+
+      lockNote('Xử lý ngay trên máy, mã hóa, không gửi lên máy chủ.')+'</div>';},
+    video:function(){return '<div class="col">'+
+      '<div class="mock-head"><span>classroom.example.vn</span><span>Bài 3 · Nhập môn Flutter</span></div>'+
+      '<div class="player">'+ic(P.play,48)+'<button class="dlpill" type="button" data-act="dlpanel">'+ic(P.dl,16)+'Tải video</button></div>'+
+      '<h2 class="h3" style="margin:20px 0 0">Bài 3: Widget và trạng thái</h2><div class="line" style="width:92%"></div><div class="line" style="width:78%"></div><div class="line" style="width:56%"></div>'+
+      lockNote('Lore phát hiện video tải được trên trang này. Nội dung có DRM hoặc cấm tải theo điều khoản của nền tảng sẽ không hiện nút tải.')+'</div>';},
+    unknown:function(){return '<div class="col">'+ask()+
+      '<p class="lead">Mockup mới hiểu bốn ví dụ dưới đây. Bản thật sẽ trả lời mọi câu bạn gõ.</p>'+
+      '<ul class="list">'+item('flight','giá vé Hà Nội đi Đà Nẵng cuối tuần này')+item('agent','đóng tiền điện tháng này giúp tôi','bill')+item('memory','tìm lại bài báo tuần trước về xe điện')+item('video','tải video bài giảng này')+'</ul></div>';}
+  };
+
+  function sw(k,t,s,on){return '<div class="row"><div><b style="font-weight:500">'+t+'</b><small>'+s+'</small></div><button class="switch" type="button" role="switch" aria-checked="'+on+'" aria-label="'+t+'" data-act="tog" data-k="'+k+'"></button></div>'}
+  function dlo(l,m){return '<button class="dlopt" type="button" data-act="dlstart" data-label="'+l+'"><b style="font-weight:500">'+l+'</b><span>'+m+'</span></button>'}
+  function ph(t){return '<div class="ph"><h3>'+t+'</h3><button class="x" type="button" data-act="close" aria-label="Đóng">×</button></div>'}
+  var PN={
+    shield:function(){return ph('Bảo vệ trên trang này')+
+      '<p style="color:var(--muted);margin:0 0 14px">Đã chặn '+fmt(S.blocked)+' quảng cáo và tracker hôm nay.</p>'+
+      sw('ads','Chặn quảng cáo và tracker','Danh sách riêng cho trang Việt Nam',S.tog.ads)+
+      sw('vpn','VPN','Singapore · WireGuard · có kill switch',S.vpn)+
+      sw('wipe','Xóa dữ liệu khi đóng tab ẩn danh','Cookie, cache và lịch sử',S.tog.wipe)+
+      sw('ai','AI chạy trên máy','Tác vụ nhẹ không rời khỏi thiết bị',S.tog.ai);},
+    dl:function(){
+      if(S.dl){var d=S.dl;return ph(d.done?'Đã lưu':'Đang tải')+'<p style="color:var(--muted);margin:0">'+d.label+'</p>'+
+        '<div class="bar2"><i style="width:'+d.pct+'%"></i></div><small style="color:var(--muted)">'+(d.done?'Đã lưu vào mục Tải xuống. Xem được khi không có mạng.':Math.round(d.pct)+'% · tải 4 luồng song song')+'</small>'+
+        '<div class="btns"><button class="btn" type="button" data-act="close">'+(d.done?'Xong':'Chạy nền')+'</button></div>';}
+      return ph('Tải video này')+'<p style="color:var(--muted);margin:0 0 12px">Bài 3 · Nhập môn Flutter · 24:10</p>'+
+        dlo('1080p · MP4','148 MB')+dlo('720p · MP4','82 MB')+dlo('Chỉ âm thanh · MP3','9 MB')+lockNote('Chỉ tải nội dung bạn có quyền lưu.');}
+  };
+
+  var NAV=[['home','Trang chủ',P.home],['memory','Trí nhớ',P.clock],['agent','Tác vụ',P.tasks],['video','Tải xuống',P.dl]];
+  function renderNav(){
+    $('#nav').innerHTML=NAV.map(function(n){
+      var cur=(S.view===n[0])||(n[0]==='home'&&(S.view==='unknown'||S.view==='flight'));
+      var kind=n[0]==='agent'?' data-kind="bill"':'';
+      var q=n[0]==='memory'?'tìm lại bài báo tuần trước về xe điện':n[0]==='agent'?'đóng tiền điện tháng này giúp tôi':n[0]==='video'?'tải video bài giảng này':'';
+      return '<button type="button" data-go="'+n[0]+'" data-q="'+q+'"'+kind+' aria-current="'+cur+'" aria-label="'+n[1]+'" title="'+n[1]+'">'+ic(n[2],20)+'</button>';
+    }).join('');
+  }
+  function render(){
+    view.innerHTML=V[S.view]();
+    renderNav();
+    $('#badge').textContent=fmt(S.blocked);
+    $('#tabtxt').textContent=S.view==='agent'?AG[S.ag.kind].title:TAB[S.view];
+    var v=$('#vpnchip');v.setAttribute('aria-pressed',String(S.vpn));$('#vpntxt').textContent=S.vpn?'VPN · Singapore':'VPN';
+    renderPanel();
+  }
+  function renderPanel(){
+    if(S.panel){panel.innerHTML=PN[S.panel]();panel.classList.add('on')}
+    else panel.classList.remove('on');
+  }
+  function clearT(){timers.forEach(function(t){clearTimeout(t);clearInterval(t)});timers=[]}
+  function go(v,q,kind){
+    clearT();S.view=v;S.panel=null;S.dl=null;
+    if(q!==undefined)intent.value=q;
+    if(v==='home')intent.value='';
+    if(v!=='home')S.blocked+=9;
+    if(v==='agent'){S.ag={kind:kind||(S.ag&&S.ag.kind)||'bill',step:0,done:false};
+      if(!q)intent.value=S.ag.kind==='bill'?'đóng tiền điện tháng này giúp tôi':'đặt vé 06:10 thứ Bảy rẻ nhất';
+      advance();}
+    render();view.scrollTop=0;
+  }
+  function advance(){
+    var n=AG[S.ag.kind].steps.length;
+    if(S.ag.step>=n)return;
+    timers.push(setTimeout(function(){S.ag.step++;if(S.view==='agent')render();advance()},950));
+  }
+  function route(q){
+    var n=norm(q);
+    if(/tim lai|bai bao|tuan truoc|xe dien|da xem/.test(n))return ['memory'];
+    if(/video|tai xuong|tai phim/.test(n))return ['video'];
+    if(/\bve\b|may bay|chuyen bay|da nang/.test(n))return ['flight'];
+    if(/dien|hoa don|thanh toan|dong tien/.test(n))return ['agent','bill'];
+    return ['unknown'];
+  }
+
+  document.addEventListener('click',function(e){
+    var g=e.target.closest('[data-go]');
+    if(g){go(g.dataset.go,g.dataset.q,g.dataset.kind);return}
+    var a=e.target.closest('[data-act]');if(!a)return;
+    var act=a.dataset.act;
+    if(act==='shield'){S.panel=S.panel==='shield'?null:'shield';renderPanel()}
+    else if(act==='close'){S.panel=null;renderPanel()}
+    else if(act==='vpn'){S.vpn=!S.vpn;render()}
+    else if(act==='tog'){var k=a.dataset.k;if(k==='vpn')S.vpn=!S.vpn;else S.tog[k]=!S.tog[k];render()}
+    else if(act==='confirm'){S.ag.done=true;render()}
+    else if(act==='cancel'){go('home')}
+    else if(act==='dlpanel'){S.panel='dl';S.dl=null;renderPanel()}
+    else if(act==='dlstart'){
+      S.dl={label:a.dataset.label,pct:0,done:false};renderPanel();
+      var iv=setInterval(function(){
+        S.dl.pct=Math.min(100,S.dl.pct+6+Math.random()*6);
+        if(S.dl.pct>=100){S.dl.done=true;clearInterval(iv)}
+        if(S.panel==='dl')renderPanel();
+      },160);timers.push(iv);
+    }
+  });
+  $('#omni').addEventListener('submit',function(e){
+    e.preventDefault();var q=intent.value.trim();if(!q)return;
+    var r=route(q);go(r[0],q,r[1]);intent.blur();
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&S.panel){S.panel=null;renderPanel();return}
+    var t=e.target&&e.target.tagName;
+    if(e.key==='/'&&t!=='INPUT'&&t!=='TEXTAREA'){e.preventDefault();intent.focus()}
+  });
+  render();
+})();
+</script>

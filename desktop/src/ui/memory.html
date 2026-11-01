@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Memory</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="dropdown.css">
+<link rel="stylesheet" href="memory.css">
+</head>
+<body>
+<header class="top">
+  <div class="titles"><h1 data-i18n="mem.title"></h1><p class="lead" data-i18n="mem.sub"></p></div>
+  <form class="search" role="search" onsubmit="return false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="q" type="search" data-i18n-ph="mem.search" autocomplete="off" spellcheck="false" autofocus>
+    <button class="clr" id="clr" type="button" hidden data-i18n-aria="mem.clear">×</button>
+  </form>
+  <div class="filters">
+    <div class="chips" id="ranges" role="group" data-i18n-aria="mem.timeRange"></div>
+    <select id="host" data-i18n-aria="mem.site"></select>
+  </div>
+</header>
+<main>
+  <ul id="list"></ul>
+  <div class="empty" id="empty" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+    <p id="empty-t"></p>
+    <div class="chips" id="examples"></div>
+  </div>
+</main>
+<footer class="foot">
+  <span id="count"></span>
+  <span class="dot" aria-hidden="true">·</span>
+  <span id="status" role="status"></span>
+  <span class="spacer"></span>
+  <button class="link" id="del-range" type="button" data-i18n="mem.deleteRange"></button>
+  <button class="link" id="del-site" type="button" hidden></button>
+  <button class="btn" id="export" type="button" data-i18n="mem.export"></button>
+</footer>
+<script src="i18n.js"></script>
+<script src="dropdown.js"></script>
+<script src="memory.js"></script>
+</body>
+</html>

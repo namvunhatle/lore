@@ -1,0 +1,32 @@
+# Rust
+core/target/
+Cargo.lock.bak
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+# iOS / macOS
+ios/build/
+ios/Pods/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+# Desktop
+desktop/node_modules/
+desktop/dist/
+# Editors
+.idea/
+.vscode/
+desktop/dist/
+# Compiled filter engine (built by npm run filters)
+desktop/src/filters/engine.bin
+
+# Local
+.env
+*.log
+site/.DS_Store
+
+# Private product brief and assistant instructions: kept locally, never published
+CLAUDE.md
+CLAUDE_1.md

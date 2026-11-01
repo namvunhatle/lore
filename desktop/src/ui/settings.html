@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="dropdown.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div class="shell">
+<nav class="side" role="tablist" aria-orientation="vertical">
+  <h1 data-i18n="set.title"></h1>
+  <button class="nav on" role="tab" data-pane="general" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span data-i18n="set.nav.general"></span></button>
+  <button class="nav" role="tab" data-pane="privacy" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span data-i18n="set.priv.h"></span></button>
+  <button class="nav" role="tab" data-pane="ai" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span data-i18n="set.ai.h"></span></button>
+</nav>
+<main>
+<div class="panes">
+
+<div class="pane on" id="pane-general" role="tabpanel">
+  <h2 data-i18n="set.lang.h"></h2>
+  <p class="lead" data-i18n="set.lang.lead"></p>
+  <label class="f" for="language"><select id="language"></select></label>
+</div>
+
+<div class="pane" id="pane-privacy" role="tabpanel">
+  <h2 data-i18n="set.priv.h"></h2>
+  <p class="lead" data-i18n="set.priv.lead"></p>
+  <div class="group">
+    <label class="set"><span class="txt"><b data-i18n="set.priv.cookies"></b><small data-i18n="set.priv.cookies.d"></small></span><input type="checkbox" class="sw" id="cookies"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.scam"></b><small data-i18n="set.priv.scam.d"></small></span><input type="checkbox" class="sw" id="scam"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.banners"></b><small data-i18n="set.priv.banners.d"></small></span><input type="checkbox" class="sw" id="banners"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.fp"></b><small data-i18n="set.priv.fp.d"></small></span><input type="checkbox" class="sw" id="fp"></label>
+  </div>
+  <label class="f gap-s"><span data-i18n="set.priv.perm"></span><select id="perm"></select></label>
+  <div class="danger">
+    <div><b data-i18n="set.priv.clear"></b><small data-i18n="set.priv.clear.d"></small></div>
+    <button class="btn" id="clear" type="button" data-i18n="set.priv.clearBtn"></button>
+  </div>
+</div>
+
+<div class="pane" id="pane-ai" role="tabpanel">
+  <h2 data-i18n="set.ai.h"></h2>
+  <p class="lead" data-i18n="set.ai.lead"></p>
+
+  <div class="cardsel" role="radiogroup" data-i18n-aria="set.ai.h">
+    <label class="pcard"><input type="radio" name="provider" value="local"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.local.t"></b><small data-i18n="set.local.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="openai"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.openai.t"></b><small data-i18n="set.openai.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="anthropic"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.anthropic.t"></b><small data-i18n="set.anthropic.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="off"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.off.t"></b><small data-i18n="set.off.d"></small></label>
+  </div>
+
+  <section id="p-local" hidden>
+    <label class="f"><span data-i18n="set.f.ollamaUrl"></span><input id="local-url" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.model"></span>
+      <div class="row"><select id="local-model-list"></select><input id="local-model" spellcheck="false" autocomplete="off" data-i18n-ph="set.f.modelPh"></div>
+    </label>
+    <div class="row gap">
+      <button class="btn" id="pull" type="button" data-i18n="set.pull"></button>
+      <button class="link" id="site" type="button" data-i18n="set.site"></button>
+    </div>
+    <label class="f gap-s"><span data-i18n="set.f.embed"></span><input id="local-embed" spellcheck="false" autocomplete="off"></label>
+    <p class="hint tight" data-i18n="set.embed.d"></p>
+    <div class="row gap"><button class="btn" id="pull-embed" type="button" data-i18n="set.pullEmbed"></button></div>
+    <div class="bar" id="pull-bar" hidden><i></i></div>
+    <p class="hint" id="local-hint"></p>
+  </section>
+
+  <section id="p-openai" hidden>
+    <label class="f"><span data-i18n="set.f.apiUrl"></span><input id="openai-url" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.model"></span><input id="openai-model" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.key"></span><input id="openai-key" type="password" spellcheck="false" autocomplete="off"></label>
+    <button class="link" id="openai-clear" type="button" data-i18n="set.clearKey" hidden></button>
+  </section>
+
+  <section id="p-anthropic" hidden>
+    <label class="f"><span data-i18n="set.f.model"></span><input id="anthropic-model" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.key"></span><input id="anthropic-key" type="password" spellcheck="false" autocomplete="off"></label>
+    <button class="link" id="anthropic-clear" type="button" data-i18n="set.clearKey" hidden></button>
+  </section>
+
+  <p class="warn" id="remote-warn" hidden></p>
+  <p class="hint" id="store-hint" hidden></p>
+</div>
+
+</div>
+<footer class="savebar">
+  <span id="status" role="status"></span>
+  <button class="btn" id="test" type="button" data-i18n="set.test"></button>
+  <button class="btn acc" id="save" type="button" data-i18n="set.save"></button>
+</footer>
+</main>
+</div>
+<script src="i18n.js"></script>
+<script src="dropdown.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

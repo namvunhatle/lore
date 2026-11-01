@@ -1,0 +1,43 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. **Do not include private data**: no passwords, API keys, personal pages or memory contents. For security problems use the private report in the Security tab instead.
+  - type: input
+    id: version
+    attributes:
+      label: Lore version
+      description: Shown in the app menu under About, or the release you downloaded.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS (Apple Silicon), macOS (Intel), Windows 11, Windows 10, Linux (from source), Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open ...\n2. Click ...\n3. See ..."
+  - type: dropdown
+    id: ai
+    attributes:
+      label: AI model in use (if it matters)
+      options: [None / AI off, Local (Ollama), OpenAI-compatible API, Claude API]
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Remove anything private first.

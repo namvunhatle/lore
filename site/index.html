@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lore: the private AI browser</title>
+<meta name="description" content="Lore is a free, open-source browser that answers with sources, helps you write, and keeps your memory on your own computer. macOS and Windows.">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" type="image/svg+xml" href="assets/lore-icon.svg">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lore: the browser that remembers you. Only you.">
+<meta property="og:description" content="A free, open-source, private AI browser. Answers with sources, drafts for email, calendar and posts, and a memory that stays on your computer.">
+<meta property="og:image" content="https://tevo-web.github.io/lore/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/google-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="Lore">
+      <img src="assets/lore-icon.svg" width="32" height="32" alt="">
+      <span>Lore</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="#features" data-i18n="nav.features">A day with Lore</a>
+      <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="nav-end">
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="vi" aria-pressed="false">VI</button>
+      </div>
+      <a class="gh" data-repo="" href="https://github.com/tevo-web/lore" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- Dawn: the lotus opens -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <img class="mark" src="assets/lore-icon.svg" width="72" height="72" alt="Lore">
+    <p class="eyebrow" data-i18n="hero.eyebrow">Free · Open source · MIT</p>
+    <h1 data-i18n="hero.h1"><span>The browser that remembers you.</span> <span>Only you.</span></h1>
+    <p class="lead" data-i18n="hero.lead">Remember that article you read last week? Lore does. It keeps the memory on your computer, and nowhere else.</p>
+    <div class="cta">
+      <a class="btn primary" id="cta-main" href="#download"><span id="cta-label" data-i18n="cta.download">Download Lore</span></a>
+      <a class="btn" data-repo="" href="https://github.com/tevo-web/lore"><span data-i18n="cta.github">View on GitHub</span></a>
+    </div>
+    <p class="fine" id="cta-note"><span data-i18n="cta.note">macOS and Windows. Early version, not code-signed yet.</span> <span id="ver"></span></p>
+
+    <div class="demo-wrap">
+      <div class="demo win" id="demo" role="img" aria-label="A short demo: Lore answers a question, drafts an email and finds a page from memory">
+        <div class="demo-bar">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="demo-url"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span id="demo-q"></span><i class="caret"></i></div>
+          <kbd>⌘L</kbd>
+        </div>
+        <div class="demo-body" id="demo-body" aria-live="off"></div>
+      </div>
+      <p class="fine center demo-note" data-i18n="demo.note">An illustration of what Lore does.</p>
+    </div>
+  </div>
+</section>
+
+<section class="trust" aria-label="Highlights">
+  <ul class="wrap">
+    <li><b data-i18n="trust.1.b">No account</b><span data-i18n="trust.1.t">Open it and go</span></li>
+    <li><b data-i18n="trust.2.b">No telemetry</b><span data-i18n="trust.2.t">Nothing phones home</span></li>
+    <li><b data-i18n="trust.3.b">Your AI, or none</b><span data-i18n="trust.3.t">Local, your key, or off</span></li>
+    <li><b data-i18n="trust.4.b">MIT licensed</b><span data-i18n="trust.4.t">Read it, change it</span></li>
+  </ul>
+</section>
+
+<!-- Morning to afternoon: one day, four moments -->
+<section class="story" id="features">
+  <div class="wrap">
+    <h2 class="center reveal" data-i18n="st.h">One ordinary day.</h2>
+    <p class="center sub reveal" data-i18n="st.p">Here is how Lore fits into it.</p>
+
+    <article class="row chapter reveal">
+      <div class="copy">
+        <p class="eyebrow time" data-i18n="f1.eyebrow">7:40 AM</p>
+        <h3 data-i18n="f1.h">You wonder something. You just ask.</h3>
+        <p data-i18n="f1.p">On the train you type a question into the one bar, not an address. Lore answers in a line or two and shows where it came from. It never guesses a price or a flight.</p>
+      </div>
+      <figure class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><img src="assets/bar-home.png" width="1280" height="88" alt=""></div><img class="win-body" src="assets/home.png" width="1280" height="732" alt="Lore new tab page" loading="lazy"></figure>
+    </article>
+
+    <article class="row chapter flip reveal">
+      <div class="copy">
+        <p class="eyebrow time" data-i18n="f2.eyebrow">9:15 AM</p>
+        <h3 data-i18n="f2.h">A long article, a short morning.</h3>
+        <p data-i18n="f2.p">Lore sits beside the page. It sums it up, pulls out the dates, or answers "does it mention a price?" by quoting the exact line.</p>
+      </div>
+      <figure class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><img src="assets/bar-page.png" width="1280" height="88" alt=""></div><div class="win-body split"><img src="assets/page-panel.jpg" width="900" height="732" alt="Wikipedia article in Lore" loading="lazy"><img src="assets/panel.png" width="380" height="732" alt="Lore AI panel quoting the answer from the page" loading="lazy"></div></figure>
+    </article>
+
+    <article class="row chapter reveal">
+      <div class="copy">
+        <p class="eyebrow time" data-i18n="f3.eyebrow">11:30 AM</p>
+        <h3 data-i18n="f3.h">The email you've been putting off.</h3>
+        <p data-i18n="f3.p">Tell Lore what you need. It writes the draft and opens it in your own Gmail or Outlook. You read it, you press Send. That last part stays yours.</p>
+        <p class="fine" data-i18n="f3.note">Sample draft from a stand-in model.</p>
+      </div>
+      <figure class="win"><div class="win-title"><span class="dots"><i></i><i></i><i></i></span><b>Tasks</b></div><img class="win-body" src="assets/tasks-email.png" width="760" height="668" alt="Tasks window with an email draft" loading="lazy"></figure>
+    </article>
+
+    <article class="row chapter flip reveal">
+      <div class="copy">
+        <p class="eyebrow time" data-i18n="f4.eyebrow">2:00 PM</p>
+        <h3 data-i18n="f4.h">Wait, where was that page?</h3>
+        <p data-i18n="f4.p">You remember the idea, not the address. Ask by meaning and Lore finds it, from a memory that is encrypted and lives only on your computer.</p>
+      </div>
+      <figure class="win crop"><div class="win-title"><span class="dots"><i></i><i></i><i></i></span><b>Memory</b></div><img class="win-body" src="assets/memory.png" width="860" height="748" alt="Memory window listing visited pages" loading="lazy"></figure>
+    </article>
+  </div>
+</section>
+
+<!-- Dusk -->
+<section class="privacy" id="privacy">
+  <div class="wrap">
+    <p class="eyebrow time center reveal" data-i18n="p.eyebrow">All day, quietly</p>
+    <h2 class="center reveal" data-i18n="p.h">You never opened a setting. It was already on.</h2>
+    <ul class="cards">
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><b data-i18n="p.1.b">Ads and trackers blocked</b><span data-i18n="p.1.t">EasyList, EasyPrivacy and more.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9 3 3 0 0 0 3 3 3 3 0 0 0 3 3 3 3 0 0 0 3 3zM9 10h.01M13 15h.01M8 15h.01"/></svg><b data-i18n="p.2.b">Third-party cookies blocked</b><span data-i18n="p.2.t">Sites cannot follow you around.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></svg><b data-i18n="p.3.b">Scam warning</b><span data-i18n="p.3.t">Look-alike bank and wallet sites.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4 10 6-.7 1-1.8 2.3-3.2 3.4M6.5 7.6C4.6 8.9 3.2 10.6 2 12c1.5 2 5 6 10 6 1.4 0 2.7-.3 3.9-.8M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><b data-i18n="p.4.b">Private tabs</b><span data-i18n="p.4.t">Nothing saved. Tinted violet.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11v3c0 2-.5 4-1.5 6M8 9a4 4 0 0 1 8 0v2c0 3-.6 5.5-2 8M5 11V9a7 7 0 0 1 14 0v1M5 15c.3-1.3.5-2.7.5-4"/></svg><b data-i18n="p.5.b">Less fingerprinting</b><span data-i18n="p.5.t">You look like everyone else.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"/></svg><b data-i18n="p.6.b">Permissions ask once</b><span data-i18n="p.6.t">Never granted silently.</span></li>
+    </ul>
+    <details class="leaves reveal">
+      <summary data-i18n="l.h">What leaves your computer</summary>
+      <table>
+        <thead><tr><th data-i18n="l.when">When</th><th data-i18n="l.to">To</th><th data-i18n="l.what">What is sent</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="l.r1.a">You ask a plain question</td><td>wikipedia.org</td><td data-i18n="l.r1.c">The topic words</td></tr>
+          <tr><td data-i18n="l.r2.a">You search the web</td><td>duckduckgo.com</td><td data-i18n="l.r2.c">Your query</td></tr>
+          <tr><td data-i18n="l.r3.a">About once a week</td><td>easylist.to, abpvn.com, GitHub</td><td data-i18n="l.r3.c">Nothing (filter lists)</td></tr>
+          <tr><td data-i18n="l.r4.a">You use a cloud AI key</td><td data-i18n="l.r4.b">The provider you chose</td><td data-i18n="l.r4.c">The text you asked about</td></tr>
+        </tbody>
+      </table>
+      <p class="fine"><span data-i18n="l.note">Your history, page text and memory are never uploaded.</span> <a data-repo-path="blob/main/README.md#what-leaves-your-computer" href="https://github.com/tevo-web/lore/blob/main/README.md#what-leaves-your-computer" data-i18n="l.link">Full list</a></p>
+    </details>
+  </div>
+</section>
+
+<!-- Night -->
+<section class="night">
+  <div class="wrap row">
+    <div class="copy reveal">
+      <p class="eyebrow time" data-i18n="f6.eyebrow">9:30 PM</p>
+      <h2 data-i18n="f6.h">Your AI. Your rules.</h2>
+      <p data-i18n="f6.p">Lore can use a model running on your own computer, your own key, or no AI at all. You choose, and everything else keeps working.</p>
+      <div class="choices" role="tablist" aria-label="AI">
+        <button type="button" role="tab" aria-selected="true" data-choice="0" data-i18n="c.0">On your computer</button>
+        <button type="button" role="tab" aria-selected="false" data-choice="1" data-i18n="c.1">Your own key</button>
+        <button type="button" role="tab" aria-selected="false" data-choice="2" data-i18n="c.2">No AI</button>
+      </div>
+      <p class="choice-text" id="choice-text" aria-live="polite" data-i18n="c.t0">A model through Ollama, so nothing you ask ever leaves your machine.</p>
+    </div>
+    <figure class="win reveal">
+      <div class="win-title"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><b data-i18n="f6.win">Settings</b></div>
+      <img class="win-body" src="assets/settings.png" width="820" height="648" alt="Settings: choose where the AI runs" loading="lazy">
+    </figure>
+  </div>
+</section>
+
+<section class="honest" id="status">
+  <div class="wrap">
+    <div class="note-card reveal">
+      <h2 data-i18n="h.h">The honest part</h2>
+      <p data-i18n="h.p">Lore is young. We would rather tell you now than let you find out.</p>
+      <ul>
+        <li data-i18n="h.1">There is no phone version yet</li>
+        <li data-i18n="h.2">It cannot pay a real bill or book a real ticket yet</li>
+        <li data-i18n="h.3">No VPN, sync or extensions</li>
+        <li data-i18n="h.4">The installer is not signed, so your computer will frown at it</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Tomorrow morning -->
+<section class="download" id="download">
+  <div class="wrap">
+    <h2 class="center reveal" data-i18n="d.h">Ready when you are.</h2>
+    <p class="center sub reveal" id="d-sub" data-i18n="d.sub">Free. No account. No catch.</p>
+    <p class="notice" id="no-release" hidden data-i18n="d.none">The first release is coming soon. You can build Lore from source now.</p>
+    <ul class="dl">
+      <li class="reveal">
+        <h3>macOS</h3>
+        <a class="btn primary" data-asset="Lore-mac-arm64.dmg" href="#">Apple Silicon (.dmg)</a>
+        <a class="btn" data-asset="Lore-mac-x64.dmg" href="#">Intel (.dmg)</a>
+      </li>
+      <li class="reveal">
+        <h3>Windows</h3>
+        <a class="btn primary" data-asset="Lore-win-x64-setup.exe" href="#">Windows 10/11, 64-bit (.exe)</a>
+      </li>
+      <li class="reveal">
+        <h3>Linux</h3>
+        <a class="btn" href="#source" data-i18n="d.linux">Build from source</a>
+        <p class="fine" data-i18n="d.linux.note">Not yet. Build from source.</p>
+      </li>
+    </ul>
+    <p class="center fine"><span data-i18n="d.sums">Checksums are listed on every release.</span> <a data-repo-path="releases" href="https://github.com/tevo-web/lore/releases" data-i18n="d.all">All releases</a></p>
+
+    <div class="faq-like">
+      <details>
+        <summary data-i18n="w.s1">macOS blocks the app</summary>
+        <p data-i18n="w.p1">It is not signed yet. Drag Lore to Applications, right-click it, choose Open, and confirm. Once is enough.</p>
+      </details>
+      <details>
+        <summary data-i18n="w.s2">Windows warns "protected your PC"</summary>
+        <p data-i18n="w.p2">Click More info, then Run anyway. Prefer not to trust a binary? Build it yourself.</p>
+      </details>
+    </div>
+
+    <div class="source" id="source">
+      <h3 data-i18n="s.h">Build from source</h3>
+      <p data-i18n="s.src">Needs Node.js 22+ and Git. Linux is untested.</p>
+<pre><code>git clone https://github.com/tevo-web/lore.git
+cd lore/desktop
+npm ci
+npm run filters   # compile the ad-block lists (needs internet)
+npm start</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="faq" id="faq">
+  <div class="wrap narrow">
+    <h2 class="center reveal" data-i18n="q.h">Questions</h2>
+    <details><summary data-i18n="q.1s">Is it free?</summary><p data-i18n="q.1p">Yes: open source, no account, no ads. A cloud AI key you add may cost money. A model on your computer does not.</p></details>
+    <details><summary data-i18n="q.2s">Is it really private?</summary><p data-i18n="q.2p">No analytics, no telemetry. Your history and memory stay on your computer, encrypted. "Private" is not "anonymous": sites still see your connection, and a cloud AI sees what you send it. Every result says where text went.</p></details>
+    <details><summary data-i18n="q.3s">Do I need an AI model?</summary><p data-i18n="q.3p">No. Answers, memory, the reader, ad blocking and scam warnings work without one. A model adds writing, summaries and translation.</p></details>
+    <details><summary data-i18n="q.5s">Can I sign in to Google?</summary><p data-i18n="q.5p">Sometimes. Google blocks some embedded browsers. If it says no, Lore offers to open the page in your system browser.</p></details>
+    <details><summary data-i18n="q.6s">Android or iPhone?</summary><p data-i18n="q.6p">Planned, not started.</p></details>
+    <details><summary data-i18n="q.7s">Who makes Lore?</summary><p data-i18n="q.7p">Tevo, with the community. MIT licensed. Contributions welcome.</p></details>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div>
+      <b>Lore</b> <span data-i18n="foot.tag">The browser that remembers you. Only you.</span>
+      <p class="fine">MIT © 2026 Tevo</p>
+      <p class="fine" data-i18n="foot.shots">Screenshots include Wikipedia content (CC BY-SA).</p>
+    </div>
+    <nav aria-label="Project">
+      <a data-repo="" href="https://github.com/tevo-web/lore">GitHub</a>
+      <a data-repo-path="issues" href="https://github.com/tevo-web/lore/issues" data-i18n="foot.issues">Report a bug</a>
+      <a data-repo-path="blob/main/CONTRIBUTING.md" href="https://github.com/tevo-web/lore/blob/main/CONTRIBUTING.md" data-i18n="foot.contrib">Contribute</a>
+      <a data-repo-path="blob/main/LICENSE" href="https://github.com/tevo-web/lore/blob/main/LICENSE" data-i18n="foot.license">License</a>
+      <a data-repo-path="blob/main/SECURITY.md" href="https://github.com/tevo-web/lore/blob/main/SECURITY.md" data-i18n="foot.security">Security</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

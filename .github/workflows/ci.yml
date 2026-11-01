@@ -1,0 +1,50 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 3 * * 1' # every Monday: catches a new Electron major even when nobody is pushing
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('core/Cargo.toml') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --check
+        working-directory: core
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: core
+      - run: cargo test
+        working-directory: core
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  electron-freshness:
+    # Fails when the pinned Electron is two or more majors behind (see docs/release.md).
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node desktop/scripts/check-electron.js --strict

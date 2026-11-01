@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest an idea
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lore keeps a few rules: browsing data stays on your device, the assistant never acts alone on anything that matters, and there is no telemetry by default. Ideas that fit those rules are most likely to land. See CONTRIBUTING.md.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Lore to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alt
+    attributes:
+      label: Anything you tried or considered instead?

@@ -1,0 +1,56 @@
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{flex:none;padding:28px 32px 14px;border-bottom:1px solid var(--line);background:var(--win)}
+.top>*{max-width:780px;margin-left:auto;margin-right:auto}
+h1{font-size:24px;font-weight:500;letter-spacing:-.01em;margin:0}
+.lead{color:var(--muted);margin:2px 0 18px}
+.search{display:flex;align-items:center;gap:10px;height:48px;padding:0 16px;border-radius:24px;background:var(--hover);border:1px solid transparent;transition:border-color .15s,background .15s}
+.search:focus-within{background:var(--win);border-color:var(--accent)}
+.search svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}
+.search input{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--ink);font:400 16px var(--f);outline:0}
+.search input::-webkit-search-cancel-button{display:none}
+.clr{width:26px;height:26px;border-radius:50%;color:var(--muted);font-size:18px;line-height:1}
+.clr:hover{background:var(--line);color:var(--ink)}
+.filters{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{height:32px;padding:0 14px;border-radius:16px;border:1px solid var(--line);color:var(--muted);font-weight:500;font-size:13px;transition:background .15s,color .15s,border-color .15s}
+.chip:hover{background:var(--hover);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+select{margin-left:auto;max-width:220px;height:32px;border-radius:16px;border:1px solid var(--line);background:var(--win);color:var(--ink);padding:0 12px;font:400 13px var(--f)}
+
+main{flex:1;overflow-y:auto;padding:6px 32px}
+ul{list-style:none;margin:0 auto;padding:0;max-width:780px}
+li{display:flex;gap:14px;align-items:flex-start;padding:14px 10px;margin:0 -10px;border-radius:12px;animation:rise .2s ease both}
+li:hover{background:var(--hover)}
+@keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.ico{flex:none;width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:600;font-size:14px;text-transform:uppercase}
+li .body{flex:1;min-width:0}
+li a{color:var(--ink);text-decoration:none;font-weight:500;font-size:15px;display:block;overflow-wrap:anywhere}
+li a:hover{text-decoration:underline}
+li small{display:block;color:var(--muted);font-size:12.5px}
+li p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+mark{background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:0 1px}
+li .x{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:18px;flex:none;opacity:0;transition:opacity .12s}
+li:hover .x,li .x:focus-visible{opacity:1}
+li .x:hover{background:var(--line);color:var(--ink)}
+
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:72px 24px;color:var(--muted)}
+.empty svg{width:40px;height:40px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-bottom:12px}
+.empty p{margin:0 0 16px;max-width:420px}
+.empty .chips{justify-content:center}
+[hidden]{display:none!important}
+
+.foot{flex:none;display:flex;align-items:center;gap:10px;padding:10px 32px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;flex-wrap:wrap}
+.spacer{flex:1}
+.btn{height:34px;padding:0 16px;border-radius:17px;border:1px solid var(--line);color:var(--ink);font:500 13px var(--f)}
+.btn:hover{background:var(--hover)}
+.link{color:var(--accent);font:500 13px var(--f);text-decoration:underline;text-underline-offset:3px}
+@media (prefers-reduced-motion:reduce){li{animation:none}}
+.filters .dd{margin-left:auto;max-width:220px}
+.filters .dd-btn{height:32px;border-radius:16px;font-size:13px}
+.filters .dd-list li{font-size:13px}
+.ico.has{background:var(--hover);padding:7px}
+.ico img{width:100%;height:100%;object-fit:contain;border-radius:3px}
