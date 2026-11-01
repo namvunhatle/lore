@@ -25,7 +25,7 @@ Lấy bộ cài mới nhất ở **[Releases](https://github.com/tevo-web/lore/r
 | macOS (Apple Silicon) | `Lore-mac-arm64.dmg` |
 | macOS (Intel) | `Lore-mac-x64.dmg` |
 | Windows 10/11 (64-bit) | `Lore-win-x64-setup.exe` |
-| Linux | tự build từ mã nguồn (xem bên dưới) |
+| Linux (64-bit) | `Lore-linux-x64.AppImage` hoặc `Lore-linux-x64.tar.gz` (đã build nhưng chưa thử trên máy Linux thật) |
 
 Bộ cài **chưa được ký số**, nên Windows SmartScreen và macOS Gatekeeper sẽ cảnh báo. Trên macOS, lần đầu hãy nhấp chuột phải vào ứng dụng rồi chọn *Mở*. Nếu bạn không muốn tin một tệp cài sẵn, hãy [tự build](#tự-build-từ-mã-nguồn), chỉ mất vài phút.
 
@@ -48,7 +48,8 @@ Chưa có, xin đừng trông cậy vào:
 
 | Mảng | Tình trạng |
 |---|---|
-| Bản Android, iOS, Linux | Chưa bắt đầu (Linux có thể chạy từ mã nguồn nhưng chưa thử) |
+| Bản Android, iOS | Chưa bắt đầu |
+| Bản Linux | Đã đóng gói (AppImage và tar.gz) nhưng chưa từng chạy trên máy Linux thật |
 | Lõi Rust dùng chung (`core/`) | Mới là chỗ giữ chỗ. Bản máy tính đang dùng bộ chặn quảng cáo viết bằng JavaScript |
 | Quy trình agent cho dịch vụ thật | Có bộ máy xác nhận trước khi làm và trình điều khiển trình duyệt, đã thử với cổng demo cục bộ. **Chưa có thanh toán hóa đơn hay đặt vé thật** |
 | VPN | Chưa có |

@@ -1,6 +1,13 @@
 name: release
 
 # Push a tag such as v0.2.0 to build the installers and attach them to a GitHub Release.
+# You can also run it by hand (Actions -> release -> Run workflow) to try a build without publishing.
+#
+# Signing is optional. macOS is signed and notarized only when ALL of these repository secrets exist, and Windows is
+# signed only when WIN_CSC_LINK exists. Without them the installers are built unsigned, exactly as before.
+#   macOS:   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#   Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD
+# See docs/release.md for how to get and add them. A signed build is verified; if the check fails, the release fails.
 on:
   push:
     tags: ['v*']
@@ -16,14 +23,23 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            script: dist:mac
+            platform: mac
             files: |
               desktop/dist/Lore-mac-*.dmg
+              desktop/dist/signed-mac.txt
           - os: windows-latest
-            script: dist:win
+            platform: win
             files: |
               desktop/dist/Lore-win-*-setup.exe
+              desktop/dist/signed-win.txt
+          - os: ubuntu-latest
+            platform: linux
+            files: |
+              desktop/dist/Lore-linux-x64.AppImage
+              desktop/dist/Lore-linux-x64.tar.gz
     runs-on: ${{ matrix.os }}
+    env:
+      SIGN: ${{ (matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '') || (matrix.platform == 'win' && secrets.WIN_CSC_LINK != '') }}
     defaults:
       run:
         working-directory: desktop
@@ -36,8 +52,52 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm test
-      # Compiles the bundled ad-block lists first (predist:*), then packages. Builds are not code-signed yet.
-      - run: npm run ${{ matrix.script }}
+
+      # Compiles the bundled ad-block lists first (predist:*), then packages.
+      # On the Windows runner, dist:win:signed still skips signing when there is no certificate, and it (unlike the local
+      # dist:win, which exists for building on a Mac) also stamps Lore's icon and version into the .exe.
+      - name: Build (unsigned)
+        if: ${{ env.SIGN != 'true' }}
+        run: npm run dist:${{ matrix.platform == 'win' && 'win:signed' || matrix.platform }}
+
+      - name: Build (signed)
+        if: ${{ env.SIGN == 'true' }}
+        run: npm run dist:${{ matrix.platform }}:signed
+        env:
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
+          WIN_CSC_LINK: ${{ matrix.platform == 'win' && secrets.WIN_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'win' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+
+      # Never trust that signing worked: check it. A failure here stops the release.
+      - name: Verify macOS signature and notarization
+        if: ${{ env.SIGN == 'true' && matrix.platform == 'mac' }}
+        run: |
+          set -e
+          for app in dist/mac-arm64/Lore.app dist/mac/Lore.app; do
+            [ -d "$app" ] || continue
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          done
+          for dmg in dist/Lore-mac-*.dmg; do xcrun stapler validate "$dmg"; done
+
+      - name: Verify Windows signature
+        if: ${{ env.SIGN == 'true' && matrix.platform == 'win' }}
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/Lore-win-*-setup.exe | ForEach-Object {
+            $s = Get-AuthenticodeSignature $_.FullName
+            Write-Host "$($_.Name): $($s.Status) $($s.SignerCertificate.Subject)"
+            if ($s.Status -ne 'Valid') { throw "$($_.Name) is not validly signed: $($s.Status)" }
+          }
+
+      - name: Record whether this build is signed
+        shell: bash
+        run: echo "${{ env.SIGN == 'true' }}" > dist/signed-${{ matrix.platform }}.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
@@ -53,15 +113,24 @@ jobs:
         with:
           path: installers
           merge-multiple: true
-      - name: Checksums
-        run: cd installers && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes and checksums
+        run: |
+          mac=$(cat installers/signed-mac.txt 2>/dev/null || echo false)
+          win=$(cat installers/signed-win.txt 2>/dev/null || echo false)
+          rm -f installers/signed-*.txt
+          {
+            echo "## Downloads"
+            if [ "$mac" = true ]; then echo "- **macOS:** signed and notarized by Apple."; else echo "- **macOS:** not signed. The first time, right-click Lore and choose Open."; fi
+            if [ "$win" = true ]; then echo "- **Windows:** signed."; else echo "- **Windows:** not signed. SmartScreen will warn: click More info, then Run anyway."; fi
+            echo "- **Linux:** built, but not tested on real Linux machines yet."
+            echo
+            echo "\`SHA256SUMS.txt\` lists a checksum for each installer: compare it with what you downloaded before you run it."
+          } > body.md
+          cd installers && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: installers/*
+          body_path: body.md
           generate_release_notes: true
           # Only tags like v1.0.0-beta.1 are pre-releases: GitHub's "latest release" link ignores pre-releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
-          body: |
-            Installers are **not code-signed** yet. Windows SmartScreen and macOS Gatekeeper will warn you: on macOS right-click the app and choose Open the first time. You can also build from source: see the README.
-
-            `SHA256SUMS.txt` lists a checksum for each installer: compare it with what you downloaded before you run it.

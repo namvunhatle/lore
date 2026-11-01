@@ -30,3 +30,6 @@ site/.DS_Store
 # Private product brief and assistant instructions: kept locally, never published
 CLAUDE.md
 CLAUDE_1.md
+
+# Local release folder (installers are published through GitHub Releases)
+release-v*/

@@ -17,7 +17,7 @@
     'skip': 'Bỏ qua, tới nội dung', 'nav.features': 'Một ngày cùng Lore', 'nav.privacy': 'Riêng tư', 'nav.download': 'Tải về', 'nav.faq': 'Hỏi đáp',
     'hero.eyebrow': 'Miễn phí · Mã nguồn mở · MIT', 'hero.h1': '<span>Trình duyệt nhớ bạn,</span> <span>và chỉ mình bạn.</span>',
     'hero.lead': 'Nhớ bài báo bạn đọc tuần trước chứ? Lore nhớ. Và chỉ giữ ký ức đó trên máy của bạn, không ở đâu khác.',
-    'cta.download': 'Tải Lore', 'cta.github': 'Xem trên GitHub', 'cta.note': 'macOS và Windows. Bản đầu tiên, chưa ký số.',
+    'cta.download': 'Tải Lore', 'cta.github': 'Xem trên GitHub', 'cta.note': 'macOS, Windows và Linux. Bản đầu tiên, chưa ký số.',
     'demo.note': 'Minh họa những gì Lore làm.',
     'trust.1.b': 'Không cần tài khoản', 'trust.1.t': 'Mở lên là dùng', 'trust.2.b': 'Không telemetry', 'trust.2.t': 'Không gửi gì về đâu cả',
     'trust.3.b': 'AI do bạn chọn', 'trust.3.t': 'Trên máy, khóa của bạn, hoặc tắt', 'trust.4.b': 'Giấy phép MIT', 'trust.4.t': 'Đọc và sửa thoải mái',
@@ -39,12 +39,12 @@
     'c.t0': 'Một mô hình qua Ollama, nên những gì bạn hỏi không bao giờ rời khỏi máy.',
     'c.t1': 'Cắm khóa của bạn cho dịch vụ tương thích OpenAI hay Claude. Lore cho bạn biết mỗi đoạn văn bản đã đi đâu.',
     'c.t2': 'Tắt AI. Câu trả lời từ Wikipedia, trí nhớ, chế độ đọc, chặn quảng cáo và cảnh báo lừa đảo vẫn chạy.',
-    'h.h': 'Phần nói thật', 'h.p': 'Lore còn non. Chúng tôi muốn nói trước hơn là để bạn tự phát hiện.', 'h.1': 'Chưa có bản cho điện thoại', 'h.2': 'Chưa thanh toán hóa đơn hay đặt vé thật được', 'h.3': 'Chưa có VPN, đồng bộ hay tiện ích mở rộng', 'h.4': 'Bộ cài chưa được ký, nên máy tính sẽ nhăn mặt',
+    'h.h': 'Phần nói thật', 'h.p': 'Lore còn non. Chúng tôi muốn nói trước hơn là để bạn tự phát hiện.', 'h.1': 'Chưa có bản cho điện thoại, và bản Linux chưa được thử', 'h.2': 'Chưa thanh toán hóa đơn hay đặt vé thật được', 'h.3': 'Chưa có VPN, đồng bộ hay tiện ích mở rộng', 'h.4': 'Bộ cài chưa được ký, nên máy tính sẽ nhăn mặt',
     'd.h': 'Sẵn sàng khi bạn muốn.', 'd.sub': 'Miễn phí. Không cần tài khoản. Không điều kiện kèm theo.', 'd.none': 'Bản phát hành đầu tiên sắp có. Bạn có thể tự build ngay bây giờ.',
-    'd.linux': 'Tự build từ mã nguồn', 'd.linux.note': 'Chưa có. Hãy tự build.', 'd.sums': 'Mã kiểm tra có trên mỗi bản phát hành.', 'd.all': 'Tất cả bản phát hành',
+    'd.linux.note': 'Đã build, nhưng chưa được thử trên máy Linux thật.', 'd.sums': 'Mã kiểm tra có trên mỗi bản phát hành.', 'd.all': 'Tất cả bản phát hành',
     'w.s1': 'macOS chặn ứng dụng', 'w.p1': 'Vì chưa được ký. Kéo Lore vào Applications, nhấp chuột phải, chọn Open và xác nhận. Một lần là đủ.',
     'w.s2': 'Windows báo "protected your PC"', 'w.p2': 'Bấm More info, rồi Run anyway. Không muốn tin tệp cài sẵn? Hãy tự build.',
-    's.h': 'Tự build từ mã nguồn', 's.src': 'Cần Node.js 22+ và Git. Linux chưa được thử.',
+    's.h': 'Tự build từ mã nguồn', 's.src': 'Cần Node.js 22+ và Git.',
     'q.h': 'Hỏi đáp',
     'q.1s': 'Có miễn phí không?', 'q.1p': 'Có: mã nguồn mở, không tài khoản, không quảng cáo. Khóa AI đám mây bạn thêm có thể tốn tiền. Mô hình chạy trên máy thì không.',
     'q.2s': 'Có thật sự riêng tư không?', 'q.2p': 'Không phân tích, không telemetry. Lịch sử và trí nhớ nằm trên máy bạn, được mã hóa. "Riêng tư" không phải "ẩn danh": trang web vẫn thấy kết nối của bạn, và AI đám mây thấy những gì bạn gửi. Mỗi kết quả đều nói rõ văn bản đã đi đâu.',
@@ -59,6 +59,17 @@
   for (const el of nodes) if (!(el.dataset.i18n in EN)) EN[el.dataset.i18n] = el.innerHTML;
   EN['c.t1'] = 'Plug in your key for any OpenAI-compatible service or Claude. Lore tells you where each text went.';
   EN['c.t2'] = 'Switch AI off. Answers from Wikipedia, memory, the reader, ad blocking and scam warnings all still work.';
+  // ---- Signed or not: the warnings follow the switch in config.js ---------------------------------------------
+  const signed = (window.LORE && window.LORE.signed) || {};
+  const sm = !!signed.mac, sw = !!signed.windows;
+  if (sm) $$('[data-unsigned="mac"]').forEach((n) => n.remove());
+  if (sw) $$('[data-unsigned="win"]').forEach((n) => n.remove());
+  if (sm && sw) $$('[data-unsigned="any"]').forEach((n) => n.remove());
+  if (!$('[data-unsigned="mac"], [data-unsigned="win"]')) $$('[data-unsigned="faq"]').forEach((n) => n.remove());
+  if (sm && sw) { EN['cta.note'] = 'macOS, Windows and Linux. Early version.'; VI['cta.note'] = 'macOS, Windows và Linux. Bản đầu tiên.'; }
+  else if (sm) { EN['cta.note'] = 'macOS, Windows and Linux. Early version. The macOS app is signed; Windows is not yet.'; VI['cta.note'] = 'macOS, Windows và Linux. Bản đầu tiên. Bản macOS đã ký; Windows thì chưa.'; EN['h.4'] = 'The Windows installer is not signed yet, so expect a warning'; VI['h.4'] = 'Bộ cài Windows chưa được ký, nên sẽ có cảnh báo'; }
+  else if (sw) { EN['cta.note'] = 'macOS, Windows and Linux. Early version. The Windows installer is signed; macOS is not yet.'; VI['cta.note'] = 'macOS, Windows và Linux. Bản đầu tiên. Bộ cài Windows đã ký; macOS thì chưa.'; EN['h.4'] = 'The macOS app is not signed yet, so expect a warning'; VI['h.4'] = 'Bản macOS chưa được ký, nên sẽ có cảnh báo'; }
+
   let lang = 'en';
   const t = (k) => (lang === 'vi' && VI[k] !== undefined ? VI[k] : EN[k]);
 
@@ -152,18 +163,18 @@
   // ---- Downloads ----------------------------------------------------------------------------------------------
   const ua = navigator.userAgent || '';
   const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
-  const os = /win/i.test(plat) || /Windows/.test(ua) ? 'windows' : /mac/i.test(plat) || /Mac OS X/.test(ua) ? 'mac' : 'other';
+  const os = /win/i.test(plat) || /Windows/.test(ua) ? 'windows' : /mac/i.test(plat) || /Mac OS X/.test(ua) ? 'mac' : /linux/i.test(plat) && !/Android/.test(ua) ? 'linux' : 'other';
   const base = gh + '/releases/latest/download/';
   let released = null; // null = not checked yet, false = no release, true = published
   const assets = new Set();
   const LABEL = {
-    en: { windows: 'Download for Windows', mac: 'Download for macOS', other: 'Build Lore from source' },
-    vi: { windows: 'Tải cho Windows', mac: 'Tải cho macOS', other: 'Tự build Lore' }
+    en: { windows: 'Download for Windows', mac: 'Download for macOS', linux: 'Download for Linux', other: 'Build Lore from source' },
+    vi: { windows: 'Tải cho Windows', mac: 'Tải cho macOS', linux: 'Tải cho Linux', other: 'Tự build Lore' }
   };
   function paintCta() {
     const cta = $('#cta-main');
     $('#cta-label').textContent = LABEL[lang][os];
-    const file = os === 'windows' ? 'Lore-win-x64-setup.exe' : os === 'mac' ? 'Lore-mac-arm64.dmg' : '';
+    const file = os === 'windows' ? 'Lore-win-x64-setup.exe' : os === 'mac' ? 'Lore-mac-arm64.dmg' : os === 'linux' ? 'Lore-linux-x64.AppImage' : '';
     cta.href = os === 'other' ? '#source' : released && (!assets.size || assets.has(file)) ? base + file : '#download';
   }
   for (const a of $$('[data-asset]')) a.href = base + a.dataset.asset;

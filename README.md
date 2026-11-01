@@ -36,7 +36,7 @@ Get the latest installer from **[Releases](https://github.com/tevo-web/lore/rele
 | macOS (Apple Silicon) | `Lore-mac-arm64.dmg` |
 | macOS (Intel) | `Lore-mac-x64.dmg` |
 | Windows 10/11 (64-bit) | `Lore-win-x64-setup.exe` |
-| Linux | build from source (see below) |
+| Linux (64-bit) | `Lore-linux-x64.AppImage` or `Lore-linux-x64.tar.gz` (built, but not tested on real Linux machines yet) |
 
 The installers are **not signed** yet, so Windows SmartScreen and macOS Gatekeeper will warn you. On macOS, right-click the app and choose *Open* the first time. If you prefer not to trust a binary, [build it yourself](#build-from-source): it takes a few minutes.
 
@@ -61,7 +61,8 @@ Not done, so please do not count on it:
 
 | Area | State |
 |---|---|
-| Android, iOS, Linux builds | Not started (Linux should run from source, but is untested) |
+| Android and iOS apps | Not started |
+| Linux build | Packaged (AppImage and tar.gz) but never run on a real Linux machine |
 | Shared Rust core (`core/`) | Placeholder only. The desktop app uses a JavaScript ad blocker for now |
 | Agent workflows for real services | The confirm-before-acting engine and a browser driver exist and are tested against a local demo portal. **Paying a real bill or booking a real ticket is not implemented** |
 | VPN | Not implemented |
@@ -107,8 +108,10 @@ npm run test:e2e    # end-to-end tests with a real Electron window; quit other E
 Installers:
 
 ```bash
-npm run dist:mac    # dist/Lore-mac-<arch>.dmg
-npm run dist:win    # dist/Lore-win-x64-setup.exe
+npm run dist:mac    # dist/Lore-mac-<arch>.dmg (unsigned)
+npm run dist:win    # dist/Lore-win-x64-setup.exe (unsigned)
+npm run dist:linux  # dist/Lore-linux-x64.AppImage and .tar.gz
+# Signed builds, for maintainers with certificates: see docs/release.md
 ```
 
 To try AI with a model on your machine: install [Ollama](https://ollama.com), then in Lore open **Settings → AI model** and pick a model.

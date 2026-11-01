@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lore: the private AI browser</title>
-<meta name="description" content="Lore is a free, open-source browser that answers with sources, helps you write, and keeps your memory on your own computer. macOS and Windows.">
+<meta name="description" content="Lore is a free, open-source browser that answers with sources, helps you write, and keeps your memory on your own computer. macOS, Windows and Linux.">
 <meta name="theme-color" content="#FFFFFF">
 <link rel="icon" type="image/svg+xml" href="assets/lore-icon.svg">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -58,7 +58,7 @@
       <a class="btn primary" id="cta-main" href="#download"><span id="cta-label" data-i18n="cta.download">Download Lore</span></a>
       <a class="btn" data-repo="" href="https://github.com/tevo-web/lore"><span data-i18n="cta.github">View on GitHub</span></a>
     </div>
-    <p class="fine" id="cta-note"><span data-i18n="cta.note">macOS and Windows. Early version, not code-signed yet.</span> <span id="ver"></span></p>
+    <p class="fine" id="cta-note"><span data-i18n="cta.note">macOS, Windows and Linux. Early version, not code-signed yet.</span> <span id="ver"></span></p>
 
     <div class="demo-wrap">
       <div class="demo win" id="demo" role="img" aria-label="A short demo: Lore answers a question, drafts an email and finds a page from memory">
@@ -184,10 +184,10 @@
       <h2 data-i18n="h.h">The honest part</h2>
       <p data-i18n="h.p">Lore is young. We would rather tell you now than let you find out.</p>
       <ul>
-        <li data-i18n="h.1">There is no phone version yet</li>
+        <li data-i18n="h.1">There is no phone version yet, and Linux is untested</li>
         <li data-i18n="h.2">It cannot pay a real bill or book a real ticket yet</li>
         <li data-i18n="h.3">No VPN, sync or extensions</li>
-        <li data-i18n="h.4">The installer is not signed, so your computer will frown at it</li>
+        <li data-i18n="h.4" data-unsigned="any">The installer is not signed, so your computer will frown at it</li>
       </ul>
     </div>
   </div>
@@ -211,18 +211,19 @@
       </li>
       <li class="reveal">
         <h3>Linux</h3>
-        <a class="btn" href="#source" data-i18n="d.linux">Build from source</a>
-        <p class="fine" data-i18n="d.linux.note">Not yet. Build from source.</p>
+        <a class="btn primary" data-asset="Lore-linux-x64.AppImage" href="#">64-bit (.AppImage)</a>
+        <a class="btn" data-asset="Lore-linux-x64.tar.gz" href="#">64-bit (.tar.gz)</a>
+        <p class="fine" data-i18n="d.linux.note">Built, but not tested on real Linux machines yet.</p>
       </li>
     </ul>
     <p class="center fine"><span data-i18n="d.sums">Checksums are listed on every release.</span> <a data-repo-path="releases" href="https://github.com/tevo-web/lore/releases" data-i18n="d.all">All releases</a></p>
 
-    <div class="faq-like">
-      <details>
+    <div class="faq-like" data-unsigned="faq">
+      <details data-unsigned="mac">
         <summary data-i18n="w.s1">macOS blocks the app</summary>
         <p data-i18n="w.p1">It is not signed yet. Drag Lore to Applications, right-click it, choose Open, and confirm. Once is enough.</p>
       </details>
-      <details>
+      <details data-unsigned="win">
         <summary data-i18n="w.s2">Windows warns "protected your PC"</summary>
         <p data-i18n="w.p2">Click More info, then Run anyway. Prefer not to trust a binary? Build it yourself.</p>
       </details>
@@ -230,7 +231,7 @@
 
     <div class="source" id="source">
       <h3 data-i18n="s.h">Build from source</h3>
-      <p data-i18n="s.src">Needs Node.js 22+ and Git. Linux is untested.</p>
+      <p data-i18n="s.src">Needs Node.js 22+ and Git.</p>
 <pre><code>git clone https://github.com/tevo-web/lore.git
 cd lore/desktop
 npm ci

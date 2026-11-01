@@ -27,11 +27,17 @@
     "test": "node --test \"test/*.test.js\"",
     "test:e2e": "electron test-e2e/run.js && electron test-e2e/pages.js && electron test-e2e/privacy.js && electron test-e2e/reader.js && electron test-e2e/features.js",
     "demo-portal": "node fixtures/portal.js",
-    "dist:win": "electron-builder --win nsis --x64",
     "filters": "node scripts/build-filters.js",
+    "dist:win": "electron-builder --win nsis --x64 -c.win.signAndEditExecutable=false",
+    "dist:win:signed": "electron-builder --win nsis --x64",
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64 -c.mac.identity=null",
+    "dist:mac:signed": "electron-builder --mac dmg --arm64 --x64",
+    "dist:linux": "electron-builder --linux AppImage tar.gz --x64",
     "predist:win": "npm run filters",
+    "predist:win:signed": "npm run filters",
     "predist:mac": "npm run filters",
-    "dist:mac": "electron-builder --mac dmg --arm64 --x64",
+    "predist:mac:signed": "npm run filters",
+    "predist:linux": "npm run filters",
     "check:electron": "node scripts/check-electron.js"
   },
   "devDependencies": {
@@ -61,7 +67,6 @@
           ]
         }
       ],
-      "signAndEditExecutable": false,
       "artifactName": "Lore-win-${arch}-setup.${ext}"
     },
     "nsis": {
@@ -82,7 +87,31 @@
       ],
       "category": "public.app-category.productivity",
       "artifactName": "Lore-mac-${arch}.${ext}",
-      "identity": null
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network;WebBrowser",
+      "synopsis": "The private AI browser",
+      "artifactName": "Lore-linux-${arch}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "Lore-linux-x64.AppImage"
     }
   },
   "dependencies": {
