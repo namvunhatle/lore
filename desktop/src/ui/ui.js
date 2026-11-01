@@ -1,48 +1,6 @@
-const $ = (s) => document.querySelector(s);
 const intent = $('#intent');
-document.documentElement.classList.add(lore.platform);
 if (lore.platform !== 'darwin') document.querySelector('kbd').textContent = 'Ctrl+L';
-let lang = 'en';
-const T = (k, v) => LORE_I18N.t(lang, k, v);
 let focused = false;
-const key = lore.platform === 'darwin' ? '⌘' : 'Ctrl+';
-
-function icon(t) {
-  if (t.private && !t.loading) {
-    const p = document.createElement('span');
-    p.className = 'fav priv';
-    p.setAttribute('role', 'img');
-    p.setAttribute('aria-label', T('tab.private'));
-    p.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11c1.5-4 4.5-6 9-6s7.5 2 9 6M6 15a3 3 0 1 0 6 0M12 15a3 3 0 1 0 6 0"/></svg>';
-    return p;
-  }
-  if (t.loading) { const sp = document.createElement('i'); sp.className = 'fav spin'; sp.setAttribute('aria-label', T('loading')); return sp; }
-  if (t.home) {
-    // New tab: the lotus in greys, so it reads as "Lore" without competing with real site favicons.
-    const l = document.createElement('span');
-    l.className = 'fav lotus';
-    l.setAttribute('role', 'img');
-    l.setAttribute('aria-label', 'Lore');
-    l.innerHTML = '<svg width="16" height="16" viewBox="-10 -10 20 20" stroke-linejoin="round"><g transform="translate(0 7.5)"><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-66) scale(.76)" fill="#9AA0AA"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(66) scale(.76)" fill="#9AA0AA"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-33) scale(.9)" fill="#B9BEC6"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(33) scale(.9)" fill="#B9BEC6"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" fill="#666C77"/></g></svg>';
-    return l;
-  }
-  const wrap = document.createElement('span');
-  wrap.className = 'fav';
-  const letter = t.home ? 'L' : (t.title || '?').trim().charAt(0).toUpperCase();
-  const fallback = () => { wrap.className = 'fav ph' + (t.home ? ' lore' : ''); wrap.textContent = letter; };
-  if (t.favicon && !t.home) {
-    const img = document.createElement('img');
-    img.alt = '';
-    img.src = t.favicon;
-    img.addEventListener('error', fallback);
-    wrap.append(img);
-  } else fallback();
-  return wrap;
-}
-
-// While a group name is being typed, the strip is not redrawn (it would throw the text box away); the latest state waits.
-let editingGroup = false;
-let waiting = null;
 
 // Where on a tab a drag lands: the outer thirds reorder, the middle one makes a group with that tab.
 function zone(e, r, t) {
@@ -87,25 +45,6 @@ function groupChip(g, edit) {
   return b;
 }
 
-function startEdit(b, g) {
-  if (!b.isConnected) return;
-  const input = document.createElement('input');
-  input.className = 'grp-edit g-' + g.color; input.value = g.name; input.maxLength = 30; input.setAttribute('aria-label', T('org.groupName')); input.placeholder = T('group.namePh');
-  let done = false;
-  const finish = (save) => {
-    if (done) return;
-    done = true;
-    editingGroup = false;
-    if (save && input.value.trim()) lore.send('group:rename', g.id, input.value); else lore.send('group:toggle', 0);
-    if (waiting) { const w = waiting; waiting = null; render(w); }
-  };
-  input.addEventListener('keydown', (k) => { if (k.key === 'Enter') finish(true); else if (k.key === 'Escape') finish(false); });
-  input.addEventListener('blur', () => finish(true));
-  editingGroup = true;
-  b.replaceWith(input);
-  input.focus(); input.select();
-}
-
 function render(s) {
   if (editingGroup) { waiting = s; return; }
   if (s.lang !== lang) { lang = s.lang; LORE_I18N.apply(lang); tips(); resetPh(); }
@@ -114,16 +53,16 @@ function render(s) {
   $('#bar').classList.toggle('loading', !!(active && active.loading));
   const tabs = $('#tabs');
   tabs.replaceChildren();
-  if (s.profiles && s.profiles.length > 1 && s.profile) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'avatar g-' + s.profile.color;
-    b.textContent = (s.profile.name || '?').charAt(0).toUpperCase();
-    b.setAttribute('aria-label', T('prof.menuAria', { name: s.profile.name }));
-    b.dataset.tip = s.profile.name;
-    b.addEventListener('click', () => { const r = b.getBoundingClientRect(); lore.send('profile:menu', Math.round(r.left), Math.round(r.bottom)); });
-    tabs.append(b);
-  }
+  const side = s.layout === 'side';
+  document.documentElement.classList.toggle('side-tabs', side);
+  document.documentElement.classList.toggle('side-closed', side && !s.sideOpen);
+  renderChrome(s);
+  // With the sidebar hidden, the toolbar carries the button that brings it back (the sidebar itself is in side.html).
+  const nt = $('#navtoggle');
+  const ntSig = lang + '|' + (side && !s.sideOpen);
+  if (nt._sig !== ntSig) { nt._sig = ntSig; nt.replaceChildren(); if (side && !s.sideOpen) nt.append(sideToggleBtn(s)); }
+  if (side) { if (s.sideOpen) renderSide(s); return; }
+  if (s.profiles && s.profiles.length > 1 && s.profile) tabs.append(avatarBtn(s));
   const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
   let lastGroup = 0;
   for (const t of s.tabs) {
@@ -181,21 +120,17 @@ function render(s) {
     tabs.append(el);
   }
   if (lastGroup && gmap.get(lastGroup)) tabs.append(groupPlus(gmap.get(lastGroup)));
-  const org = document.createElement('button');
-  org.className = 'plus org';
-  org.hidden = s.tabs.length < 3;
-  org.setAttribute('aria-label', T('org.menu'));
-  org.dataset.tip = T('org.tip', { k: key });
-  org.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
-  org.addEventListener('click', () => lore.send('organize:open'));
   const plus = document.createElement('button');
   plus.className = 'plus';
   plus.textContent = '+';
   plus.setAttribute('aria-label', T('tab.open'));
   plus.dataset.tip = T('tip.newTab', { k: key });
   plus.addEventListener('click', () => lore.send('tab:new'));
-  tabs.append(plus, org);
+  tabs.append(plus, orgBtn(s));
+}
 
+// Everything outside the tabs: toolbar, lock, star, bookmarks bar. Same in both layouts.
+function renderChrome(s) {
   const dlb = $('#downloads');
   dlb.hidden = !s.downloads || !s.downloads.count;
   dlb.classList.toggle('busy', !!(s.downloads && s.downloads.active));
@@ -321,31 +256,6 @@ function updateChip() {
   }, 50);
 }
 
-const tipEl = $('#tip');
-let tipTimer;
-function showTip(target) {
-  const [, text, cap] = /^(.*?)(?:\s*\(([^)]+)\))?$/.exec(target.dataset.tip);
-  tipEl.replaceChildren(document.createTextNode(text));
-  if (cap) { const k = document.createElement('kbd'); k.textContent = cap; tipEl.append(k); }
-  tipEl.hidden = false;
-  const r = target.getBoundingClientRect();
-  const w = tipEl.offsetWidth;
-  // Above the button, kept inside the window and clear of the macOS window buttons.
-  const min = lore.platform === 'darwin' && r.left < 90 ? 92 : 8;
-  tipEl.style.left = Math.max(min, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-  tipEl.style.top = '10px';
-}
-function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; }
-document.addEventListener('mouseover', (e) => {
-  const t = e.target.closest && e.target.closest('[data-tip]');
-  clearTimeout(tipTimer);
-  if (!t) return hideTip();
-  tipTimer = setTimeout(() => showTip(t), tipEl.hidden ? 400 : 80);
-});
-document.addEventListener('mousedown', hideTip);
-document.addEventListener('focusin', (e) => { if (e.target.matches && e.target.matches('[data-tip]:focus-visible')) showTip(e.target); });
-document.addEventListener('focusout', hideTip);
-
 // Short messages from the main process: progress of a writing action, or why it could not run.
 const toastEl = $('#toast');
 let toastTimer;
@@ -377,10 +287,6 @@ $('#omni').addEventListener('submit', (e) => {
 document.querySelector('kbd').textContent = key + 'L';
 LORE_I18N.apply(lang);
 tips();
-// Tooltips are drawn by the page (see below) so they appear fast and can show the shortcut as a key cap.
-function tips() {
-  for (const e of document.querySelectorAll('[data-i18n-title]')) { e.dataset.tip = T(e.dataset.i18nTitle, { k: key }); e.removeAttribute('title'); }
-}
 $('#assist').addEventListener('click', () => lore.send('assist:open'));
 $('#more').addEventListener('click', () => { const r = $('#more').getBoundingClientRect(); lore.send('menu:more', Math.round(r.left), Math.round(r.bottom)); });
 $('#back').addEventListener('click', () => lore.send('nav:back'));

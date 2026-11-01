@@ -9,8 +9,17 @@
 </head>
 <body>
   <div class="tabs" id="tabs"></div>
+  <nav class="side" id="side" data-i18n-aria="side.aria">
+    <div class="side-top" id="side-top"></div>
+    <div class="pins" id="pins" role="tablist" data-i18n-aria="side.pinned"></div>
+    <div class="sscroll" id="sscroll">
+      <div class="slist" id="slist" role="tablist" aria-orientation="vertical"></div>
+      <button type="button" class="srow snew" id="snew" data-i18n-title="tip.newTab"><span class="fav" aria-hidden="true">+</span><span class="ttl" data-i18n="side.newTab"></span></button>
+    </div>
+  </nav>
   <div class="bar" id="bar">
     <div class="navs">
+      <span id="navtoggle"></span>
       <button class="ib" id="back" data-i18n-title="tip.back" data-i18n-aria="nav.back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
       <button class="ib" id="fwd" data-i18n-title="tip.forward" data-i18n-aria="nav.forward"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
       <button class="ib" id="reload" data-i18n-title="tip.reload" data-i18n-aria="nav.reload"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
@@ -38,6 +47,8 @@
   <div id="toast" role="status" hidden></div>
   <div id="tip" role="tooltip" hidden></div>
   <script src="i18n.js"></script>
+  <script src="tabs-common.js"></script>
+  <script src="side.js"></script>
   <script src="ui.js"></script>
 </body>
 </html>

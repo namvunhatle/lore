@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lore sidebar</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src https: http: data:">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <nav class="side" id="side" data-i18n-aria="side.aria">
+    <div class="side-top" id="side-top"></div>
+    <div class="pins" id="pins" role="tablist" data-i18n-aria="side.pinned"></div>
+    <div class="sscroll" id="sscroll">
+      <div class="slist" id="slist" role="tablist" aria-orientation="vertical"></div>
+      <button type="button" class="srow snew" id="snew" data-i18n-title="tip.newTab"><span class="fav" aria-hidden="true">+</span><span class="ttl" data-i18n="side.newTab"></span></button>
+    </div>
+  </nav>
+  <div id="tip" role="tooltip" hidden></div>
+  <script src="i18n.js"></script>
+  <script src="tabs-common.js"></script>
+  <script src="side.js"></script>
+  <script src="side-peek.js"></script>
+</body>
+</html>

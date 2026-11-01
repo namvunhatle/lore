@@ -6,6 +6,8 @@ const DEFAULTS = () => ({
   language: 'auto', // auto | en | vi
   autoUpdate: true,   // look for a newer version on GitHub now and then
   appearance: 'system', // system | light | dark
+  tabsLayout: 'top', // top (a strip above the page) | side (a list down the left)
+  sidebarOpen: true, // with tabs in a sidebar: kept open, or hidden until the pointer reaches the left edge
   startup: 'restore', // restore (continue where I left off) | new (start with a new tab)
   privacy: {
     blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask', // permissions: ask | block
@@ -25,6 +27,7 @@ const PROVIDERS = ['local', 'openai', 'anthropic', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
 const APPEARANCES = ['system', 'light', 'dark'];
+const TAB_LAYOUTS = ['top', 'side'];
 const DOH = ['off', 'automatic', 'cloudflare', 'quad9'];
 const ALIAS = ['off', 'addy', 'simplelogin'];
 const hostList = (v) => (Array.isArray(v) ? [...new Set(v.filter((h) => typeof h === 'string' && /^[a-z0-9.-]{1,100}$/i.test(h)).map((h) => h.toLowerCase()))].slice(0, 200) : null);
@@ -51,6 +54,8 @@ class Settings {
     if (patch.language !== undefined) out.language = patch.language;
     if (STARTUPS.includes(patch.startup)) out.startup = patch.startup;
     if (APPEARANCES.includes(patch.appearance)) out.appearance = patch.appearance;
+    if (TAB_LAYOUTS.includes(patch.tabsLayout)) out.tabsLayout = patch.tabsLayout;
+    if (typeof patch.sidebarOpen === 'boolean') out.sidebarOpen = patch.sidebarOpen;
     if (typeof patch.autoUpdate === 'boolean') out.autoUpdate = patch.autoUpdate;
     const pv = patch.privacy || {};
     for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint', 'httpsFirst', 'stripTracking', 'memory', 'lock']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
@@ -107,7 +112,7 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, sidebarOpen: c.sidebarOpen, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },

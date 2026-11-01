@@ -41,7 +41,7 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 #intent:not(:placeholder-shown)~.omni-ph{display:none}
 .omni.typing{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 /* Tooltips */
-#tip{position:fixed;z-index:20;top:10px;display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:var(--ink);color:var(--win);font:500 12px/1.4 var(--f);white-space:nowrap;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.22);animation:tip .12s ease-out both}
+#tip{position:fixed;z-index:20;top:10px;display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:var(--ink);color:var(--win);font:500 12px/1.4 var(--f);white-space:nowrap;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.22);animation:tip 125ms cubic-bezier(.23,1,.32,1) both}
 #tip kbd{color:inherit;border-color:currentColor;opacity:.75;line-height:16px}
 #tip[hidden]{display:none}
 @keyframes tip{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -146,3 +146,125 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .tab.in-split{box-shadow:inset 0 -2px 0 var(--accent)}
 .tab.split-a{border-bottom-right-radius:0}
 .tab.split-b{border-bottom-left-radius:0}
+
+/* ---- Tabs in a sidebar (Settings → Appearance → Tabs, or View → Tabs in Sidebar) ---------------------------------
+   The window draws the sidebar down the left and the toolbar to its right; pages sit under the toolbar, right of the
+   sidebar. Switching layouts is instant on purpose: it is a keyboard shortcut people use many times a day. */
+:root{--side-bg:color-mix(in srgb,var(--bg) 55%,var(--win))}
+.side{display:none}
+html.side-tabs,html.side-tabs body{height:100%}
+html.side-tabs body{display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:48px auto 1fr;font-optical-sizing:auto}
+html.side-tabs #tabs{display:none}
+html.side-tabs .side{display:flex;flex-direction:column;grid-column:1;grid-row:1/-1;min-height:0;padding:0 8px 8px;background:var(--side-bg);box-shadow:inset -1px 0 0 var(--line)}
+html.side-tabs .bar{grid-column:2;grid-row:1;-webkit-app-region:drag;grid-template-columns:auto minmax(200px,1fr) auto}
+html.side-tabs .bar button,html.side-tabs .omni{-webkit-app-region:no-drag}
+html.side-tabs .bmbar{grid-column:2;grid-row:2}
+.win32.side-tabs .bar,.linux.side-tabs .bar{padding-right:150px}
+/* Row 1 lines up with the toolbar; on macOS the window buttons sit at its left. */
+.side-top{-webkit-app-region:drag;flex:none;display:flex;align-items:center;gap:2px;height:48px;padding:0 0 0 78px}
+.side-top .grow{flex:1}
+.win32 .side-top,.linux .side-top{padding-left:4px}
+.side-top button{-webkit-app-region:no-drag}
+.side-top .avatar{margin:0 4px}
+.side-top .plus{width:30px;height:30px}
+
+/* Pinned tabs: a grid of tiles, icon only. */
+.pins{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:0 0 10px;flex:none}
+.pins:empty{display:none}
+.pin{position:relative;height:40px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--win) 55%,transparent)}
+.pin .fav{width:18px;height:18px}
+.pin .fav img{width:18px;height:18px}
+.pin[aria-selected="true"]{background:var(--win);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.06)}
+
+/* The list scrolls; its edges fade only on the side that has more. */
+.sscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:2px 4px 8px;scroll-padding:4px 0;scrollbar-width:none;
+  --mt:#000;--mb:#000;-webkit-mask-image:linear-gradient(to bottom,var(--mt),#000 14px,#000 calc(100% - 14px),var(--mb));mask-image:linear-gradient(to bottom,var(--mt),#000 14px,#000 calc(100% - 14px),var(--mb))}
+.sscroll::-webkit-scrollbar{display:none}
+.sscroll[data-top]{--mt:transparent}
+.sscroll[data-bot]{--mb:transparent}
+.slist{position:relative;display:flex;flex-direction:column;gap:1px}
+/* Rows that slide pass over a row fading out underneath (its z-index is set to 0 when it leaves). */
+.slist>.srow,.slist>.sgrp{position:relative;z-index:1}
+
+.srow{position:relative;display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 4px 0 8px;border-radius:8px;color:var(--ink);font:500 13px/1 var(--f);text-align:left;cursor:default}
+.srow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.srow:not([aria-selected="true"]) .ttl{color:color-mix(in srgb,var(--ink) 82%,var(--muted))}
+.srow[aria-selected="true"]{background:var(--win);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.05)}
+.srow .x{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;color:var(--muted);font-size:15px;line-height:1;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+.srow .x:active{transform:scale(.95)}
+.srow.in-g{margin-left:12px;width:calc(100% - 12px)}
+.srow.in-split::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:1px;background:var(--accent)}
+.snew{margin-top:4px;color:var(--muted);font-weight:400}
+.snew .fav{color:var(--muted);font-size:17px;font-weight:300}
+.snew:active,.pin:active{transform:scale(.97)}
+.snew,.pin{transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+@media (hover:hover) and (pointer:fine){
+  .srow:not([aria-selected="true"]):hover,.pin:not([aria-selected="true"]):hover{background:color-mix(in srgb,var(--win) 70%,transparent)}
+  .srow .x{opacity:0}
+  .srow:hover .x,.srow[aria-selected="true"] .x{opacity:1}
+  .srow .x:hover{background:var(--hover);color:var(--ink)}
+  .snew:hover{color:var(--ink)}
+}
+
+/* A group the user made: a quiet header row, its tabs indented under it. */
+.sgrp{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 8px;margin-top:6px;border-radius:8px;color:var(--muted);font:600 12px/1 var(--f);letter-spacing:.02em;text-align:left}
+.sgrp i{width:8px;height:8px;border-radius:50%;background:var(--g);flex:none}
+.sgrp span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sgrp svg{flex:none;transition:transform 200ms cubic-bezier(.77,0,.175,1)}
+.sgrp[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.sgrp.over{outline:2px solid var(--accent);outline-offset:-2px}
+.slist .grp-edit{width:100%;height:28px;margin-top:6px;border-radius:8px}
+@media (hover:hover) and (pointer:fine){.sgrp:hover{background:color-mix(in srgb,var(--win) 70%,transparent);color:var(--ink)}}
+
+
+/* Drag to reorder: a line shows where the tab will land. */
+.srow.over-t::after,.srow.over-b::after{content:"";position:absolute;left:8px;right:8px;height:2px;border-radius:1px;background:var(--accent)}
+.srow.over-t::after{top:-2px}
+.srow.over-b::after{bottom:-2px}
+.srow.over-mid{outline:2px solid var(--accent);outline-offset:-2px}
+.pin.over-l::before,.pin.over-r::after{content:"";position:absolute;top:6px;bottom:6px;width:2px;border-radius:1px;background:var(--accent)}
+.pin.over-l::before{left:-4px}
+.pin.over-r::after{right:-4px}
+.srow.dragging,.pin.dragging{opacity:.5}
+
+@media (prefers-reduced-motion:reduce){
+  .sgrp svg{transition:none}
+}
+@media (prefers-reduced-transparency:reduce){
+  html.side-tabs .side{background:var(--bg)}
+  .pin,.srow:hover,.pin:hover{background:var(--hover)}
+}
+@media (prefers-contrast:more){
+  html.side-tabs .side{box-shadow:inset -1px 0 0 var(--muted)}
+  .srow[aria-selected="true"],.pin[aria-selected="true"]{box-shadow:0 0 0 1.5px var(--ink)}
+}
+
+/* Sidebar hidden (Cmd+S): the toolbar takes the full width and gets the button to bring the sidebar back. */
+.sidetoggle[aria-pressed="true"]{color:var(--ink)}
+#navtoggle{display:contents}
+.navs .sidetoggle{width:36px;height:36px;border-radius:10px;display:grid;place-items:center}
+html.side-tabs.side-closed body{grid-template-columns:0 minmax(0,1fr)}
+html.side-tabs.side-closed .side{display:none}
+.darwin.side-tabs.side-closed .bar{padding-left:84px}
+
+/* The same sidebar, sliding over the page when the pointer reaches the left edge (side.html).
+   A drawer: enters on an iOS-like curve, leaves faster than it came, along the same path. */
+html.peek,html.peek body{height:100%;background:transparent}
+html.peek .side{display:flex;flex-direction:column;position:fixed;top:6px;bottom:6px;left:6px;width:240px;padding:0 8px 8px;border-radius:12px;
+  background:var(--side-bg);box-shadow:0 0 0 1px var(--line),0 12px 40px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.08);
+  transform:translateX(calc(-100% - 40px));transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+html.peek.open .side{transform:none;transition:transform 240ms cubic-bezier(.32,.72,0,1)}
+html.peek .side-top{padding-left:72px}
+/* Off screen, a loading spinner has nobody to tell; stop drawing it until the sidebar comes out. */
+html.peek:not(.open) .fav.spin{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){
+  html.peek .side{transform:none;opacity:0;transition:opacity 150ms ease}
+  html.peek.open .side{opacity:1;transition:opacity 150ms ease}
+}
+@media (prefers-reduced-transparency:reduce){html.peek .side{background:var(--bg)}}
+@media (prefers-contrast:more){html.peek .side{box-shadow:0 0 0 1.5px var(--ink)}}
+
+/* Tooltips beside a control (sidebar) come from that side; one following another appears at once. */
+#tip[data-x]{animation-name:tipx}
+@keyframes tipx{from{opacity:0;transform:translateX(var(--tx,0))}to{opacity:1;transform:none}}
+#tip[data-instant]{animation:none}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -79,7 +79,16 @@ const downloader = require('./downloader');
 
 const CHROME_BASE = 88;
 const BAR_H = 34; // the bookmarks bar, when it is shown
-const chromeHeight = () => CHROME_BASE + (bookmarks && bookmarks.bar ? BAR_H : 0);
+const TABS_H = 40; // the tab strip, when tabs are along the top
+const SIDE_W = 240; // the tab sidebar, when tabs are down the left
+const sideOn = () => !!settings && settings.get().tabsLayout === 'side';
+const sideOpen = () => sideOn() && settings.get().sidebarOpen !== false;
+const sideW = () => (sideOpen() ? SIDE_W : 0);
+const PEEK_STRIP = 6, PEEK_W = SIDE_W + 32; // the hidden sidebar: an edge strip, and the view while it is out
+let sideView = null; // the hidden sidebar, a transparent view above the pages (ui/side.html)
+let peekOut = false;
+let sideReady = false;
+const chromeHeight = () => CHROME_BASE - (sideOn() ? TABS_H : 0) + (bookmarks && bookmarks.bar ? BAR_H : 0);
 const HOME = path.join(__dirname, 'ui', 'home.html');
 const TAB_PRELOAD = path.join(__dirname, 'tab-preload.js');
 
@@ -161,18 +170,106 @@ function layout() {
   if (!win || win.isDestroyed() || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  const y = chromeHeight(), height = h - chromeHeight(), width = w - pw;
+  // With the sidebar on, pages start to its right; the toolbar (drawn by the window itself) sits above them.
+  const x = sideW();
+  const y = chromeHeight(), height = h - chromeHeight(), width = w - pw - x;
   if (t.fs) { t.view.setBounds({ x: 0, y: 0, width: w, height: h }); return; }
   if (splitOn()) {
     const left = Math.round((width - SPLIT_GAP) * split.ratio);
-    tabById(split.a).view.setBounds({ x: 0, y, width: left, height });
-    tabById(split.b).view.setBounds({ x: left + SPLIT_GAP, y, width: width - SPLIT_GAP - left, height });
-    if (splitHandle) splitHandle.setBounds({ x: left, y, width: SPLIT_GAP, height });
-  } else t.view.setBounds({ x: 0, y, width, height });
+    tabById(split.a).view.setBounds({ x, y, width: left, height });
+    tabById(split.b).view.setBounds({ x: x + left + SPLIT_GAP, y, width: width - SPLIT_GAP - left, height });
+    if (splitHandle) splitHandle.setBounds({ x: x + left, y, width: SPLIT_GAP, height });
+  } else t.view.setBounds({ x, y, width, height });
   if (panel && pw) panel.setBounds({ x: w - pw, y: chromeHeight(), width: pw, height: h - chromeHeight() });
   layoutFind();
   layoutPriv();
+  layoutPeek();
 }
+
+// The hidden sidebar sits above the pages: a thin strip on the left edge, widened while the sidebar is out.
+// It is created only when needed and kept on top whenever pages are re-attached.
+function layoutPeek() {
+  if (!win || win.isDestroyed()) return;
+  const t = active();
+  const want = sideOn() && !sideOpen() && !(t && t.fs);
+  if (!want) {
+    if (sideView) { try { win.contentView.removeChildView(sideView); } catch { /* not attached */ } }
+    peekOut = false;
+    watchEdge(false);
+    return;
+  }
+  watchEdge(true);
+  if (!sideView) {
+    sideView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
+    sideView.setBackgroundColor('#00000000');
+    sideView.webContents.loadFile(path.join(__dirname, 'ui', 'side.html'));
+    sideView.webContents.on('did-finish-load', () => { sideReady = true; pushState(); });
+    sideView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    sideView.webContents.on('will-navigate', (e) => e.preventDefault());
+  }
+  // Re-attach only when something went above it: re-attaching a view can drop a frame (a visible flicker).
+  if (win.contentView.children.at(-1) !== sideView) win.contentView.addChildView(sideView);
+  // Its size never changes; only its position does. Idle, it is pushed off the left edge so that just its last
+  // PEEK_STRIP px show (transparent) and catch the pointer. Sliding out then needs one move and no re-layout,
+  // so the CSS slide starts on the very next frame instead of waiting for a resize.
+  const [, h] = win.getContentSize();
+  sideView.setBounds({ x: peekOut ? 0 : PEEK_STRIP - PEEK_W, y: 0, width: PEEK_W, height: h });
+}
+// Opening the hidden sidebar from the edge. Pointer events alone miss a quick flick: the pointer jumps over a few
+// pixels in one frame, or leaves the window past the edge. So while the sidebar is hidden and the window is in front,
+// the pointer position is read every frame: resting within EDGE px of the left edge opens it, and so does crossing
+// that edge on the way out of the window (when the window does not touch the screen edge).
+const EDGE = 8;
+let edgeTimer = null;
+let lastInside = 0;
+let awaySince = 0;
+function watchEdge(on) {
+  // Runs only while it can matter: sidebar hidden and the window in front. Read every frame near the left edge, a few
+  // times a second elsewhere (a fast flick of ~1200 px/s still gets within 200 px of the edge before it is checked).
+  const want = on && !!sideView && !!win && !win.isDestroyed() && win.isFocused() && win.isVisible() && !win.isMinimized();
+  if (!want) { clearTimeout(edgeTimer); edgeTimer = null; return; }
+  if (edgeTimer) return;
+  const tick = () => {
+    edgeTimer = null;
+    if (!win || win.isDestroyed() || !sideView) return;
+    if (!sideReady) { edgeTimer = setTimeout(tick, 100); return; }
+    if (!win.isFocused()) return; // blur stops the watch; focus starts it again
+    const p = screen.getCursorScreenPoint();
+    const b = win.getContentBounds();
+    const x = p.x - b.x;
+    const now = Date.now();
+    const inY = p.y >= b.y && p.y <= b.y + b.height;
+    let next = x < 200 || peekOut ? 16 : 50;
+    if (peekOut) {
+      // Out, but the pointer is nowhere near it (it may never have entered the view): put it away after a beat.
+      // Over the sidebar the page itself decides (it knows about drags, menus and renaming).
+      const near = inY && x >= -120 && x <= PEEK_W;
+      if (near) awaySince = 0; else if (!awaySince) awaySince = now; else if (now - awaySince > 300) { awaySince = 0; sideView.webContents.send('side-peek', false); }
+    } else if (inY) {
+      if (x >= EDGE && x <= b.width) lastInside = now;
+      else if ((x >= 0 && x < EDGE) || (x < 0 && x > -120 && now - lastInside < 250)) {
+        peekOut = true;
+        layoutPeek();
+        sideView.webContents.send('side-peek', true);
+      }
+    }
+    edgeTimer = setTimeout(tick, next);
+  };
+  edgeTimer = setTimeout(tick, 16);
+}
+function wireEdgeWatch() {
+  for (const ev of ['focus', 'restore', 'show']) win.on(ev, () => watchEdge(sideOn() && !sideOpen()));
+  for (const ev of ['blur', 'minimize', 'hide']) win.on(ev, () => watchEdge(false));
+}
+
+// Pages are attached under the hidden sidebar, never above it, so selecting a tab from it does not make it flicker.
+function attachPage(view) {
+  // Detach first: the index of the sidebar is only meaningful once this view is out of the list.
+  if (win.contentView.children.includes(view)) win.contentView.removeChildView(view);
+  const i = sideView ? win.contentView.children.indexOf(sideView) : -1;
+  if (i >= 0) win.contentView.addChildView(view, i); else win.contentView.addChildView(view);
+}
+const fromSidebar = (e) => win && (e.sender === win.webContents || (sideView && e.sender === sideView.webContents));
 
 function isLoading(tab) {
   const wc = tab.view.webContents;
@@ -182,7 +279,7 @@ function isLoading(tab) {
 function paintTitleBar(priv) {
   if (process.platform === 'darwin' || !win.setTitleBarOverlay) return;
   const dark = priv || nativeTheme.shouldUseDarkColors;
-  win.setTitleBarOverlay({ color: priv ? '#1A1330' : dark ? '#10151E' : '#FFFFFF', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
+  win.setTitleBarOverlay({ color: priv ? '#1A1330' : dark ? '#10151E' : '#FFFFFF', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: sideOn() ? 48 : 40 });
 }
 
 const hostOfUrl = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
@@ -199,7 +296,7 @@ function pushState() {
   const t = active();
   if (t) paintTitleBar(!!t.private);
   const wc = t && t.view.webContents;
-  win.webContents.send('state', {
+  const state = {
     lang: L(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
@@ -220,8 +317,12 @@ function pushState() {
     blocked: S.blocked,
     adsOn: S.adsOn,
     media: !!t && !isDeniedSite(t.url) ? t.media.length : 0,
-    web: !!t && !t.isHome && /^https?:/.test(t.url)
-  });
+    web: !!t && !t.isHome && /^https?:/.test(t.url),
+    layout: sideOn() ? 'side' : 'top',
+    sideOpen: sideOpen()
+  };
+  win.webContents.send('state', state);
+  if (sideView && sideReady) sideView.webContents.send('state', state);
 }
 
 // ---- Session: reopen the tabs of the last run (BRW-05) ---------------------------------------------------------------
@@ -555,7 +656,7 @@ function syncViews() {
   const want = new Set(splitOn() ? [tabById(split.a), tabById(split.b)] : [t]);
   for (const x of tabs) if (!want.has(x)) { try { win.contentView.removeChildView(x.view); } catch { /* not attached */ } }
   for (const x of want) {
-    win.contentView.addChildView(x.view);
+    attachPage(x.view);
     if (x.lazyUrl) { const u = x.lazyUrl; x.lazyUrl = ''; x.view.webContents.loadURL(u); }
   }
   if (splitOn()) {
@@ -565,6 +666,7 @@ function syncViews() {
     }
     win.contentView.addChildView(splitHandle);
   } else if (splitHandle) { try { win.contentView.removeChildView(splitHandle); } catch { /* not attached */ } }
+  layoutPeek();
 }
 function exitSplit() { split = null; syncViews(); layout(); pushState(); }
 // Opens a split next to the tab in front: with a tab already open, or with a new one to type in.
@@ -967,18 +1069,19 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1280, height: 820, minWidth: 720, minHeight: 480,
     ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 13 } }
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: sideOn() ? 17 : 13 } }
       : {
           titleBarStyle: 'hidden', autoHideMenuBar: true,
           titleBarOverlay: {
             color: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
-            symbolColor: nativeTheme.shouldUseDarkColors ? '#E9EDF3' : '#12161C', height: 40
+            symbolColor: nativeTheme.shouldUseDarkColors ? '#E9EDF3' : '#12161C', height: sideOn() ? 48 : 40
           }
         }),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true }
   });
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
+  wireEdgeWatch();
   win.on('resize', layout);
   panel = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'panel-preload.js'), contextIsolation: true, sandbox: true } });
   panel.webContents.loadFile(path.join(__dirname, 'ui', 'panel.html'));
@@ -1107,6 +1210,28 @@ function applyAppearance() {
   const bg = nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF';
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.setBackgroundColor(bg);
   if (win && !win.isDestroyed()) pushState();
+}
+
+// Tabs along the top or down a sidebar. Switching is instant: pages are moved once, never animated (that would re-lay them out every frame).
+function applyTabsLayout() {
+  if (!win || win.isDestroyed()) return;
+  if (process.platform === 'darwin' && win.setWindowButtonPosition) win.setWindowButtonPosition({ x: 14, y: sideOn() ? 17 : 13 });
+  layout();
+  pushState();
+}
+// Cmd+S: keep the sidebar open, or hide it until the pointer reaches the left edge. Instant, like the layout switch.
+function toggleSidebar() {
+  if (!sideOn()) return;
+  settings.update({ sidebarOpen: !sideOpen() });
+  peekOut = false;
+  applyTabsLayout();
+  buildMenu();
+}
+function setTabsLayout(v) {
+  if (settings.get().tabsLayout === v) return;
+  settings.update({ tabsLayout: v });
+  applyTabsLayout();
+  buildMenu();
 }
 
 // A new tab is for typing: the cursor goes straight into the address and ask box.
@@ -2108,12 +2233,14 @@ function wireSettingsIpc() {
   ipcMain.handle('settings:save', (e, patch) => {
     if (!trusted(e)) return reject();
     const before = L();
+    const layoutBefore = settings.get().tabsLayout;
     try {
       const view = settings.update(patch);
       llm = createLlm(settings.get());
       refreshEmbedder();
       if (L() !== before) applyLanguage();
       applyAppearance();
+      if (settings.get().tabsLayout !== layoutBefore) { applyTabsLayout(); buildMenu(); }
       applyDoh();
       applySearch();
       return { view, lang: L() };
@@ -2200,26 +2327,28 @@ function wireIpc() {
   ipcMain.on('split:drag', (e, screenX) => {
     if (!splitHandle || e.sender !== splitHandle.webContents || !splitOn() || !Number.isFinite(screenX)) return;
     const [w] = win.getContentSize();
-    const width = w - (agentOpen() ? PANEL_W : 0) - SPLIT_GAP;
-    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - SPLIT_GAP / 2) / width));
+    const width = w - (agentOpen() ? PANEL_W : 0) - sideW() - SPLIT_GAP;
+    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - sideW() - SPLIT_GAP / 2) / width));
     layout();
   });
   ipcMain.on('split:reset', (e) => { if (splitHandle && e.sender === splitHandle.webContents && split) { split.ratio = 0.5; layout(); } });
-  ipcMain.on('profile:menu', (e, x, y) => { if (e.sender === win.webContents) showProfileMenu(x, y); });
-  ipcMain.on('tab:menu', (e, id) => { if (e.sender === win.webContents) showTabMenu(Number(id)); });
-  ipcMain.on('tab:move', (e, id, beforeId) => { if (e.sender === win.webContents) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
+  ipcMain.on('side:toggle', (e) => { if (fromSidebar(e)) toggleSidebar(); });
+  ipcMain.on('side:peek', (e, out) => { if (sideView && e.sender === sideView.webContents && peekOut !== !!out) { peekOut = !!out; layoutPeek(); } });
+  ipcMain.on('profile:menu', (e, x, y) => { if (fromSidebar(e)) showProfileMenu(x, y); });
+  ipcMain.on('tab:menu', (e, id) => { if (fromSidebar(e)) showTabMenu(Number(id)); });
+  ipcMain.on('tab:move', (e, id, beforeId) => { if (fromSidebar(e)) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
   ipcMain.on('tab:groupWith', (e, dragId, targetId) => {
-    if (e.sender !== win.webContents) return;
+    if (!fromSidebar(e)) return;
     const a = tabs.find((t) => t.id === Number(dragId)), b = tabs.find((t) => t.id === Number(targetId));
     if (!a || !b || a === b || a.pinned || b.pinned) return;
     if (b.group) addToGroup(a.id, b.group); else newGroup('', [b.id, a.id], { edit: true });
   });
-  ipcMain.on('tab:addToGroup', (e, id, gid) => { if (e.sender === win.webContents && groups.has(Number(gid)) && tabs.some((t) => t.id === Number(id) && !t.pinned)) addToGroup(Number(id), Number(gid)); });
-  ipcMain.on('group:newTab', (e, gid) => { if (e.sender === win.webContents && groups.has(Number(gid))) { const t = openTab(); setOrder(tabstate.assign(tabs, [{ groupId: Number(gid), ids: [t.id] }])); } });
-  ipcMain.on('group:toggle', (e, id) => { if (e.sender === win.webContents && Number(id) === 0) return pushState(); if (e.sender === win.webContents && groups.has(Number(id))) { const g = groups.get(Number(id)); g.collapsed = !g.collapsed; pushState(); } });
-  ipcMain.on('group:rename', (e, id, name) => { if (e.sender === win.webContents && groups.has(Number(id)) && typeof name === 'string') { groups.get(Number(id)).name = name.trim().slice(0, 30); pushState(); } });
-  ipcMain.on('group:menu', (e, id) => { if (e.sender === win.webContents) showGroupMenu(Number(id)); });
-  ipcMain.on('organize:open', (e) => { if (e.sender === win.webContents || (bookmarksWin && e.sender === bookmarksWin.webContents)) openOrganize(e.sender === win.webContents ? 'tabs' : 'bookmarks'); });
+  ipcMain.on('tab:addToGroup', (e, id, gid) => { if (fromSidebar(e) && groups.has(Number(gid)) && tabs.some((t) => t.id === Number(id) && !t.pinned)) addToGroup(Number(id), Number(gid)); });
+  ipcMain.on('group:newTab', (e, gid) => { if (fromSidebar(e) && groups.has(Number(gid))) { const t = openTab(); setOrder(tabstate.assign(tabs, [{ groupId: Number(gid), ids: [t.id] }])); } });
+  ipcMain.on('group:toggle', (e, id) => { if (fromSidebar(e) && Number(id) === 0) return pushState(); if (fromSidebar(e) && groups.has(Number(id))) { const g = groups.get(Number(id)); g.collapsed = !g.collapsed; pushState(); } });
+  ipcMain.on('group:rename', (e, id, name) => { if (fromSidebar(e) && groups.has(Number(id)) && typeof name === 'string') { groups.get(Number(id)).name = name.trim().slice(0, 30); pushState(); } });
+  ipcMain.on('group:menu', (e, id) => { if (fromSidebar(e)) showGroupMenu(Number(id)); });
+  ipcMain.on('organize:open', (e) => { if (fromSidebar(e) || (bookmarksWin && e.sender === bookmarksWin.webContents)) openOrganize(fromSidebar(e) ? 'tabs' : 'bookmarks'); });
   ipcMain.on('nav:submit', (_e, text) => submit(String(text)));
   ipcMain.on('nav:back', () => active().view.webContents.navigationHistory.goBack());
   ipcMain.on('nav:forward', () => active().view.webContents.navigationHistory.goForward());
@@ -2392,6 +2521,9 @@ function buildMenu() {
     { role: 'editMenu' },
     // Not the stock viewMenu: its Reload (Cmd/Ctrl+R) reloads the browser's own window, which empties the tab strip.
     { label: T('menu.view'), submenu: [
+      { label: T('menu.sidebar'), type: 'checkbox', checked: sideOn(), click: () => setTabsLayout(sideOn() ? 'top' : 'side') },
+      { label: T('menu.showSidebar'), type: 'checkbox', checked: sideOpen(), enabled: sideOn(), accelerator: 'CmdOrCtrl+S', click: toggleSidebar },
+      { type: 'separator' },
       { label: T('nav.reload'), accelerator: 'CmdOrCtrl+R', click: () => { const t = active(); if (t) t.view.webContents.reload(); } },
       { label: T('menu.hardReload'), accelerator: 'CmdOrCtrl+Shift+R', click: () => { const t = active(); if (t) t.view.webContents.reloadIgnoringCache(); } },
       { type: 'separator' },

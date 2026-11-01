@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('lore', {
   onState: (fn) => ipcRenderer.on('state', (_e, s) => fn(s)),
   onTypeRun: (fn) => ipcRenderer.on('type-run', (_e, q) => fn(String(q))),
   onToast: (fn) => ipcRenderer.on('toast', (_e, t) => fn(t)),
-  focusIntent: (fn) => ipcRenderer.on('focus-intent', fn)
+  focusIntent: (fn) => ipcRenderer.on('focus-intent', fn),
+  onPeek: (fn) => ipcRenderer.on('side-peek', (_e, v) => fn(!!v))
 });
