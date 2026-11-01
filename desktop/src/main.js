@@ -2395,6 +2395,8 @@ function wireIpc() {
   ipcMain.on('profile:menu', (e, x, y) => { if (fromSidebar(e)) showProfileMenu(x, y); });
   ipcMain.on('tab:menu', (e, id) => { if (fromSidebar(e)) showTabMenu(Number(id)); });
   ipcMain.on('tab:move', (e, id, beforeId) => { if (fromSidebar(e)) { const next = tabstate.reorder(tabs, Number(id), beforeId == null ? null : Number(beforeId)); if (next.findIndex((t) => t.id === Number(id)) !== tabs.findIndex((t) => t.id === Number(id))) tabstate.detach(next, Number(id)); tabstate.settle(next, Number(id)); setOrder(tabstate.arrange(next)); } });
+  // Dropping a tab on the pinned area pins it; dropping a pinned tab among the others unpins it.
+  ipcMain.on('tab:setPinned', (e, id, pinned) => { const t = fromSidebar(e) && tabById(Number(id)); if (t && !!t.pinned !== !!pinned) pinTab(t.id); });
   ipcMain.on('tab:groupWith', (e, dragId, targetId) => {
     if (!fromSidebar(e)) return;
     const a = tabs.find((t) => t.id === Number(dragId)), b = tabs.find((t) => t.id === Number(targetId));

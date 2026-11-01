@@ -120,44 +120,8 @@ function tabPress(el) {
   el.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('tab:menu', el._t.id); });
 }
 
-// Drag to reorder, with the existing tab:move / tab:groupWith messages. Vertical rows: top and bottom thirds reorder,
-// the middle groups. Pins sit in a row, so they use left and right halves.
-let sideDragId = 0;
+// Dragging is in side-drag.js. The key of the row that was just dropped must not slide: the ghost flies there instead.
 let droppedKey = '';
-function sideZone(e, el) {
-  const r = el.getBoundingClientRect();
-  if (el._t.pinned) return (e.clientX - r.left) / r.width < 0.5 ? 'l' : 'r';
-  const f = (e.clientY - r.top) / r.height;
-  return f < 0.3 ? 't' : f > 0.7 ? 'b' : 'mid';
-}
-const clearOver = (el) => el.classList.remove('over-t', 'over-b', 'over-mid', 'over-l', 'over-r');
-function tabDrag(el, all) {
-  el.draggable = true;
-  el.addEventListener('dragstart', (e) => { sideDragId = el._t.id; e.dataTransfer.setData('text/plain', String(el._t.id)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
-  el.addEventListener('dragend', () => { sideDragId = 0; el.classList.remove('dragging'); for (const x of document.querySelectorAll('#side .srow,#side .pin')) clearOver(x); });
-  el.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const z = sideZone(e, el);
-    clearOver(el);
-    if (sideDragId !== el._t.id) el.classList.add('over-' + z);
-  });
-  el.addEventListener('dragleave', () => clearOver(el));
-  el.addEventListener('drop', (e) => {
-    e.preventDefault();
-    clearOver(el);
-    const id = Number(e.dataTransfer.getData('text/plain'));
-    const t = el._t;
-    if (!id || id === t.id) return;
-    markPointer();
-    droppedKey = 't' + id;
-    const z = sideZone(e, el);
-    if (z === 'mid') return lore.send('tab:groupWith', id, t.id);
-    const list = all();
-    const i = list.findIndex((x) => x.id === t.id);
-    const before = z === 't' || z === 'l' ? t.id : (list[i + 1] ? list[i + 1].id : null);
-    if (id !== before) lore.send('tab:move', id, before);
-  });
-}
 
 function pinItem(t, all) {
   return {
@@ -286,9 +250,6 @@ function groupItem(g, edit) {
       b.addEventListener('click', () => { markPointer(); lore.send('group:toggle', b._g.id); });
       b.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('group:menu', b._g.id); });
       b.addEventListener('dblclick', (e) => { e.preventDefault(); startEdit(b, b._g); });
-      b.addEventListener('dragover', (e) => { e.preventDefault(); b.classList.add('over'); });
-      b.addEventListener('dragleave', () => b.classList.remove('over'));
-      b.addEventListener('drop', (e) => { e.preventDefault(); b.classList.remove('over'); markPointer(); const id = Number(e.dataTransfer.getData('text/plain')); if (id) lore.send('tab:addToGroup', id, b._g.id); });
       return b;
     },
     update(b) {
@@ -375,6 +336,7 @@ function renderSide(s) {
   }
   sideEdges();
   sideDrawn = true;
+  dragRendered();
 }
 
 const sscroll = $('#sscroll');
