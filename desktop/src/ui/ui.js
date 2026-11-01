@@ -386,7 +386,7 @@ $('#more').addEventListener('click', () => { const r = $('#more').getBoundingCli
 $('#back').addEventListener('click', () => lore.send('nav:back'));
 $('#fwd').addEventListener('click', () => lore.send('nav:forward'));
 $('#reload').addEventListener('click', () => lore.send('nav:reload'));
-$('#shield').addEventListener('click', () => lore.send('shield:toggle'));
+$('#shield').addEventListener('click', () => lore.send('priv:open'));
 $('#memory').addEventListener('click', () => lore.send('memory:open'));
 $('#media').addEventListener('click', () => lore.send('media:open'));
 $('#downloads').addEventListener('click', () => lore.send('downloads:open'));

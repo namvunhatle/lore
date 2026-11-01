@@ -59,3 +59,28 @@ function applyFingerprintProtection() {
 
 // webFrame runs the code in the page's main world; Electron 33 has no contextBridge.executeInMainWorld yet.
 if (process.argv.includes('--lore-fp=1')) webFrame.executeJavaScript('(' + applyFingerprintProtection.toString() + ')()');
+
+// BRW-12: when a person submits a form that has a password, tell the browser (never the page) so it can offer to save it.
+// Only real clicks and key presses count, not events a page makes up. The browser takes the site from the tab itself.
+const { ipcRenderer } = require('electron');
+// A page can make the browser submit a form by script, so a submit only counts when the person pressed a key or clicked a
+// moment ago; a page cannot fake those.
+let lastInput = 0;
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, (e) => { if (e.isTrusted) lastInput = Date.now(); }, true);
+function reportLogin(form) {
+  if (Date.now() - lastInput > 10000) return;
+  try {
+    const pw = [...form.querySelectorAll('input[type=password]')].find((i) => i.value);
+    if (!pw) return;
+    const before = [...form.querySelectorAll('input')].filter((i) => ['text', 'email', 'tel', ''].includes(i.type) && i.value && (i.compareDocumentPosition(pw) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const named = form.querySelector('input[autocomplete~=username]');
+    const user = (named && named.value) || (before.length ? before[before.length - 1].value : '');
+    ipcRenderer.send('pw:submit', { user: String(user).slice(0, 200), pass: String(pw.value).slice(0, 500) });
+  } catch { /* a page we cannot read */ }
+}
+document.addEventListener('submit', (e) => { if (e.isTrusted && e.target instanceof HTMLFormElement) reportLogin(e.target); }, true);
+document.addEventListener('click', (e) => {
+  if (!e.isTrusted || !e.target || !e.target.closest) return;
+  const b = e.target.closest('button, input[type=submit]');
+  if (b && b.form && b.type !== 'button' && b.type !== 'reset') reportLogin(b.form);
+}, true);

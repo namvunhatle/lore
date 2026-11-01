@@ -50,3 +50,5 @@ footer .grow{flex:1}
 .note2{color:var(--ink);opacity:.8;font-size:12.5px;margin-top:2px;line-height:1.4}
 li.day{display:block;padding:0;margin:0}
 li.day:hover{background:none}
+
+.note{color:var(--muted);font-size:12.5px;margin-top:2px}

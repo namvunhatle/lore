@@ -71,4 +71,31 @@ function withoutHeader(headers, name) {
   return out;
 }
 
-module.exports = { etld1, isThirdParty, stripsThirdPartyCookies, permissionPolicy, isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected, withoutHeader };
+// PRV-13: well-known tracking parameters removed from an address before the page loads. Other parameters are left exactly
+// as they were written (not re-encoded), so signed links keep working.
+const TRACKING = /^(utm_[a-z0-9_]+|fbclid|gclid|gclsrc|dclid|msclkid|yclid|twclid|ttclid|li_fat_id|igshid|mc_eid|mc_cid|_hsenc|_hsmi|mkt_tok|vero_id|oly_enc_id|oly_anon_id|wickedid)$/i;
+function stripTrackingParams(url) {
+  let u;
+  try { u = new URL(url); } catch { return { url, removed: 0 }; }
+  if (!/^https?:$/.test(u.protocol) || !u.search) return { url, removed: 0 };
+  const parts = u.search.slice(1).split('&');
+  const kept = parts.filter((p) => !TRACKING.test(decodeURIComponent(p.split('=')[0].replace(/\+/g, ' ')).trim()));
+  const removed = parts.length - kept.length;
+  if (!removed) return { url, removed: 0 };
+  u.search = kept.length ? '?' + kept.join('&') : '';
+  return { url: u.toString(), removed };
+}
+
+// PRV-11: the https:// address for a plain http:// one, or '' when it should be left alone (this computer, a home network,
+// an address with its own port).
+const LOCAL_END = /\.(local|localhost|test|internal|lan|home|corp)$/;
+function httpsUpgrade(url) {
+  let u;
+  try { u = new URL(url); } catch { return ''; }
+  const h = u.hostname.toLowerCase();
+  if (u.protocol !== 'http:' || u.port || !h.includes('.') || LOCAL_END.test(h) || /^\d+\.\d+\.\d+\.\d+$/.test(h) || h.startsWith('[')) return '';
+  u.protocol = 'https:';
+  return u.toString();
+}
+
+module.exports = { stripTrackingParams, httpsUpgrade, etld1, isThirdParty, stripsThirdPartyCookies, permissionPolicy, isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected, withoutHeader };

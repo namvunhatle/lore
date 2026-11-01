@@ -1,6 +1,6 @@
 // Per-session privacy hardening: ad blocking, third-party cookies, Global Privacy Control, permissions.
 // All app state comes in through `deps`, so this can be tested against a real Electron session.
-const { isThirdParty, stripsThirdPartyCookies, permissionPolicy, withoutHeader } = require('./privacy');
+const { isThirdParty, stripsThirdPartyCookies, permissionPolicy, withoutHeader, stripTrackingParams, httpsUpgrade } = require('./privacy');
 
 const done = new WeakSet();
 const safeHost = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
@@ -8,7 +8,8 @@ const safeHost = (u) => { try { return new URL(u).hostname; } catch { return '';
 function hardenSession(ses, deps) {
   if (done.has(ses)) return;
   done.add(ses);
-  const { isPrivate = false, blocker, adsOn, privacy, siteOf, onBlocked, onResponse, ask, scam, onScam } = deps;
+  const { isPrivate = false, blocker, adsOn, privacy, siteOf, onBlocked, onResponse, ask, scam, onScam, onUpgrade, onStripped, insecureOk } = deps;
+  const perms = deps.perms || (() => null);
   // The user agent is left as Electron reports it. Google refuses sign-in from browsers that claim to be another browser
   // (tested: with a Chrome-like user agent Google rejects the sign-in at the first step; with the real one it does not).
 
@@ -17,8 +18,20 @@ function hardenSession(ses, deps) {
       const verdict = scam(details.url);
       if (verdict) { onScam(details, verdict); return cb({ cancel: true }); }
     }
+    if (details.resourceType === 'mainFrame') {
+      const pv = privacy();
+      // Links are cleaned first, then upgraded; the redirect comes back through here once, with nothing left to change.
+      if (pv.stripTracking && !pv.trackingOff.includes(safeHost(details.url).replace(/^www\./, ''))) {
+        const s = stripTrackingParams(details.url);
+        if (s.removed) { if (onStripped) onStripped(s.removed); return cb({ redirectURL: s.url }); }
+      }
+      if (pv.httpsFirst && !(insecureOk && insecureOk(safeHost(details.url)))) {
+        const up = httpsUpgrade(details.url);
+        if (up) { if (onUpgrade) onUpgrade(details.url, up); return cb({ redirectURL: up }); }
+      }
+    }
     if (adsOn() && details.resourceType !== 'mainFrame' && blocker.match(details.url, siteOf(details) || details.referrer, details.resourceType)) {
-      onBlocked();
+      onBlocked(details.url);
       return cb({ cancel: true });
     }
     cb({});
@@ -46,7 +59,13 @@ function hardenSession(ses, deps) {
   });
 
   // Safe permissions pass, risky ones ask once per site (never in private tabs), the rest are refused.
-  const decided = new Map();
+  // Normal tabs keep answers in the profile's saved list (BRW-18); private tabs only for the life of the tab.
+  const mem = new Map();
+  const decided = {
+    has: (k) => (isPrivate || !perms() ? mem.has(k) : perms().map.has(k)),
+    get: (k) => (isPrivate || !perms() ? mem.get(k) : perms().map.get(k)),
+    set: (k, v) => { if (isPrivate || !perms()) mem.set(k, v); else { const i = k.lastIndexOf('|'); perms().set(k.slice(0, i), k.slice(i + 1), v); } }
+  };
   const policy = (p) => permissionPolicy(p, { isPrivate, setting: privacy().permissions });
   const originOf = (u) => { try { return new URL(u).origin; } catch { return ''; } };
   ses.setPermissionCheckHandler((_wc, permission, origin) => policy(permission) === 'allow' || decided.get(origin + '|' + permission) === true);

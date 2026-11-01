@@ -29,3 +29,7 @@ li:hover{background:var(--hover)}
 .empty svg{width:40px;height:40px;fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .empty p{margin:10px 0 2px;color:var(--ink);font-weight:500}
 @media (prefers-reduced-motion:reduce){.bar.wait i{animation:none;width:100%!important;opacity:.5}}
+
+.sug{margin-top:6px;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12.5px}
+.sug .new{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sug button{flex:none;color:var(--accent);font-weight:500}

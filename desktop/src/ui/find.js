@@ -25,7 +25,13 @@ $('#next').addEventListener('click', () => { search(true, true); q.focus(); });
 $('#prev').addEventListener('click', () => { search(false, true); q.focus(); });
 $('#close').addEventListener('click', () => finder.close());
 
+// A long phrase with no match, or one ending in a question mark, is probably a question: offer to ask the page.
+const looksLikeQuestion = (s, total) => s.trim().split(/\s+/).length >= 3 && (total === 0 || /\?\s*$/.test(s));
+$('#ask').addEventListener('click', () => finder.ask(q.value));
 finder.onResult((r) => {
+  const askable = !!q.value && looksLikeQuestion(q.value, r.total);
+  $('#ask').hidden = !askable;
+  count.hidden = askable;
   if (!q.value) { count.textContent = ''; count.className = ''; return; }
   count.textContent = r.total ? T('find.count', { i: r.active, n: r.total }) : T('find.none');
   count.className = r.total ? '' : 'none';

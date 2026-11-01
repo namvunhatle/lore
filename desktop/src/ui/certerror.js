@@ -11,4 +11,4 @@ const reason = ['name', 'date', 'authority', 'revoked', 'weak', 'invalid'].inclu
 $('why').textContent = T('certerr.' + reason, { host });
 $('addr').textContent = target;
 // Handled by the main process, and only when this page is the one asking. "cert=1" allows this one host until Lore is closed.
-$('go').href = 'lore-proceed:?cert=1&u=' + encodeURIComponent(target);
+$('go').href = 'lore-proceed:?why=cert&u=' + encodeURIComponent(target);

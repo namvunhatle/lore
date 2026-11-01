@@ -5,7 +5,26 @@ function norm(s) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
 }
 
-const SEARCH_URL = 'https://duckduckgo.com/?q=';
+// BRW-08: the search engine behind the address bar. `%s` stands for the search text.
+const ENGINES = {
+  duckduckgo: 'https://duckduckgo.com/?q=%s',
+  google: 'https://www.google.com/search?q=%s',
+  bing: 'https://www.bing.com/search?q=%s',
+  brave: 'https://search.brave.com/search?q=%s',
+  coccoc: 'https://coccoc.com/search?query=%s'
+};
+let searchTemplate = ENGINES.duckduckgo;
+// A custom template must be an https address with exactly one %s; anything else keeps the current engine.
+function validSearchTemplate(t) {
+  try { return !!t && (t.match(/%s/g) || []).length === 1 && new URL(t.replace('%s', 'x')).protocol === 'https:'; } catch { return false; }
+}
+function setSearchEngine(id, custom = '') {
+  const t = id === 'custom' ? String(custom).trim() : ENGINES[id];
+  if (!validSearchTemplate(t)) return false;
+  searchTemplate = t;
+  return true;
+}
+const searchUrl = (q) => searchTemplate.replace('%s', encodeURIComponent(q));
 
 function asUrl(input) {
   const t = input.trim();
@@ -59,7 +78,7 @@ function classify(input) {
   if (!QUESTION_OPENER.test(n)) for (const [task, re] of WRITE) if (re.test(n)) return { kind: 'write', task, text };
   if (AGENT.test(n) && !QUESTION_OPENER.test(n)) return { kind: 'agent', text };
   if (MEMORY.test(n)) return { kind: 'memory', text };
-  return { kind: 'search', url: SEARCH_URL + encodeURIComponent(text), text };
+  return { kind: 'search', url: searchUrl(text), text };
 }
 
-module.exports = { classify, norm };
+module.exports = { classify, norm, setSearchEngine, validSearchTemplate, searchUrl, ENGINES };

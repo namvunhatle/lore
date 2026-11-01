@@ -19,6 +19,25 @@ $('c-dl').href = run(T('card.dl.q'));
 for (const [id, a] of [['t-tasks', 'tasks'], ['t-private', 'private'], ['t-memory', 'memory'], ['t-settings', 'settings']]) $(id).href = 'lore-do:?a=' + a;
 if (kind) $('tools').style.display = 'none';
 
+if (!kind) {
+  let items = [];
+  try { items = JSON.parse(p.get('resume') || '[]'); } catch { items = []; }
+  items = items.filter((i) => i && /^https?:\/\//.test(i.url)).slice(0, 3);
+  if (items.length) {
+    $('resume').hidden = false;
+    $('resume-k').textContent = T('resume.k');
+    for (const i of items) {
+      const a = document.createElement('a');
+      a.href = i.url;
+      a.className = 'res';
+      const b = document.createElement('b'); b.textContent = i.title;
+      const s = document.createElement('small'); s.textContent = i.host;
+      a.append(b, s);
+      $('resume-l').append(a);
+    }
+  }
+}
+
 function ago(ts) {
   const d = Math.floor((Date.now() - ts) / 86400000);
   return d <= 0 ? T('ago.today') : d === 1 ? T('ago.yesterday') : T('ago.days', { n: d });
@@ -35,11 +54,27 @@ if (kind === 'memory') {
   const results = JSON.parse(p.get('results') || '[]');
   const box = $('hits');
   if (!results.length) box.textContent = T('mem.none', { n: p.get('total') || 0 });
+  // An answer written from these pages, with numbered citations that link to them.
+  let rec = null;
+  try { rec = JSON.parse(p.get('recall') || 'null'); } catch { rec = null; }
+  if (rec && rec.answer) {
+    $('rec').hidden = false;
+    $('rec-k').textContent = T('mem.rec');
+    const t = $('rec-t');
+    for (const part of rec.answer.split(/(\[\d{1,2}\])/)) {
+      const m = /^\[(\d{1,2})\]$/.exec(part);
+      const src = m && results[Number(m[1]) - 1];
+      if (src) { const a = document.createElement('a'); a.href = src.url; a.className = 'cite'; a.textContent = m[1]; a.title = src.title; t.append(a); } else t.append(document.createTextNode(part));
+    }
+    $('rec-m').textContent = rec.remote ? T('mem.recRemote', { host: rec.remote }) : T('mem.recLocal');
+  }
+  let n = 0;
   for (const r of results) {
+    n++;
     const a = document.createElement('a');
     a.href = r.url;
     const b = document.createElement('b');
-    b.textContent = r.title;
+    b.textContent = (rec && rec.answer ? '[' + n + '] ' : '') + r.title;
     const s = document.createElement('small');
     s.textContent = T('mem.meta', { host: new URL(r.url).hostname, when: ago(r.ts) });
     a.append(b, s);

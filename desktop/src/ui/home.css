@@ -42,3 +42,17 @@ h1{font-weight:500;font-size:clamp(30px,4.6vw,46px);line-height:1.1;letter-spaci
 .card.go{border-color:var(--accent);background:var(--accent-soft)}
 #tools{margin-top:20px}
 .foot{margin-top:40px}
+
+#rec{margin:0 0 22px;padding:20px 22px;border:1px solid var(--line);border-radius:16px}
+#rec .k{margin:0 0 8px;font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+#rec .lead{font-size:18px;margin:0 0 10px}
+.cite{display:inline-grid;place-items:center;min-width:19px;height:19px;margin:0 2px;padding:0 5px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font:600 11.5px var(--f);text-decoration:none;vertical-align:2px}
+.cite:hover{background:var(--accent);color:var(--accent-ink)}
+
+#resume{margin:0 0 22px}
+#resume .k{margin:0 0 6px;color:var(--muted);font-size:12.5px}
+#resume .res{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}
+#resume .res:last-child{border-bottom:1px solid var(--line)}
+#resume .res b{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#resume .res small{flex:none;color:var(--muted)}
+#resume .res:hover b{color:var(--accent)}

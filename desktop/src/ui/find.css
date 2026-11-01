@@ -5,6 +5,9 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 #q::placeholder{color:var(--muted)}
 #count{flex:none;color:var(--muted);font-size:12px;padding:0 8px;min-width:48px;text-align:right;white-space:nowrap}
 #count.none{color:var(--warn)}
+.pill{flex:none;height:26px;padding:0 11px;margin:0 4px;border-radius:13px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);font:500 12px var(--f);cursor:pointer;white-space:nowrap}
+.pill:hover{background:var(--accent);color:var(--accent-ink)}
+.pill:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .b{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--muted);background:none;border:0;cursor:pointer}
 .b:hover:not(:disabled){background:var(--hover);color:var(--ink)}
 .b:disabled{opacity:.35;cursor:default}

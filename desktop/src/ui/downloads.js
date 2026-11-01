@@ -47,13 +47,29 @@ function row(r) {
   }
   if (r.state === 'done' && r.risky) { const w = document.createElement('div'); w.className = 'warnline'; w.textContent = T('dl2.risky'); body.append(w); }
   const acts = document.createElement('div'); acts.className = 'acts';
+  const sug = document.createElement('div'); sug.className = 'sug'; sug.hidden = true;
   if (r.state === 'progressing') acts.append(button(r.paused ? T('dl2.resume') : T('dl2.pause'), r.paused ? 'resume' : 'pause', r.id), button(T('dl2.cancel'), 'cancel', r.id, true));
   else if (r.state === 'interrupted') acts.append(button(T('dl2.resume'), 'resume', r.id), button(T('dl2.cancel'), 'cancel', r.id, true));
   else {
     if (r.state === 'done') acts.append(button(T('dl2.open'), 'open', r.id), button(T('dl2.reveal'), 'reveal', r.id));
+    if (r.state === 'done' && !r.risky && !r.private) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'quiet'; b.textContent = T('dl2.rename');
+      b.addEventListener('click', async () => {
+        b.disabled = true; sug.hidden = false; sug.textContent = T('dl2.renameWait');
+        const n = await downloads.suggest(r.id);
+        b.disabled = false;
+        if (!n) { sug.textContent = T('dl2.renameNone'); return; }
+        sug.replaceChildren();
+        const t = document.createElement('span'); t.textContent = n; t.className = 'new';
+        const ok = document.createElement('button'); ok.type = 'button'; ok.textContent = T('dl2.renameApply');
+        ok.addEventListener('click', async () => { if (!(await downloads.rename(r.id, n))) sug.textContent = T('dl2.renameFail'); });
+        sug.append(t, ok);
+      });
+      acts.append(b);
+    }
     acts.append(button(T('dl2.remove'), 'remove', r.id, true));
   }
-  body.append(acts);
+  body.append(acts, sug);
   li.append(e, body);
   return li;
 }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Check a password</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="breach.css">
+</head>
+<body>
+<main>
+  <h1 data-i18n="br.h"></h1>
+  <p class="lead" data-i18n="br.lead"></p>
+  <form id="f" autocomplete="off">
+    <input id="pw" type="password" data-i18n-ph="br.ph" data-i18n-aria="br.ph" autocomplete="off" spellcheck="false" autofocus>
+    <button class="btn" id="go" type="submit" data-i18n="br.go"></button>
+  </form>
+  <p id="out" role="status"></p>
+  <p class="foot" data-i18n="br.foot"></p>
+</main>
+<script src="i18n.js"></script>
+<script src="breach.js"></script>
+</body>
+</html>

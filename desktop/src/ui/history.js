@@ -33,12 +33,15 @@ function row(i) {
   const body = document.createElement('div'); body.className = 'body';
   const t = document.createElement('button'); t.type = 'button'; t.className = 't'; t.textContent = i.title || i.url; t.addEventListener('click', () => browsing.go(i.url));
   const u = document.createElement('div'); u.className = 'u'; u.textContent = i.host;
-  body.append(t, u);
+  const nt = document.createElement('div'); nt.className = 'note'; nt.hidden = true;
+  body.append(t, u, nt);
   const time = document.createElement('span'); time.className = 'time'; time.textContent = clock(i.ts);
   const acts = document.createElement('div'); acts.className = 'acts';
   const d = document.createElement('button'); d.type = 'button'; d.className = 'del'; d.textContent = T('dl2.remove');
   d.addEventListener('click', async () => { await browsing.remove(i.url); refresh(); });
-  acts.append(d);
+  const w = document.createElement('button'); w.type = 'button'; w.className = 'del'; w.textContent = T('hist.note');
+  w.addEventListener('click', async () => { w.disabled = true; nt.hidden = false; nt.textContent = T('hist.noteWait'); const s = await browsing.note(i.url); nt.textContent = s || T('hist.noteNone'); w.hidden = !!s; w.disabled = false; });
+  acts.append(w, d);
   li.append(ico, body, time, acts);
   return li;
 }

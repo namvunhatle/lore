@@ -9,3 +9,11 @@ $('why').textContent = T('warn.' + (['list', 'lookalike', 'idn'].includes(p.get(
 $('addr').textContent = target;
 // Handled by the main process, and only when this page is the one asking.
 $('go').href = 'lore-proceed:?u=' + encodeURIComponent(target);
+// A page that only works over plain http: the person can still open it, knowing nobody protects what they send.
+if (p.get('reason') === 'insecure') {
+  document.title = T('warn.insTitle');
+  document.querySelector('h1').textContent = T('warn.insTitle');
+  $('why').textContent = T('warn.insecure', { host: new URL(target).hostname });
+  $('go').textContent = T('warn.insProceed');
+  $('go').href = 'lore-proceed:?why=ins&u=' + encodeURIComponent(target);
+}

@@ -63,3 +63,17 @@ test('cancel, remove and clear', () => {
   list.remove(b.id);
   assert.strictEqual(list.items.length, 0);
 });
+
+test('a finished file can be renamed without overwriting another', () => {
+  const fs = require('fs'); const os = require('os'); const path = require('path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lore-dl-'));
+  const a = path.join(dir, 'download (3).pdf'); const taken = path.join(dir, 'Manual.pdf');
+  fs.writeFileSync(a, 'x'); fs.writeFileSync(taken, 'y');
+  const list = new DownloadList({ dir });
+  list.items.push({ id: 1, name: 'download (3).pdf', path: a, state: 'done' });
+  assert.ok(list.rename(1, 'Manual.pdf'));
+  assert.strictEqual(list.get(1).name, 'Manual (1).pdf');
+  assert.strictEqual(fs.readFileSync(taken, 'utf8'), 'y');
+  assert.ok(!list.rename(1, 'Manual.exe'), 'the extension cannot change');
+  fs.rmSync(dir, { recursive: true });
+});

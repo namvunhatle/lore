@@ -64,6 +64,19 @@ class DownloadList {
   resume(id) { const i = this.live.get(id); if (i && i.canResume()) i.resume(); }
   cancel(id) { const i = this.live.get(id); if (i) i.cancel(); }
   remove(id) { this.cancel(id); this.items = this.items.filter((r) => r.id !== id); this.onChange(null); }
+  // Gives a finished file a new name in the same folder. Never overwrites: a taken name gets " (1)".
+  rename(id, newName) {
+    const r = this.get(id);
+    if (!r || r.state !== 'done' || !r.path || !this.exists(r.path)) return false;
+    const dir = path.dirname(r.path);
+    const base = safeName(newName);
+    if (path.extname(base).toLowerCase() !== path.extname(r.path).toLowerCase()) return false;
+    const to = uniquePath(dir, base, this.exists);
+    try { fs.renameSync(r.path, to); } catch { return false; }
+    r.path = to; r.name = path.basename(to);
+    this.onChange(r);
+    return true;
+  }
   clearFinished() { this.items = this.items.filter((r) => r.state === 'progressing' || r.state === 'interrupted'); this.onChange(null); }
   get active() { return this.items.filter((r) => r.state === 'progressing').length; }
 

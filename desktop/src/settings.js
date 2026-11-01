@@ -7,7 +7,15 @@ const DEFAULTS = () => ({
   autoUpdate: true,   // look for a newer version on GitHub now and then
   appearance: 'system', // system | light | dark
   startup: 'restore', // restore (continue where I left off) | new (start with a new tab)
-  privacy: { blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask' }, // permissions: ask | block
+  privacy: {
+    blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask', // permissions: ask | block
+    httpsFirst: true, stripTracking: true, memory: true, lock: false,
+    doh: 'automatic', // off | automatic | cloudflare | quad9
+    trackingOff: [], aiOff: [] // sites where link cleaning / AI reading are switched off
+  },
+  minFont: 0, // smallest text size a page may use, in px; 0 leaves pages alone
+  search: 'duckduckgo', searchCustom: '', // duckduckgo | google | bing | brave | coccoc | custom
+  alias: { provider: 'off', key: '' }, // off | addy | simplelogin
   provider: 'local', // local | openai | anthropic | off
   local: { url: process.env.LORE_LLM_URL || 'http://127.0.0.1:11434', model: process.env.LORE_LLM_MODEL || 'qwen2.5:3b', embedModel: 'bge-m3' },
   openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', key: '' },
@@ -17,6 +25,9 @@ const PROVIDERS = ['local', 'openai', 'anthropic', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
 const APPEARANCES = ['system', 'light', 'dark'];
+const DOH = ['off', 'automatic', 'cloudflare', 'quad9'];
+const ALIAS = ['off', 'addy', 'simplelogin'];
+const hostList = (v) => (Array.isArray(v) ? [...new Set(v.filter((h) => typeof h === 'string' && /^[a-z0-9.-]{1,100}$/i.test(h)).map((h) => h.toLowerCase()))].slice(0, 200) : null);
 
 function httpUrl(u, { allowPlainLocal }) {
   let x;
@@ -42,7 +53,15 @@ class Settings {
     if (APPEARANCES.includes(patch.appearance)) out.appearance = patch.appearance;
     if (typeof patch.autoUpdate === 'boolean') out.autoUpdate = patch.autoUpdate;
     const pv = patch.privacy || {};
-    for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
+    for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint', 'httpsFirst', 'stripTracking', 'memory', 'lock']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
+    if (DOH.includes(pv.doh)) out.privacy.doh = pv.doh;
+    for (const k of ['trackingOff', 'aiOff']) { const l = hostList(pv[k]); if (l) out.privacy[k] = l; }
+    if ([0, 12, 14, 16, 18].includes(patch.minFont)) out.minFont = patch.minFont;
+    if (['duckduckgo', 'google', 'bing', 'brave', 'coccoc', 'custom'].includes(patch.search)) out.search = patch.search;
+    if (typeof patch.searchCustom === 'string') out.searchCustom = patch.searchCustom.trim().slice(0, 300);
+    const al = patch.alias || {};
+    if (ALIAS.includes(al.provider)) out.alias.provider = al.provider;
+    if (typeof al.key === 'string' && al.key.trim()) out.alias.key = al.key.trim();
     if (pv.permissions !== undefined) out.privacy.permissions = pv.permissions;
     for (const k of ['local', 'openai', 'anthropic']) {
       for (const f of Object.keys(out[k])) {
@@ -59,6 +78,7 @@ class Settings {
   validate(cfg) {
     if (!PROVIDERS.includes(cfg.provider)) throw new Error('set.v.provider');
     if (!LANGUAGES.includes(cfg.language)) throw new Error('set.v.lang');
+    if (cfg.search === 'custom' && !require('./router').validSearchTemplate(cfg.searchCustom)) throw new Error('set.v.search');
     if (!['ask', 'block'].includes(cfg.privacy.permissions)) throw new Error('set.v.provider');
     if (cfg.provider === 'local') { httpUrl(cfg.local.url, { allowPlainLocal: true }); if (!cfg.local.model) throw new Error('set.v.chooseModel'); }
     if (cfg.provider === 'openai') {
@@ -87,10 +107,11 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, language: c.language, startup: c.startup, appearance: c.appearance, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
-      anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key }
+      anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },
+      alias: { provider: c.alias.provider, hasKey: !!c.alias.key }
     };
   }
 }

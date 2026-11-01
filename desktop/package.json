@@ -38,7 +38,8 @@
     "predist:mac": "npm run filters",
     "predist:mac:signed": "npm run filters",
     "predist:linux": "npm run filters",
-    "check:electron": "node scripts/check-electron.js"
+    "check:electron": "node scripts/check-electron.js",
+    "smoke": "node scripts/smoke.js"
   },
   "devDependencies": {
     "electron": "^45.2.1",
@@ -140,7 +141,8 @@
   "dependencies": {
     "@ghostery/adblocker": "^2.20.3",
     "@mozilla/readability": "^0.6.0",
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "pdfjs-dist": "^6.4.299"
   },
   "engines": {
     "node": ">=22"

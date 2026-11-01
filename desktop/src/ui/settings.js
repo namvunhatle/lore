@@ -1,5 +1,6 @@
 const $ = (s) => document.querySelector(s);
 const val = (id) => $(id).value.trim();
+let lockOk = false;
 let view;
 let lang = 'en';
 const T = (k, v) => LORE_I18N.t(lang, k, v);
@@ -14,6 +15,29 @@ function setLang(l) {
     const o = document.createElement('option'); o.value = v; o.textContent = T(k); perm.append(o);
   }
   if (view) perm.value = view.privacy.permissions;
+  const rng = $('#clr-range');
+  const keep = rng.value;
+  rng.replaceChildren();
+  for (const [v, k] of [['all', 'mem.r.all'], ['hour', 'mem.r.hour'], ['day', 'mem.r.day'], ['week', 'mem.r.week'], ['month', 'mem.r.month']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); rng.append(o); }
+  rng.value = keep || 'all';
+  const mf = $('#minfont');
+  const keepMf = mf.value;
+  mf.replaceChildren();
+  for (const v of [0, 12, 14, 16, 18]) { const o = document.createElement('option'); o.value = String(v); o.textContent = v ? v + ' px' : T('set.a11y.off'); mf.append(o); }
+  mf.value = view ? String(view.minFont) : keepMf || '0';
+  const se = $('#search');
+  const keepSe = se.value;
+  se.replaceChildren();
+  for (const v of ['duckduckgo', 'google', 'bing', 'brave', 'coccoc', 'custom']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.search.' + v); se.append(o); }
+  se.value = view ? view.search : keepSe || 'duckduckgo';
+  const doh = $('#doh');
+  doh.replaceChildren();
+  for (const v of ['off', 'automatic', 'cloudflare', 'quad9']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.priv.doh.' + v); doh.append(o); }
+  if (view) doh.value = view.privacy.doh;
+  const al = $('#alias');
+  al.replaceChildren();
+  for (const v of ['off', 'addy', 'simplelogin']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.priv.alias.' + v); al.append(o); }
+  if (view) al.value = view.alias.provider;
   const sel = $('#language');
   const cur = view ? view.language : 'auto';
   sel.replaceChildren();
@@ -42,6 +66,21 @@ function fill(v) {
   $('#banners').checked = v.privacy.cookieBanners;
   $('#fp').checked = v.privacy.reduceFingerprint;
   $('#perm').value = v.privacy.permissions;
+  $('#minfont').value = String(v.minFont);
+  $('#search').value = v.search;
+  $('#search-custom').value = v.searchCustom;
+  $('#search-custom-row').hidden = v.search !== 'custom';
+  $('#https').checked = v.privacy.httpsFirst;
+  $('#strip').checked = v.privacy.stripTracking;
+  $('#mem').checked = v.privacy.memory;
+  $('#doh').value = v.privacy.doh;
+  $('#lock').checked = v.privacy.lock && lockOk;
+  $('#lock').disabled = !lockOk;
+  $('#lock-d').textContent = T(lockOk ? 'set.priv.lock.d' : 'set.priv.lock.na');
+  $('#alias').value = v.alias.provider;
+  $('#alias-key').value = '';
+  $('#alias-key').placeholder = v.alias.hasKey ? T('set.priv.aliasSaved') : '';
+  $('#alias-key-row').hidden = v.alias.provider === 'off';
   $('#local-url').value = v.local.url;
   $('#local-model').value = v.local.model;
   $('#local-embed').value = v.local.embedModel;
@@ -81,7 +120,10 @@ function patch() {
     startup: $('#startup').value,
     appearance: $('#appearance').value,
     autoUpdate: $('#autoupdate').checked,
-    privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value },
+    privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value, httpsFirst: $('#https').checked, stripTracking: $('#strip').checked, memory: $('#mem').checked, doh: $('#doh').value, lock: $('#lock').checked },
+    alias: { provider: $('#alias').value, key: $('#alias-key').value },
+    minFont: Number($('#minfont').value),
+    search: $('#search').value, searchCustom: $('#search-custom').value,
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },
     anthropic: { model: val('#anthropic-model'), key: $('#anthropic-key').value }
@@ -108,9 +150,11 @@ async function refreshModels() {
 document.querySelectorAll('input[name="provider"]').forEach((r) => r.addEventListener('change', show));
 $('#openai-url').addEventListener('input', show);
 $('#local-url').addEventListener('change', refreshModels);
+$('#search').addEventListener('change', () => { $('#search-custom-row').hidden = $('#search').value !== 'custom'; });
+$('#alias').addEventListener('change', () => { $('#alias-key-row').hidden = $('#alias').value === 'off'; });
 $('#local-model-list').addEventListener('change', (e) => { if (e.target.value) $('#local-model').value = e.target.value; });
 $('#clear').addEventListener('click', async () => {
-  const r = await settings.clear();
+  const r = await settings.clear({ history: $('#clr-hist').checked, site: $('#clr-site').checked, cache: $('#clr-cache').checked, range: $('#clr-range').value });
   if (r.ok) say(T('set.priv.cleared'));
 });
 $('#site').addEventListener('click', () => settings.ollamaSite());
@@ -156,6 +200,41 @@ $('#pull').addEventListener('click', () => pull(val('#local-model'), $('#pull'))
 $('#pull-embed').addEventListener('click', () => pull(val('#local-embed'), $('#pull-embed')));
 settings.onPull((p) => { $('#pull-bar i').style.width = Math.round(p * 100) + '%'; });
 
+// Site permissions (BRW-18): answers given to sites, with a way to take each back.
+async function paintPerms() {
+  const list = await settings.perms.list();
+  const ul = $('#perm-list');
+  ul.replaceChildren();
+  if (!list.length) { const li = document.createElement('li'); li.className = 'none'; li.textContent = T('set.perm.none'); ul.append(li); return; }
+  for (const p of list) {
+    const li = document.createElement('li');
+    const t = document.createElement('span'); t.textContent = p.origin.replace(/^https?:\/\//, '') + ' · ' + T('perm.' + p.permission) + ' · ' + T(p.allowed ? 'set.perm.allowed' : 'set.perm.blocked');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'link'; b.textContent = T('set.perm.reset');
+    b.addEventListener('click', async () => { await settings.perms.remove(p.origin, p.permission); paintPerms(); });
+    li.append(t, b);
+    ul.append(li);
+  }
+}
+paintPerms();
+
+// One-click setup of an on-device model (AI-11).
+settings.onSetup((n, p) => {
+  $('#setup-bar i').style.width = Math.round(p * 100) + '%';
+  $('#setup-s').textContent = n ? T('set.setup.pulling', { n }) : T('set.setup.testing');
+});
+$('#setup').addEventListener('click', async () => {
+  const btn = $('#setup');
+  btn.disabled = true;
+  $('#setup-bar').hidden = false;
+  $('#setup-s').textContent = T('set.setup.start');
+  const r = await settings.autosetup();
+  btn.disabled = false;
+  $('#setup-bar').hidden = true;
+  if (r.ok) { fill(r.view); $('#setup-s').textContent = T('set.setup.done', { m: r.model }); return; }
+  $('#setup-s').textContent = r.message;
+  if (r.needOllama) settings.ollamaSite();
+});
+
 // ---- Profiles ----------------------------------------------------------------------------------------------------------
 const COLORS = ['blue', 'green', 'amber', 'red', 'purple', 'grey'];
 let pcolor = 'blue';
@@ -197,7 +276,7 @@ $('#padd').addEventListener('submit', async (e) => {
 settings.profiles.list().then(paintProfiles);
 settings.onPane((id) => go(id));
 
-settings.get().then((r) => { view = r.view; setLang(r.lang); fill(r.view); });
+settings.get().then((r) => { view = r.view; lockOk = r.lockOk; setLang(r.lang); fill(r.view); });
 
 // Left-hand navigation: one pane at a time, arrow keys move between them.
 const navs = [...document.querySelectorAll('.nav')];

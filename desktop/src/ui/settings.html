@@ -27,6 +27,12 @@
   <h2 data-i18n="set.look.h"></h2>
   <p class="lead" data-i18n="set.look.lead"></p>
   <label class="f" for="appearance"><select id="appearance"></select></label>
+  <h2 data-i18n="set.a11y.h"></h2>
+  <label class="f"><span data-i18n="set.a11y.font"></span><select id="minfont"></select></label>
+  <p class="hint tight" data-i18n="set.a11y.font.d"></p>
+  <h2 data-i18n="set.search.h"></h2>
+  <label class="f" for="search"><select id="search"></select></label>
+  <label class="f gap-s" id="search-custom-row" hidden><span data-i18n="set.search.custom"></span><input id="search-custom" spellcheck="false" autocomplete="off" placeholder="https://example.com/search?q=%s"></label>
   <h2 data-i18n="set.upd.h"></h2>
   <div class="group">
     <label class="set"><span class="txt"><b data-i18n="set.upd.t"></b><small data-i18n="set.upd.d"></small></span><input type="checkbox" class="sw" id="autoupdate"></label>
@@ -56,8 +62,26 @@
     <label class="set"><span class="txt"><b data-i18n="set.priv.scam"></b><small data-i18n="set.priv.scam.d"></small></span><input type="checkbox" class="sw" id="scam"></label>
     <label class="set"><span class="txt"><b data-i18n="set.priv.banners"></b><small data-i18n="set.priv.banners.d"></small></span><input type="checkbox" class="sw" id="banners"></label>
     <label class="set"><span class="txt"><b data-i18n="set.priv.fp"></b><small data-i18n="set.priv.fp.d"></small></span><input type="checkbox" class="sw" id="fp"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.https"></b><small data-i18n="set.priv.https.d"></small></span><input type="checkbox" class="sw" id="https"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.strip"></b><small data-i18n="set.priv.strip.d"></small></span><input type="checkbox" class="sw" id="strip"></label>
+    <label class="set"><span class="txt"><b data-i18n="set.priv.mem"></b><small data-i18n="set.priv.mem.d"></small></span><input type="checkbox" class="sw" id="mem"></label>
+    <label class="set" id="lock-row"><span class="txt"><b data-i18n="set.priv.lock"></b><small id="lock-d"></small></span><input type="checkbox" class="sw" id="lock"></label>
   </div>
+  <label class="f gap-s"><span data-i18n="set.priv.alias"></span><select id="alias"></select></label>
+  <label class="f gap-s" id="alias-key-row"><span data-i18n="set.priv.aliasKey"></span><input id="alias-key" type="password" autocomplete="off" spellcheck="false"></label>
+  <p class="hint tight" data-i18n="set.priv.alias.d"></p>
   <label class="f gap-s"><span data-i18n="set.priv.perm"></span><select id="perm"></select></label>
+  <label class="f gap-s"><span data-i18n="set.priv.doh"></span><select id="doh"></select></label>
+  <p class="hint tight" data-i18n="set.priv.doh.d"></p>
+  <div class="group" id="clear-opts">
+    <label class="set"><span class="txt"><b data-i18n="set.clr.hist"></b><small data-i18n="set.clr.hist.d"></small></span><input type="checkbox" class="sw" id="clr-hist" checked></label>
+    <label class="set"><span class="txt"><b data-i18n="set.clr.site"></b><small data-i18n="set.clr.site.d"></small></span><input type="checkbox" class="sw" id="clr-site" checked></label>
+    <label class="set"><span class="txt"><b data-i18n="set.clr.cache"></b><small data-i18n="set.clr.cache.d"></small></span><input type="checkbox" class="sw" id="clr-cache" checked></label>
+  </div>
+  <label class="f gap-s"><span data-i18n="set.clr.range"></span><select id="clr-range"></select></label>
+  <h2 data-i18n="set.perm.h"></h2>
+  <p class="lead" data-i18n="set.perm.lead"></p>
+  <ul id="perm-list" class="plist"></ul>
   <div class="danger">
     <div><b data-i18n="set.priv.clear"></b><small data-i18n="set.priv.clear.d"></small></div>
     <button class="btn" id="clear" type="button" data-i18n="set.priv.clearBtn"></button>
@@ -68,6 +92,8 @@
   <h2 data-i18n="set.ai.h"></h2>
   <p class="lead" data-i18n="set.ai.lead"></p>
 
+  <div class="row gap setup"><button class="btn pri" id="setup" type="button" data-i18n="set.setup"></button><span class="hint tight" id="setup-s" role="status"></span></div>
+  <div class="bar" id="setup-bar" hidden><i></i></div>
   <div class="cardsel" role="radiogroup" data-i18n-aria="set.ai.h">
     <label class="pcard"><input type="radio" name="provider" value="local"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.local.t"></b><small data-i18n="set.local.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="openai"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.openai.t"></b><small data-i18n="set.openai.d"></small></label>

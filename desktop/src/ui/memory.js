@@ -35,10 +35,43 @@ function ago(ts) {
   return d <= 0 ? LORE_I18N.t(lang, 'ago.today') : d === 1 ? LORE_I18N.t(lang, 'ago.yesterday') : LORE_I18N.t(lang, 'ago.days', { n: d });
 }
 
+// Topics: pages grouped by the words their titles share. Pressing one narrows the list to its pages.
+let topicList = [];
+let topic = -1;
+function paintTopics() {
+  const box = $('#topics');
+  box.replaceChildren();
+  box.hidden = !topicList.length;
+  topicList.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = t.name + ' · ' + t.count;
+    b.setAttribute('aria-pressed', String(i === topic));
+    b.addEventListener('click', () => { topic = topic === i ? -1 : i; paintTopics(); refresh(); });
+    box.append(b);
+  });
+}
+memory.topics().then((t) => { topicList = t; paintTopics(); });
+
+$('#sum').addEventListener('click', async () => {
+  const btn = $('#sum');
+  btn.disabled = true;
+  $('#digest').hidden = false;
+  $('#dg-k').textContent = T('mem.sumK');
+  $('#dg-t').textContent = T('mem.sumWait');
+  $('#dg-m').textContent = '';
+  const r = await memory.digest();
+  btn.disabled = false;
+  if (!r.pages) { $('#dg-t').textContent = T('mem.sumNone'); return; }
+  $('#dg-t').textContent = r.text || T('mem.sumPlain', { n: r.pages });
+  const names = r.topics.slice(0, 4).map((t) => t.name).join(', ');
+  $('#dg-m').textContent = (names ? names + '. ' : '') + (r.text ? (r.remote ? T('mem.sumRemote', { host: r.remote }) : T('mem.sumLocal')) : '');
+});
+
 let timer;
 async function refresh() {
   const host = $('#host').value;
   const r = await memory.list({ q: $('#q').value, range, host });
+  if (topic >= 0 && topicList[topic]) { const set = new Set(topicList[topic].urls); r.items = r.items.filter((i) => set.has(i.url)); }
   // site filter
   const cur = $('#host').value;
   $('#host').replaceChildren();

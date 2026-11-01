@@ -1,8 +1,8 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { classify } = require('./router');
+const { classify, setSearchEngine, searchUrl } = require('./router');
 const { createBlocker } = require('./adblock');
 const { isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected } = require('./privacy');
 const { hardenSession: harden } = require('./harden');
@@ -27,6 +27,18 @@ const updates = require('./update');
 const secure = require('./security');
 const organize = require('./organize');
 const aibookmark = require('./aibookmark');
+const recall = require('./recall');
+const comparer = require('./compare');
+const topics = require('./topics');
+const modelplan = require('./modelplan');
+const pdftext = require('./pdftext');
+const dlname = require('./dlname');
+const { PrivacyStats } = require('./pstats');
+const aliasLib = require('./alias');
+const { SitePerms } = require('./perms');
+const pwLib = require('./passwords');
+const pagenote = require('./pagenote');
+const breachLib = require('./breach');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
@@ -45,6 +57,19 @@ const loadUi = (wc, file, query = {}) => {
   return wc.loadFile(file, { query: { lang: L(), blocked: String(S.blocked), ...(tab && tab.private ? { private: '1' } : {}), ...query } });
 };
 const loadHome = (wc, query = {}) => loadUi(wc, HOME, query);
+// MEM-06: the New tab page offers the last few pages from the local memory, newest first, one per site.
+function resumeQuery() {
+  if (!memory || !memory.size) return {};
+  const seen = new Set();
+  const out = [];
+  for (const i of memory.list({ from: Date.now() - 3 * 86400000 })) {
+    const h = hostOfUrl(i.url);
+    if (!h || seen.has(h) || !/^https?:/.test(i.url)) continue;
+    seen.add(h); out.push({ url: i.url, title: i.title || h, host: h.replace(/^www\./, '') });
+    if (out.length === 3) break;
+  }
+  return out.length ? { resume: JSON.stringify(out) } : {};
+}
 const isOurHome = (url) => url.startsWith('file:') && decodeURI(url).includes('/ui/home.html');
 const { AgentRun, WORKFLOWS, match: matchWorkflow } = require('./agent');
 const { PageDriver } = require('./driver');
@@ -72,6 +97,8 @@ const groups = new Map();  // tab groups: id -> { id, name, color, collapsed }
 let nextGroup = 1;
 const GROUP_COLORS = ['blue', 'green', 'amber', 'red', 'purple', 'grey'];
 let organizeWin = null;
+let compareWin = null;
+let compareDefault = [];
 let split = null;         // { a, b, ratio }: two tabs shown side by side while either one is in front
 let splitHandle = null;   // the draggable divider
 const SPLIT_GAP = 8;
@@ -89,12 +116,24 @@ const allowedCert = new Set(); // hosts whose certificate error the user chose t
 let findView = null;       // the find-in-page bar (BRW-01)
 let activeId = null;
 const S = { blocked: 0, adsOn: true };
-let statsFile = null;
-function today() { return new Date().toISOString().slice(0, 10); }
-function loadStats() {
-  try { const j = JSON.parse(require('fs').readFileSync(statsFile, 'utf8')); S.blocked = j.date === today() ? j.blocked : 0; } catch { S.blocked = 0; }
+let pstats = null;          // daily privacy counters (PRV-04)
+const allowedInsecure = new Set(); // hosts the user chose to open over plain http, for this run only
+const upgraded = new Map();        // host -> { orig, ts }: pages Lore sent to https, to explain it if https does not work
+const aiOffFor = (url) => settings.get().privacy.aiOff.includes(hostOfUrl(url || '').replace(/^www\./, ''));
+// PRV-12: encrypted DNS. 'automatic' uses the DNS provider's secure option when there is one and falls back to normal DNS.
+const DOH_SERVERS = { cloudflare: 'https://cloudflare-dns.com/dns-query', quad9: 'https://dns.quad9.net/dns-query' };
+function applySearch() { const s = settings.get(); setSearchEngine(s.search, s.searchCustom); }
+function applyDoh() {
+  const m = settings.get().privacy.doh;
+  try {
+    app.configureHostResolver(m === 'off' ? { secureDnsMode: 'off' } : DOH_SERVERS[m] ? { secureDnsMode: 'secure', secureDnsServers: [DOH_SERVERS[m]] } : { secureDnsMode: 'automatic' });
+  } catch { /* not supported on this system */ }
 }
-function saveStats() { try { require('fs').writeFileSync(statsFile, JSON.stringify({ date: today(), blocked: S.blocked })); } catch { /* best effort */ } }
+function loadStats() { pstats = new PrivacyStats({ file: statsFile }); S.blocked = pstats.today().blocked; }
+function saveStats() { if (pstats) pstats.save(); }
+let statsFile = null;
+let vault;
+let perms;
 let memory;
 let blocker;
 let scamList;
@@ -119,10 +158,11 @@ const active = () => tabs.find((t) => t.id === activeId);
 
 function layout() {
   const t = active();
-  if (!win || !t) return;
+  if (!win || win.isDestroyed() || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
   const y = chromeHeight(), height = h - chromeHeight(), width = w - pw;
+  if (t.fs) { t.view.setBounds({ x: 0, y: 0, width: w, height: h }); return; }
   if (splitOn()) {
     const left = Math.round((width - SPLIT_GAP) * split.ratio);
     tabById(split.a).view.setBounds({ x: 0, y, width: left, height });
@@ -131,6 +171,7 @@ function layout() {
   } else t.view.setBounds({ x: 0, y, width, height });
   if (panel && pw) panel.setBounds({ x: w - pw, y: chromeHeight(), width: pw, height: h - chromeHeight() });
   layoutFind();
+  layoutPriv();
 }
 
 function isLoading(tab) {
@@ -210,7 +251,27 @@ function startTabs() {
     for (const u of pendingUrls.splice(0)) openLink(u);
     if (freshInstall) { freshInstall = false; setTimeout(() => openWelcome('first'), 400); }
     scheduleUpdateChecks();
+    if (process.env.LORE_SMOKE) runSmoke();
   }
+}
+
+// CI starts the packaged app with LORE_SMOKE=1: it must open a window, draw the tab strip, load the bundled ad-block engine and
+// show the New tab page, within half a minute. A build that cannot do that never reaches a release.
+function runSmoke() {
+  const fail = (why) => { console.error('LORE_SMOKE_FAIL ' + why); app.exit(1); };
+  setTimeout(() => fail('timeout'), 40000).unref();
+  const check = async () => {
+    try {
+      const t = active();
+      const strip = await win.webContents.executeJavaScript("document.querySelectorAll('.tab').length");
+      const page = t ? t.view.webContents.getURL() : '';
+      if (!t || strip < 1 || !/home\.html/.test(page) || t.view.webContents.isLoading()) return setTimeout(check, 500);
+      if (!blocker || !blocker.ready) return fail('the ad-block engine did not load');
+      console.log('LORE_SMOKE_OK tabs=' + strip + ' packaged=' + app.isPackaged);
+      app.exit(0);
+    } catch (e) { setTimeout(check, 500); }
+  };
+  check();
 }
 
 // ---- Profiles (PRV-14) -----------------------------------------------------------------------------------------------
@@ -220,10 +281,12 @@ function openStores(id) {
   fs.mkdirSync(dir, { recursive: true });
   const f = (n) => fileStore(path.join(dir, n), safeStorage);
   const bm = f('bookmarks.bin');
-  return { memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
+  const pm = f('perms.bin');
+  const pv = f('passwords.bin');
+  return { vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
 }
 function useStores(st) {
-  memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
+  vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
   refreshEmbedder();
 }
 // Closes every tab without remembering it or opening a new one: the next profile's tabs take their place.
@@ -276,12 +339,40 @@ function showProfileMenu(x, y) {
   ]).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
 }
 
+// ---- Pop-up windows for sign-in (WEB-01) -------------------------------------------------------------------------------
+function popupHandler(tab, priv) {
+  return ({ url, disposition, features }) => {
+    if (!isAllowedNavigation(url)) return { action: 'deny' };
+    const popup = disposition === 'new-window' && /(?:width|height)\s*=/i.test(features || '');
+    if (!popup) { openTab({ url }, { private: priv }); return { action: 'deny' }; }
+    const num = (k, d) => { const m = new RegExp(k + '\\s*=\\s*(\\d+)', 'i').exec(features || ''); return m ? Math.min(Math.max(Number(m[1]), 320), 1200) : d; };
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        parent: win, width: num('width', 520), height: num('height', 680), minimizable: false, maximizable: false, autoHideMenuBar: true,
+        title: 'Lore', backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: TAB_PRELOAD }
+      }
+    };
+  };
+}
+function trackPopup(tab, child, priv) {
+  child.setMenuBarVisibility(false);
+  const wc = child.webContents;
+  (tab.popups || (tab.popups = new Set())).add(child);
+  child.on('closed', () => tab.popups && tab.popups.delete(child));
+  // The window is only for web pages: it can send the person onward on the web, never to a file or an app address.
+  wc.on('will-navigate', (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); });
+  wc.on('will-redirect', (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); });
+  wc.setWindowOpenHandler(({ url }) => { if (isAllowedNavigation(url)) openTab({ url }, { private: priv }); return { action: 'deny' }; });
+}
+
 function openTab(target, { private: priv = false, lazy = false, pinned = false, title = '', group = 0 } = {}) {
   const id = nextId++;
   // A partition without the "persist:" prefix lives in memory only, so a private tab leaves nothing on disk.
   const view = new WebContentsView({
     webPreferences: {
-      sandbox: true, contextIsolation: true, preload: TAB_PRELOAD,
+      sandbox: true, contextIsolation: true, preload: TAB_PRELOAD, minimumFontSize: settings.get().minFont || 0,
       additionalArguments: settings.get().privacy.reduceFingerprint ? ['--lore-fp=1'] : [],
       ...(priv ? { partition: 'private-' + id } : partitionFor(profiles.active) ? { partition: partitionFor(profiles.active) } : {})
     }
@@ -296,10 +387,10 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   // Clicking into the other half of a split makes it the tab in front.
   wc.on('focus', () => { if (split && (tab.id === split.a || tab.id === split.b) && activeId !== tab.id && splitOn()) { activeId = tab.id; pushState(); } });
   wireFind(wc);
-  wc.setWindowOpenHandler(({ url }) => {
-    if (isAllowedNavigation(url)) openTab({ url }, { private: priv });
-    return { action: 'deny' };
-  });
+  // A link that opens "a new tab" becomes a tab. A script that opens a small window (sign in with Google, Apple, GitHub, a
+  // payment page) gets a real child window, because it talks back to the page that opened it and a tab cannot do that (WEB-01).
+  wc.setWindowOpenHandler(popupHandler(tab, priv));
+  wc.on('did-create-window', (child) => trackPopup(tab, child, priv));
   // Web pages may only send the tab to web addresses (never file:, javascript:, data: or app schemes).
   const guard = (e, url) => { if (!isAllowedNavigation(url)) e.preventDefault(); };
   wc.on('will-redirect', guard);
@@ -320,10 +411,16 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     if (why) return wc.loadFile(CERTERR, { query: { lang: L(), url: failedUrl, reason: why } });
     if (!isMainFrame) return;
     // Anything else that stops a page from loading gets a page that says so (and a game when there is no connection).
+    // A page Lore sent to https that cannot be reached that way: say so, and let the person open it over http on purpose.
+    const up = upgraded.get(hostOfUrl(failedUrl || ''));
+    if (up && Date.now() - up.ts < 30000 && ![-3, -20, -105, -106].includes(code) && !tab.pendingScam) {
+      upgraded.delete(hostOfUrl(failedUrl));
+      return wc.loadFile(WARNING, { query: { lang: L(), url: up.orig, reason: 'insecure' } });
+    }
     if (!tab.pendingScam) {
       if (code === -3 || code === -20 || !/^https?:/i.test(failedUrl || '')) return;
       tab.errorUrl = failedUrl;
-      return wc.loadFile(NETERR, { query: { lang: L(), url: failedUrl, code: String(code), offline: net.isOnline() ? '0' : '1' } });
+      return wc.loadFile(NETERR, { query: { lang: L(), url: failedUrl, code: String(code), offline: net.isOnline() ? '0' : '1', search: searchUrl('%q').replace('%25q', '%s') } });
     }
     const { url, v } = tab.pendingScam;
     tab.pendingScam = null;
@@ -336,7 +433,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
       const target = new URL(url).searchParams.get('u');
       // Only the sign-in page may hand an address to the system browser, and only a Google sign-in address.
       if (url.startsWith('lore-external:')) { if (target && isGoogleSignIn(target)) shell.openExternal(target); return; }
-      if (target && isAllowedNavigation(target)) { (new URL(url).searchParams.get('cert') === '1' ? allowedCert : allowedScam).add(new URL(target).hostname.toLowerCase()); wc.loadURL(target); }
+      if (target && isAllowedNavigation(target)) { ({ cert: allowedCert, ins: allowedInsecure }[new URL(url).searchParams.get('why')] || allowedScam).add(new URL(target).hostname.toLowerCase()); wc.loadURL(target); }
       return;
     }
     if (url.startsWith('lore-retry:') && isOurWarning(wc.getURL())) {
@@ -348,7 +445,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     if (url.startsWith('lore-do:')) {
       e.preventDefault();
       const a = new URL(url).searchParams.get('a');
-      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openTab(undefined, { private: true }), memory: openMemory, settings: openSettings, tasks: () => openTasks() }[a] || (() => {}))();
+      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openPrivate(), memory: openMemoryLocked, settings: openSettings, tasks: () => openTasks() }[a] || (() => {}))();
       return;
     }
     if (!url.startsWith('lore-run:')) return guard(e, url);
@@ -358,7 +455,14 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   });
   wc.on('page-favicon-updated', (_e, icons) => { tab.favicon = icons[0] || ''; pushState(); if (!priv && !tab.isHome) saveFavicon(wc, tab.url, icons); });
   wc.on('did-start-navigation', (_e, _u, inPlace, isMain) => { if (isMain && !inPlace && tab.id === activeId) closeFind(); });
-  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv) memory.add({ url, title: tab.title }); pushState(); });
+  wc.on('did-navigate', () => applyZoom(tab));
+  wc.on('zoom-changed', (_e, dir) => { if (tab.id === activeId) zoomActive(dir === 'in' ? 0.5 : -0.5); });
+  // A page that goes full screen (a video, a presentation) covers the whole window until it leaves.
+  wc.on('enter-html-full-screen', () => { tab.fs = true; tab.fsWindow = !win.isFullScreen(); if (tab.fsWindow) win.setFullScreen(true); layout(); });
+  wc.on('leave-html-full-screen', () => { tab.fs = false; if (tab.fsWindow) win.setFullScreen(false); tab.fsWindow = false; layout(); });
+  // A page that crashed shows a page that says so, instead of a white tab.
+  wc.on('render-process-gone', (_e, d) => { if (!tabs.includes(tab) || !win || win.isDestroyed() || wc.isDestroyed() || d.reason === 'clean-exit' || d.reason === 'killed' && tab.closing) return; tab.fs = false; tab.crashedUrl = tab.url; tab.isHome = true; wc.loadFile(NETERR, { query: { lang: L(), url: tab.crashedUrl, code: 'crash', search: searchUrl('%q').replace('%25q', '%s') } }); layout(); });
+  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
     const url = wc.getURL();
@@ -376,7 +480,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     } catch { /* page navigated away */ }
   });
   wc.on('did-finish-load', () => {
-    if (tab.isHome || priv || !/^https?:/.test(tab.url)) return;
+    if (tab.isHome || priv || !/^https?:/.test(tab.url) || !settings.get().privacy.memory || aiOffFor(tab.url)) return;
     const url = tab.url;
     // Give single-page apps a moment, then keep a short text excerpt so Memory can answer by content.
     setTimeout(async () => {
@@ -412,18 +516,33 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   selectTab(tab.id);
   if (target && target.url) wc.loadURL(target.url);
   else {
-    loadHome(wc, target || {});
+    loadHome(wc, target || (priv ? {} : resumeQuery()));
     // The page loads after the box is shown, and loading takes the focus: take it back once it is ready.
     wc.once('did-finish-load', () => { if (tab.id === activeId && tab.isHome) focusIntent(); });
   }
   return tab;
 }
 
+// BRW-16: the zoom level is remembered for each site (not for private tabs) and applied when a page from it opens.
+let zoomFile = null;
+let zooms = {};
+const zoomHost = (t) => (t && /^https?:/.test(t.url) ? hostOfUrl(t.url).replace(/^www\./, '') : '');
+function loadZooms() { try { zooms = JSON.parse(fs.readFileSync(zoomFile, 'utf8')) || {}; } catch { zooms = {}; } }
+function saveZooms() { try { fs.writeFileSync(zoomFile, JSON.stringify(zooms)); } catch { /* best effort */ } }
+function applyZoom(t) {
+  const h = zoomHost(t);
+  const lvl = h && !t.private && Number.isFinite(zooms[h]) ? zooms[h] : 0;
+  if (t.view.webContents.getZoomLevel() !== lvl) t.view.webContents.setZoomLevel(lvl);
+}
 function zoomActive(step) {
   const t = active();
   if (!t) return;
   const wc = t.view.webContents;
-  wc.setZoomLevel(step === null ? 0 : Math.max(-3, Math.min(5, wc.getZoomLevel() + step)));
+  const lvl = step === null ? 0 : Math.max(-3, Math.min(5, wc.getZoomLevel() + step));
+  wc.setZoomLevel(lvl);
+  const h = zoomHost(t);
+  if (h && !t.private) { if (lvl === 0) delete zooms[h]; else zooms[h] = lvl; saveZooms(); }
+  toast({ text: T('zoom.pct', { n: Math.round(100 * Math.pow(1.2, lvl)), host: h || '' }) });
 }
 
 // ---- Split view (BRW-25) -----------------------------------------------------------------------------------------------
@@ -483,6 +602,8 @@ function closeTab(id) {
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
   const [t] = tabs.splice(i, 1);
+  for (const c of t.popups || []) { try { c.close(); } catch { /* gone */ } }
+  clearTimeout(t.ephemeral); clearTimeout(t.ephemeralWarn);
   closedTabs.push({ url: t.lazyUrl || t.url, title: t.title, pinned: t.pinned, private: t.private });
   // Closing one half of a split leaves the other one on its own.
   const partner = split && (split.a === id || split.b === id) ? (split.a === id ? split.b : split.a) : null;
@@ -560,6 +681,7 @@ function showGroupMenu(groupId) {
     { label: g.collapsed ? T('group.expand') : T('group.collapse'), click: () => { g.collapsed = !g.collapsed; pushState(); } },
     { label: T('group.color'), submenu: GROUP_COLORS.map((c) => ({ label: T('group.c.' + c), type: 'radio', checked: g.color === c, click: () => { g.color = c; pushState(); } })) },
     { type: 'separator' },
+    { label: T('cmp.group'), enabled: tabs.filter((t) => t.group === groupId).length > 1, click: () => openCompare(tabs.filter((t) => t.group === groupId).map((t) => t.id)) },
     { label: T('group.saveBookmarks'), click: () => { const n = groupBookmarks(groupId); toast({ text: T('group.saved', { n, name: g.name }), action: 'bookmarks', actionLabel: T('bm.edit') }); } },
     { label: T('group.saveClose'), click: () => { const n = groupBookmarks(groupId); if (n) { toast({ text: T('group.savedClosed', { n, name: g.name }), action: 'bookmarks', actionLabel: T('bm.edit') }); closeGroup(groupId); } } },
     { type: 'separator' },
@@ -693,8 +815,22 @@ const modelInfo = async () => ({ ready: !!llm && (await llm.available()), remote
 
 // Everything a model reads from a page comes through here (AI-10): visible text only, invisible characters stripped,
 // and a report of anything that looked like an order to the assistant.
+// A PDF tab has no page text to read: the file is fetched with the tab's own session and read with pdf.js (AI-12).
+async function pdfRead(tab) {
+  const url = tab.url;
+  if (!tab.pdf || tab.pdf.url !== url) {
+    const r = await tab.view.webContents.session.fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!r.ok) throw new Error('pdf.http');
+    const bytes = Buffer.from(await r.arrayBuffer());
+    tab.pdf = { url, text: pdftext.withPages((await pdftext.extract(bytes)).pages) };
+  }
+  return shield.prepare(tab.pdf.text, {});
+}
+
 async function pageRead(tab) {
   const wc = tab.view.webContents;
+  if (aiOffFor(tab.url)) return shield.prepare('', {});
+  if (pdftext.isPdfUrl(tab.url)) { try { return await pdfRead(tab); } catch { return shield.prepare('', {}); } }
   let raw = '', hidden = {};
   try {
     const a = await wc.executeJavaScriptInIsolatedWorld(1003, [{ code: extractionScript() }]);
@@ -712,6 +848,7 @@ async function pageRead(tab) {
 async function pageAssistant(action, question = '') {
   const tab = active();
   if (!tab) return;
+  if (aiOffFor(tab.url)) { claimPanel(tab); return sendPage({ mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), reset: true, state: 'error', error: 'pg.aiOff' }); }
   if (tab.isHome || !/^https?:/.test(tab.url)) return loadHome(tab.view.webContents, { kind: 'nopage' });
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
@@ -806,8 +943,19 @@ async function submit(text) {
   } else {
     const query = { kind: r.kind, q: r.text };
     if (r.kind === 'memory') {
-      query.results = JSON.stringify((await memory.search(r.text)).map(({ url, title, ts, snippet }) => ({ url, title, ts, snippet })));
+      // Search, then (with a model) answer from the best pages with numbered citations (MEM-04).
+      if (!(await unlock())) return;
+      const tab = active();
+      tab.title = r.text; tab.isHome = true; tab.busy = true; tab.pending = r.text;
+      loadHome(wc, { kind: 'loading', q: r.text });
+      pushState();
+      const m = await modelInfo();
+      let res;
+      try { res = await recall.ask({ question: r.text, memory, llm: m.ready ? llm : null, lang: L() }); } finally { tab.busy = false; tab.pending = ''; }
+      if (!tabs.includes(tab)) return;
+      query.results = JSON.stringify(res.sources.map((s) => ({ url: s.url, title: s.title, ts: s.ts, snippet: s.passages[0] || '' })));
       query.total = String(memory.size);
+      query.recall = JSON.stringify({ answer: res.answer, cites: res.cites, remote: m.ready && m.remote ? m.remote : '' });
     }
     loadHome(wc, query);
   }
@@ -874,6 +1022,16 @@ function wireMemoryIpc() {
       items: raw.map((i) => ({ url: i.url, title: i.title, ts: i.ts, host: hostOf(i.url), snippet: i.snippet || '', icon: favicons.get(hostOf(i.url)) })),
       total: memory.size, hosts: memory.hosts().slice(0, 50), embedded: memory.embeddedCount
     };
+  });
+  ipcMain.handle('memory:topics', (e) => {
+    if (!trusted(e)) return reject();
+    return topics.clusterTopics(memory.list({ from: Date.now() - 60 * 86400000 }).slice(0, 400));
+  });
+  ipcMain.handle('memory:digest', async (e) => {
+    if (!trusted(e)) return reject();
+    const m = await modelInfo();
+    const r = await topics.summarize({ items: memory.list({ from: Date.now() - 86400000 }).slice(0, 80), llm: m.ready ? llm : null, lang: L() });
+    return { ...r, remote: m.ready && m.remote ? m.remote : '' };
   });
   ipcMain.handle('memory:remove', (e, url) => {
     if (!trusted(e)) return reject();
@@ -1107,9 +1265,13 @@ function showContextMenu(tab, params) {
   if (link) {
     items.push(
       { label: T('ctx.openTab'), click: () => openTab({ url: link }, { private: tab.private }) },
-      { label: T('ctx.openPrivate'), click: () => openTab({ url: link }, { private: true }) },
+      { label: T('ctx.openPrivate'), click: () => openPrivate({ url: link }) },
       { label: T('ctx.copyLink'), click: () => clipboard.writeText(link) }
     );
+    sep();
+  }
+  if (params.mediaType === 'video' && !tab.private) {
+    items.push({ label: T('ctx.pip'), click: () => wc.executeJavaScriptInIsolatedWorld(1005, [{ code: `(() => { const v = [...document.querySelectorAll('video')].find((x) => !x.paused) || document.querySelector('video'); if (v && document.pictureInPictureEnabled) v.requestPictureInPicture().catch(() => {}); })()` }]).catch(() => {}) });
     sep();
   }
   if (img) {
@@ -1125,7 +1287,7 @@ function showContextMenu(tab, params) {
   else if (sel) items.push({ role: 'copy' });
   if (sel && !edit) {
     const q = sel.replace(/\s+/g, ' ').slice(0, 200);
-    items.push({ label: T('ctx.search', { q: q.length > 30 ? q.slice(0, 30) + '…' : q }), click: () => openTab({ url: 'https://duckduckgo.com/?q=' + encodeURIComponent(q) }, { private: tab.private }) });
+    items.push({ label: T('ctx.search', { q: q.length > 30 ? q.slice(0, 30) + '…' : q }), click: () => openTab({ url: searchUrl(q) }, { private: tab.private }) });
   }
   if (sel || edit) {
     const A = (action, label, extra) => ({ label, click: () => runWriting(tab, action, params, extra) });
@@ -1188,6 +1350,247 @@ async function runWriting(tab, action, params, { target } = {}) {
   sendPage({ mode: 'sel', state: 'done', question: label, answer: out, ai: true, safety: shield.worthWarning(prep.report) ? prep.report : null, model: m.model, remote: m.remote, seq: ++paSeq, reset: fresh, page: pageMeta(tab) });
 }
 
+// ---- Print, save as PDF, view source, reading list (BRW-11, BRW-22, BRW-20) ------------------------------------------------
+const webTab = () => { const t = active(); return t && !t.isHome && /^https?:/.test(t.url) ? t : null; };
+function printPage() { const t = webTab(); if (t) t.view.webContents.print({ silent: false, printBackground: true }); }
+async function savePdf() {
+  const t = webTab();
+  if (!t) return;
+  const name = (t.title || hostOfUrl(t.url) || 'page').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'page';
+  const r = await dialog.showSaveDialog(win, { defaultPath: name + '.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+  if (r.canceled || !r.filePath) return;
+  try { fs.writeFileSync(r.filePath, await t.view.webContents.printToPDF({ printBackground: true })); toast({ text: T('pdf.saved') }); } catch { toast({ text: T('pdf.failed') }); }
+}
+// The page's own HTML as the server sent it, in a plain window. It is text only: nothing in it can run.
+async function viewSource() {
+  const t = webTab();
+  if (!t) return;
+  let text;
+  try { const r = await t.view.webContents.session.fetch(t.url, { signal: AbortSignal.timeout(20000) }); text = await r.text(); } catch { return toast({ text: T('src.failed') }); }
+  const w = new BrowserWindow({ width: 900, height: 700, title: T('src.title', { host: hostOfUrl(t.url) }), parent: win, webPreferences: { sandbox: true, contextIsolation: true, javascript: false } });
+  w.setMenuBarVisibility(false);
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>source</title><style>body{margin:0;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#fff;color:#12161C}@media(prefers-color-scheme:dark){body{background:#10151E;color:#E9EDF3}}pre{margin:0;padding:16px;white-space:pre-wrap;word-break:break-all}</style><pre>${esc(text.slice(0, 2e6))}</pre>`));
+}
+// Saved for later: a bookmark in a folder of its own, so it shows in the bookmarks window and the bar.
+function readLater() {
+  const t = webTab();
+  if (!t || t.private) return;
+  const folder = T('rl.folder');
+  if (!bookmarks.items.some((b) => b.url === t.url && b.folder === folder)) bookmarks.add({ url: t.url, title: t.title, folder });
+  pushState();
+  toast({ text: T('rl.added'), action: 'bookmarks', actionLabel: T('rl.open') });
+}
+
+// ---- Passwords (BRW-12) ------------------------------------------------------------------------------------------------
+let pwWin = null;
+const lastPrompt = new Map(); // host -> time of the last offer, so a page cannot ask again and again
+async function offerSave(tab, { user, pass }) {
+  const host = hostOfUrl(tab.url).replace(/^www\./, '');
+  const kind = vault.classify(host, user, pass);
+  if (process.env.LORE_DEBUG) console.log('[pw] offer', host, kind, user ? 'user' : 'no-user');
+  if (kind === 'same' || kind === 'never' || Date.now() - (lastPrompt.get(host) || 0) < 60000) return;
+  lastPrompt.set(host, Date.now());
+  const r = await dialog.showMessageBox(win, {
+    type: 'question', buttons: [T(kind === 'update' ? 'pw.update' : 'pw.saveBtn'), T('pw.notNow'), T('pw.never')], defaultId: 0, cancelId: 1,
+    message: T(kind === 'update' ? 'pw.updateAsk' : 'pw.saveAsk', { host }), detail: user ? T('pw.askUser', { user }) : ''
+  });
+  if (r.response === 0) { vault.save({ host, user, pass }); toast({ text: T('pw.saved') }); } else if (r.response === 2) vault.neverFor(host);
+}
+async function fillPassword() {
+  const t = webTab();
+  if (!t || t.private) return;
+  const host = hostOfUrl(t.url).replace(/^www\./, '');
+  const found = vault.forSite(host);
+  if (!found.length) return toast({ text: T('pw.none', { host }) });
+  if (!(await unlock())) return;
+  const put = async (x) => {
+    const code = `((u, p) => {
+      const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+      const set = (el, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      const pw = [...document.querySelectorAll('input[type=password]')].find(vis);
+      if (!pw) return false;
+      const us = [...(pw.form || document).querySelectorAll('input')].filter((i) => vis(i) && ['text', 'email', 'tel'].includes(i.type || 'text') && (i.compareDocumentPosition(pw) & Node.DOCUMENT_POSITION_FOLLOWING));
+      if (u && us.length) set(us[us.length - 1], u);
+      set(pw, p);
+      return true;
+    })(${JSON.stringify(x.user).replace(/\u2028|\u2029/g, '')}, ${JSON.stringify(x.pass).replace(/\u2028|\u2029/g, '')})`;
+    let ok = false;
+    try { ok = await t.view.webContents.executeJavaScriptInIsolatedWorld(1004, [{ code }]); } catch { ok = false; }
+    toast({ text: ok ? T('pw.filled') : T('pw.nofield') });
+  };
+  if (found.length === 1) return put(found[0]);
+  Menu.buildFromTemplate(found.map((x) => ({ label: x.user || T('pw.noUser'), click: () => put(x) }))).popup({ window: win });
+}
+function openPasswords() {
+  if (pwWin && !pwWin.isDestroyed()) { pwWin.focus(); return; }
+  pwWin = new BrowserWindow({
+    width: 760, height: 620, minWidth: 520, minHeight: 420, title: T('pw.h'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'passwords-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  pwWin.setMenuBarVisibility(false);
+  pwWin.loadFile(path.join(__dirname, 'ui', 'passwords.html'), { query: { lang: L() } });
+  pwWin.on('closed', () => { pwWin = null; });
+}
+function wirePasswordsIpc() {
+  const ok = (e) => pwWin && e.sender === pwWin.webContents;
+  ipcMain.on('pw:submit', (e, d) => {
+    const tab = tabForWc(e.sender.id);
+    if (!tab || tab.private || !d || typeof d.pass !== 'string' || typeof d.user !== 'string' || !d.pass) return;
+    let u; try { u = new URL(tab.url); } catch { return; }
+    if (u.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(u.hostname)) return;
+    offerSave(tab, { user: d.user.slice(0, 200), pass: d.pass.slice(0, 500) });
+  });
+  ipcMain.handle('pw:list', (e) => (ok(e) ? vault.view() : []));
+  ipcMain.handle('pw:add', (e, site, user, pass) => {
+    if (!ok(e)) return false;
+    const host = String(site).trim().replace(/^https?:\/\//, '').split('/')[0];
+    return !!vault.save({ host, user: String(user).trim(), pass: String(pass) });
+  });
+  ipcMain.handle('pw:remove', (e, id) => { if (ok(e)) vault.remove(Number(id)); return true; });
+  ipcMain.handle('pw:copy', async (e, id) => {
+    if (!ok(e) || !(await unlock())) return false;
+    const x = vault.get(Number(id));
+    if (!x) return false;
+    clipboard.writeText(x.pass);
+    setTimeout(() => { if (clipboard.readText() === x.pass) clipboard.clear(); }, 30000).unref();
+    return true;
+  });
+  ipcMain.handle('pw:check', async (e, id) => {
+    if (!ok(e)) return { error: true };
+    const x = vault.get(Number(id));
+    if (!x) return { error: true };
+    try { return { n: await breachLib.timesSeen(x.pass, (u, o) => net.fetch(u, o)) }; } catch { return { error: true }; }
+  });
+  ipcMain.handle('pw:generate', (e) => (ok(e) ? pwLib.generate(20) : ''));
+}
+
+// ---- Lock (PRV-06), self-destructing tabs (PRV-05), email aliases (PRV-07), breach check (PRV-08) ------------------------
+// The lock asks for Touch ID on a Mac that has it. Windows and Linux have no equivalent in Electron, so the switch is
+// shown as unavailable there rather than pretending to protect anything.
+const lockAvailable = () => { try { return process.platform === 'darwin' && systemPreferences.canPromptTouchID(); } catch { return false; } };
+let unlockedUntil = 0;
+async function unlock() {
+  if (!settings.get().privacy.lock || !lockAvailable()) return true;
+  if (Date.now() < unlockedUntil) return true;
+  try { await systemPreferences.promptTouchID(T('lock.reason')); unlockedUntil = Date.now() + 5 * 60000; return true; } catch { return false; }
+}
+async function openPrivate(target) { if (await unlock()) return openTab(target, { private: true }); return null; }
+async function openMemoryLocked() { if (await unlock()) openMemory(); }
+
+function openEphemeral(minutes) {
+  const t = openTab(undefined, { private: true });
+  if (!t) return;
+  t.ephemeral = setTimeout(() => { if (tabs.includes(t)) { closeTab(t.id); toast({ text: T('eph.closed') }); } }, minutes * 60000);
+  if (minutes > 2) t.ephemeralWarn = setTimeout(() => { if (tabs.includes(t)) toast({ text: T('eph.soon') }); }, (minutes - 1) * 60000);
+  toast({ text: T('eph.opened', { n: minutes }) });
+}
+
+async function createAlias() {
+  const a = settings.get().alias;
+  if (a.provider === 'off' || !a.key) return toast({ text: T('alias.setup'), action: 'settings', actionLabel: T('menu.settings') });
+  const t = active();
+  const site = t && /^https?:/.test(t.url) ? hostOfUrl(t.url).replace(/^www\./, '') : '';
+  try {
+    const email = await aliasLib.create({ provider: a.provider, key: a.key, note: site });
+    clipboard.writeText(email);
+    toast({ text: T('alias.done', { email }) });
+  } catch (err) { toast({ text: T(err.message === 'alias.key' ? 'alias.badKey' : 'alias.fail') }); }
+}
+
+let breachWin = null;
+function openBreach() {
+  if (breachWin && !breachWin.isDestroyed()) { breachWin.focus(); return; }
+  breachWin = new BrowserWindow({
+    width: 480, height: 330, resizable: false, minimizable: false, title: T('br.h'), parent: win,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'breach-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  breachWin.setMenuBarVisibility(false);
+  breachWin.loadFile(path.join(__dirname, 'ui', 'breach.html'), { query: { lang: L() } });
+  breachWin.on('closed', () => { breachWin = null; });
+  ipcMain.removeHandler('breach:check');
+  ipcMain.handle('breach:check', async (e, pw) => {
+    if (!breachWin || e.sender !== breachWin.webContents) return { error: true };
+    try { return { n: await breachLib.timesSeen(String(pw).slice(0, 200), (u, o) => net.fetch(u, o)) }; } catch { return { error: true }; }
+  });
+}
+
+// ---- Privacy at a glance (PRV-15) and the weekly report (PRV-04) -----------------------------------------------------------
+let privView = null;
+let reportWin = null;
+const PRIV_W = 330, PRIV_H = 424;
+function layoutPriv() {
+  if (!privView || !win) return;
+  const [w] = win.getContentSize();
+  const pw = agentOpen() ? PANEL_W : 0;
+  privView.setBounds({ x: Math.max(0, w - pw - PRIV_W - 12), y: chromeHeight() + 4, width: PRIV_W, height: PRIV_H });
+}
+function closePriv(refocus = true) {
+  if (!privView || !win || win.isDestroyed()) return;
+  try { win.contentView.removeChildView(privView); } catch { /* not shown */ }
+  // Focus goes back to the page only when the panel is simply dismissed; when another window is opening or the person clicked
+  // elsewhere, taking focus here would pull the main window in front of it.
+  const t = active();
+  if (refocus && t && win.isFocused()) t.view.webContents.focus();
+}
+function openPriv() {
+  if (!privView) {
+    privView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'priv-preload.js'), contextIsolation: true, sandbox: true } });
+    privView.setBackgroundColor('#00000000');
+    privView.webContents.loadFile(path.join(__dirname, 'ui', 'priv.html'), { query: { lang: L() } });
+    privView.webContents.on('blur', () => setTimeout(() => { if (privView && !privView.webContents.isFocused()) closePriv(false); }, 120));
+  }
+  closeFind();
+  win.contentView.addChildView(privView);
+  layoutPriv();
+  privView.webContents.send('priv:refresh');
+  privView.webContents.focus();
+}
+function openReport() {
+  if (reportWin && !reportWin.isDestroyed()) { reportWin.focus(); return; }
+  reportWin = new BrowserWindow({
+    width: 600, height: 640, minWidth: 440, minHeight: 420, title: T('rep.h'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'report-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  reportWin.setMenuBarVisibility(false);
+  reportWin.loadFile(path.join(__dirname, 'ui', 'report.html'), { query: { lang: L() } });
+  reportWin.on('closed', () => { reportWin = null; });
+}
+function wirePrivIpc() {
+  const ok = (e) => privView && e.sender === privView.webContents;
+  const siteOf = () => { const t = active(); return t && !t.isHome && /^https?:/.test(t.url) ? hostOfUrl(t.url).replace(/^www\./, '') : ''; };
+  ipcMain.on('priv:open', (e) => { if (e.sender === win.webContents) (privView && privView.webContents && win.contentView.children.includes(privView) ? closePriv : openPriv)(); });
+  ipcMain.handle('priv:get', (e) => {
+    if (!ok(e)) return null;
+    const pv = settings.get().privacy;
+    const site = siteOf();
+    return {
+      host: site, site: !!site, ads: S.adsOn, https: pv.httpsFirst, memory: pv.memory, stripOn: pv.stripTracking,
+      clean: pv.stripTracking && !pv.trackingOff.includes(site), ai: !pv.aiOff.includes(site), today: pstats.today()
+    };
+  });
+  ipcMain.handle('priv:set', (e, key, value) => {
+    if (!ok(e)) return false;
+    const pv = settings.get().privacy;
+    const site = siteOf();
+    const without = (list) => list.filter((h) => h !== site);
+    if (key === 'ads') { S.adsOn = value; pushState(); }
+    else if (key === 'https') settings.update({ privacy: { httpsFirst: value } });
+    else if (key === 'memory') settings.update({ privacy: { memory: value } });
+    else if (key === 'clean' && site) settings.update({ privacy: { trackingOff: value ? without(pv.trackingOff) : [...pv.trackingOff, site] } });
+    else if (key === 'ai' && site) settings.update({ privacy: { aiOff: value ? without(pv.aiOff) : [...pv.aiOff, site] } });
+    return true;
+  });
+  ipcMain.on('priv:report', (e) => { if (ok(e)) { closePriv(false); openReport(); } });
+  ipcMain.on('priv:settings', (e) => { if (ok(e)) { closePriv(false); openSettings(); } });
+  ipcMain.on('priv:close', (e) => { if (ok(e)) closePriv(); });
+  ipcMain.handle('report:get', (e) => (reportWin && e.sender === reportWin.webContents ? pstats.week() : null));
+  ipcMain.on('report:copy', (e, text) => { if (reportWin && e.sender === reportWin.webContents) clipboard.writeText(String(text).slice(0, 1000)); });
+}
+
 // ---- Find in page (BRW-01) ------------------------------------------------------------------------------------------
 const FIND_W = 380;
 function layoutFind() {
@@ -1230,6 +1633,13 @@ function wireFindIpc() {
     const q = String(text || '').slice(0, 200);
     if (!q) { t.view.webContents.stopFindInPage('clearSelection'); findView.webContents.send('find:result', { active: 0, total: 0 }); return; }
     t.view.webContents.findInPage(q, { forward: forward !== false, findNext: !!next });
+  });
+  // AI-15: a question typed into find-in-page goes to the page assistant instead of failing to match.
+  ipcMain.on('find:ask', (e, text) => {
+    if (!ok(e)) return;
+    const q = String(text || '').slice(0, 300).trim();
+    closeFind();
+    if (q) pageAssistant('ask', q);
   });
   ipcMain.on('find:close', (e) => { if (ok(e)) closeFind(); });
 }
@@ -1314,6 +1724,44 @@ function wireOrganizeIpc() {
     setOrder(tabs.slice().sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : 1e6) - (pos.has(b.id) ? pos.get(b.id) : 1e6)));
     return true;
   });
+}
+
+// ---- Compare tabs (AI-08) --------------------------------------------------------------------------------------------------
+function openCompare(ids) {
+  compareDefault = Array.isArray(ids) ? ids : [];
+  if (compareWin && !compareWin.isDestroyed()) { compareWin.close(); }
+  compareWin = new BrowserWindow({
+    width: 760, height: 640, minWidth: 520, minHeight: 420, title: T('cmp.h'), parent: win,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    webPreferences: { preload: path.join(__dirname, 'compare-preload.js'), contextIsolation: true, sandbox: true }
+  });
+  compareWin.setMenuBarVisibility(false);
+  compareWin.loadFile(path.join(__dirname, 'ui', 'compare.html'), { query: { lang: L() } });
+  compareWin.on('closed', () => { compareWin = null; });
+}
+function wireCompareIpc() {
+  const trusted = (e) => compareWin && e.sender === compareWin.webContents;
+  const candidates = () => tabs.filter((t) => !t.private && !t.isHome && /^https?:/.test(t.lazyUrl || t.url) && !isSensitiveHost(hostOfUrl(t.lazyUrl || t.url)));
+  ipcMain.handle('compare:tabs', (e) => {
+    if (!trusted(e)) return { tabs: [], preselect: [] };
+    const list = candidates();
+    const pre = compareDefault.length ? compareDefault : [activeId, ...list.filter((t) => t.id !== activeId).slice(0, 1).map((t) => t.id)];
+    return { tabs: list.map((t) => ({ id: t.id, title: t.title || t.url, host: hostOfUrl(t.url).replace(/^www\./, ''), loaded: !t.lazyUrl })), preselect: pre };
+  });
+  ipcMain.handle('compare:run', async (e, ids) => {
+    if (!trusted(e) || !Array.isArray(ids)) return { error: 'bad' };
+    const m = await modelInfo();
+    if (!m.ready) return { error: 'noModel' };
+    const picked = ids.map(Number).filter((id) => candidates().some((t) => t.id === id)).slice(0, comparer.MAX_PAGES).map((id) => tabById(id));
+    if (picked.length < 2) return { error: 'bad' };
+    const items = [];
+    for (const [i, t] of picked.entries()) { const r = await pageRead(t); items.push({ n: i + 1, title: t.title || t.url, host: hostOfUrl(t.url).replace(/^www\./, ''), text: r.text }); }
+    try {
+      const rows = await comparer.compare({ items, llm, lang: L() });
+      return { rows, pages: items.map((i) => ({ title: i.title, host: i.host })), remote: m.remote };
+    } catch { return { error: 'failed' }; }
+  });
+  ipcMain.on('settings:open-from-compare', (e) => { if (trusted(e)) openSettings(); });
 }
 
 // AI bookmark: after the star is pressed, a model suggests a clean title, a folder and a one-line note.
@@ -1445,6 +1893,14 @@ function wireBrowserDataIpc() {
       .map((i) => ({ url: i.url, title: i.title, ts: i.ts, host: hostOfUrl(i.url), icon: favicons.get(hostOfUrl(i.url)) }));
     return { items, total: memory.size };
   });
+  // AI-15: a one-line note for a row, only when asked, from the text Memory already kept for that page.
+  ipcMain.handle('history:note', async (e, url) => {
+    if (!hiTrusted(e)) return '';
+    const it = memory.items.find((x) => x.url === String(url));
+    const m = await modelInfo();
+    if (!it || !m.ready) return '';
+    return pagenote.note({ title: it.title, text: it.text, llm, lang: L() });
+  });
   ipcMain.handle('history:remove', (e, url) => (hiTrusted(e) ? memory.remove(String(url)) : false));
   ipcMain.handle('history:clear', async (e, range) => {
     if (!hiTrusted(e) || !(range === 'all' || RANGES[range])) return false;
@@ -1489,6 +1945,18 @@ function wireDownloadsIpc() {
     }
     return true;
   });
+  // AI-15: a suggested name for a finished file, only when asked. A PDF's first page helps the model; other files go by name and site.
+  ipcMain.handle('downloads:suggest', async (e, id) => {
+    if (!trusted(e)) return '';
+    const r = downloads.get(Number(id));
+    if (!r || r.state !== 'done' || r.risky || r.private) return '';
+    const m = await modelInfo();
+    if (!m.ready) return '';
+    let excerpt = '';
+    if (/\.pdf$/i.test(r.name) && fs.existsSync(r.path)) { try { excerpt = (await pdftext.extract(fs.readFileSync(r.path))).pages[0] || ''; } catch { /* name and site only */ } }
+    return dlname.suggest({ name: r.name, host: r.host, excerpt, llm, lang: L() });
+  });
+  ipcMain.handle('downloads:rename', (e, id, name) => (trusted(e) && typeof name === 'string' ? downloads.rename(Number(id), name) : false));
   ipcMain.handle('downloads:clear', (e) => { if (trusted(e)) downloads.clearFinished(); return true; });
   ipcMain.on('downloads:open', (e) => { if (e.sender === win.webContents) openDownloads(); });
 }
@@ -1636,7 +2104,7 @@ function wireSettingsIpc() {
   const trusted = (e) => settingsWin && e.sender === settingsWin.webContents;
   const reject = () => { throw new Error('untrusted sender'); };
   const msg = (e) => (e && e.name === 'TimeoutError' ? T('set.err.timeout') : e && /^(llm|set)\./.test(e.message) ? T(e.message, { status: e.status, detail: e.detail ? ': ' + e.detail : '' }) : e && e.message ? e.message : T('set.err.connect'));
-  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L() } : reject()));
+  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L(), lockOk: lockAvailable() } : reject()));
   ipcMain.handle('settings:save', (e, patch) => {
     if (!trusted(e)) return reject();
     const before = L();
@@ -1646,6 +2114,8 @@ function wireSettingsIpc() {
       refreshEmbedder();
       if (L() !== before) applyLanguage();
       applyAppearance();
+      applyDoh();
+      applySearch();
       return { view, lang: L() };
     } catch (err) { return { error: msg(err) }; }
   });
@@ -1666,18 +2136,22 @@ function wireSettingsIpc() {
       return reply ? { ok: true } : { ok: false, message: T('set.err.empty') };
     } catch (err) { return { ok: false, message: msg(err) }; }
   });
-  ipcMain.handle('settings:clear', async (e) => {
+  ipcMain.handle('settings:clear', async (e, opts = {}) => {
     if (!trusted(e)) return reject();
+    const o = { history: !!opts.history, site: !!opts.site, cache: !!opts.cache, range: ['hour', 'day', 'week', 'month', 'all'].includes(opts.range) ? opts.range : 'all' };
+    if (!o.history && !o.site && !o.cache) return { ok: false };
     const r = await dialog.showMessageBox(settingsWin, {
       type: 'warning', buttons: [T('set.priv.clearBtn'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('set.priv.confirm')
     });
     if (r.response !== 0) return { ok: false };
-    await session.defaultSession.clearStorageData();
-    await session.defaultSession.clearCache();
-    memory.clear();
-    favicons.clear();
+    // Cookies and site data cannot be cleared by time range, so they go entirely; the range applies to what Lore remembers.
+    if (o.site) await session.defaultSession.clearStorageData();
+    if (o.cache) await session.defaultSession.clearCache();
+    if (o.history) { memory.removeSince(o.range); if (!memory.size) favicons.clear(); }
     return { ok: true };
   });
+  ipcMain.handle('perms:list', (e) => (trusted(e) ? perms.list() : reject()));
+  ipcMain.handle('perms:remove', (e, origin, permission) => { if (!trusted(e)) return reject(); if (origin === '*') perms.reset(); else perms.remove(String(origin), String(permission)); return perms.list(); });
   ipcMain.handle('settings:models', async (e, url) => (trusted(e) ? listLocalModels(String(url)) : reject()));
   ipcMain.handle('settings:pull', async (e, url, model) => {
     if (!trusted(e)) return reject();
@@ -1685,6 +2159,31 @@ function wireSettingsIpc() {
       await pullLocalModel(String(url), String(model), (p, status) => e.sender.send('settings:pull-progress', p, status));
       return { ok: true };
     } catch (err) { return { ok: false, message: T('set.err.pull', { e: msg(err) }) }; }
+  });
+  // AI-11: one button. Needs Ollama running (it cannot be installed silently); then picks a model for this computer's memory,
+  // downloads what is missing, checks it answers, and switches the assistant to it.
+  let settingUp = false;
+  ipcMain.handle('settings:autosetup', async (e) => {
+    if (!trusted(e)) return reject();
+    if (settingUp) return { ok: false, message: T('set.setup.busy') };
+    settingUp = true;
+    const step = (n, p = 0) => { if (!e.sender.isDestroyed()) e.sender.send('settings:setup-step', n, p); };
+    try {
+      const url = settings.get().local.url;
+      let names;
+      try { names = await listLocalModels(url); } catch { return { ok: false, needOllama: true, message: T('set.setup.needOllama') }; }
+      const plan = modelplan.recommend(require('os').totalmem());
+      const todo = [plan.chat, plan.embed].filter((m) => !modelplan.installed(names, m));
+      for (const [i, m] of todo.entries()) { step(1 + i, 0); await pullLocalModel(url, m, (p) => step(1 + i, p)); }
+      step(0, 1);
+      const probe = createLlm({ ...settings.get(), provider: 'local', local: { ...settings.get().local, model: plan.chat } });
+      const reply = await probe.chat([{ role: 'user', content: 'Reply with the single word: ok' }], { timeoutMs: 90000 });
+      if (!reply) return { ok: false, message: T('set.err.empty') };
+      const view = settings.update({ provider: 'local', local: { url, model: plan.chat, embedModel: plan.embed } });
+      llm = createLlm(settings.get());
+      refreshEmbedder();
+      return { ok: true, model: plan.chat, view };
+    } catch (err) { return { ok: false, message: msg(err) }; } finally { settingUp = false; }
   });
   ipcMain.on('settings:ollama-site', (e) => { if (trusted(e)) shell.openExternal('https://ollama.com/download'); });
 }
@@ -1751,7 +2250,7 @@ function wireIpc() {
     const web = (() => { const t = active(); return !!t && !t.isHome && /^https?:/.test(t.url); })();
     Menu.buildFromTemplate([
       { label: T('menu.newTab'), accelerator: 'CmdOrCtrl+T', click: () => openTab() },
-      { label: T('more.private'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openTab(undefined, { private: true }) },
+      { label: T('more.private'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openPrivate() },
       { type: 'separator' },
       { label: T('more.assist'), enabled: web, accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
       { label: T('pg.summarize'), enabled: web, accelerator: 'CmdOrCtrl+Alt+S', click: () => pageAssistant('summarize') },
@@ -1759,7 +2258,7 @@ function wireIpc() {
       { label: T('menu.openExternal'), enabled: web, accelerator: 'CmdOrCtrl+Shift+O', click: () => { const t = active(); if (t) shell.openExternal(t.url); } },
       { type: 'separator' },
       { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
-      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
+      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
       { label: T('menu.import'), click: () => openWelcome('import') },
       { label: T('menu.update'), click: () => checkForUpdates(true) },
       { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
@@ -1771,7 +2270,7 @@ function wireIpc() {
       { label: T('more.shortcuts', { k: process.platform === 'darwin' ? '⌘' : 'Ctrl+' }), enabled: false }
     ]).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
   });
-  ipcMain.on('memory:open', (e) => { if (e.sender === win.webContents) openMemory(); });
+  ipcMain.on('memory:open', (e) => { if (e.sender === win.webContents) openMemoryLocked(); });
   ipcMain.on('settings:open', (e) => { if (e.sender === win.webContents) openSettings(); });
   ipcMain.on('dl:start', (e, i) => { if (e.sender === panel.webContents) startDownload(Number(i)); });
   ipcMain.on('dl:reveal', (e) => { if (e.sender === panel.webContents && dl && dl.path) shell.showItemInFolder(dl.path); });
@@ -1800,7 +2299,11 @@ function hardenSession(ses, isPrivate = false) {
     adsOn: () => S.adsOn,
     privacy: () => settings.get().privacy,
     siteOf: (details) => { const t = tabForWc(details.webContentsId); return t && /^https?:/.test(t.url) ? t.url : ''; },
-    onBlocked: () => { S.blocked++; if (S.blocked % 5 === 0 || S.blocked < 10) pushState(); if (S.blocked % 25 === 0) saveStats(); },
+    onBlocked: (url) => { S.blocked++; pstats.record('blocked', hostOfUrl(url || '').replace(/^www\./, '')); if (S.blocked % 5 === 0 || S.blocked < 10) pushState(); if (S.blocked % 25 === 0) saveStats(); },
+    onStripped: (n) => pstats.record('params', '', n),
+    onUpgrade: (orig) => { pstats.record('https'); upgraded.set(hostOfUrl(orig), { orig, ts: Date.now() }); },
+    insecureOk: (host) => allowedInsecure.has(host),
+    perms: () => perms,
     onResponse: detectMedia,
     scam: (url) => {
       if (!settings.get().privacy.scamProtection) return null;
@@ -1848,8 +2351,14 @@ function buildMenu() {
       { label: T('more.assist'), accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
       { label: T('menu.openExternal'), accelerator: 'CmdOrCtrl+Shift+O', click: () => { const t = active(); if (t && /^https?:/.test(t.url)) shell.openExternal(t.url); } },
       { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
-      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemory },
-      { label: T('menu.newPrivate'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openTab(undefined, { private: true }) },
+      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
+      { label: T('menu.newPrivate'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openPrivate() },
+      { label: T('eph.menu'), submenu: [5, 15, 60].map((n) => ({ label: T('eph.min', { n }), click: () => openEphemeral(n) })) },
+      { label: T('alias.menu'), click: createAlias },
+      { label: T('br.menu'), click: openBreach },
+      { label: T('pw.fill'), accelerator: 'CmdOrCtrl+Shift+\\', click: fillPassword },
+      { label: T('pw.menu'), accelerator: 'CmdOrCtrl+Alt+P', click: async () => { if (await unlock()) openPasswords(); } },
+      { label: T('rl.add'), accelerator: 'CmdOrCtrl+Shift+L', click: readLater },
       { label: T('menu.closeTab'), accelerator: 'CmdOrCtrl+W', click: () => active() && closeTab(activeId) },
       { label: T('tab.reopen'), accelerator: 'CmdOrCtrl+Shift+T', click: reopenClosed },
       { label: T('group.newFromTab'), accelerator: 'CmdOrCtrl+Shift+G', click: () => { const t = active(); if (t && !t.pinned) newGroup('', [t.id], { edit: true }); } },
@@ -1858,6 +2367,8 @@ function buildMenu() {
       { label: T('tab.goTo'), submenu: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ label: n === 9 ? T('tab.last') : T('tab.nth', { n }), accelerator: 'CmdOrCtrl+' + n, click: () => switchTab(tabstate.nth(tabs, n)) })) },
       { type: 'separator' },
       { label: T('split.menu'), accelerator: 'CmdOrCtrl+Alt+D', click: () => openSplit() },
+      { label: T('rep.menu'), click: openReport },
+      { label: T('cmp.menu'), accelerator: 'CmdOrCtrl+Alt+C', click: () => openCompare() },
       { label: T('org.menu'), accelerator: 'CmdOrCtrl+Alt+O', click: () => openOrganize('tabs') },
       { label: T('menu.find'), accelerator: 'CmdOrCtrl+F', click: openFind },
       { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
@@ -1888,6 +2399,10 @@ function buildMenu() {
       { label: T('menu.zoomOut'), accelerator: 'CmdOrCtrl+-', click: () => zoomActive(-0.5) },
       { label: T('menu.zoomReset'), accelerator: 'CmdOrCtrl+0', click: () => zoomActive(null) },
       { type: 'separator' },
+      { label: T('pdf.print'), accelerator: 'CmdOrCtrl+P', click: printPage },
+      { label: T('pdf.save'), click: savePdf },
+      { label: T('src.menu'), accelerator: 'CmdOrCtrl+U', click: viewSource },
+      { type: 'separator' },
       { role: 'togglefullscreen' },
       { label: T('menu.devtools'), accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => { const t = active(); if (t) t.view.webContents.toggleDevTools(); } }
     ] },
@@ -1910,6 +2425,8 @@ app.whenReady().then(() => {
   });
   llm = createLlm(settings.get());
   applyAppearance();
+  applyDoh();
+  applySearch();
   nativeTheme.on('updated', applyAppearance);
   const profFile = path.join(app.getPath('userData'), 'profiles.json');
   const dataDir = app.getPath('userData');
@@ -1935,8 +2452,13 @@ app.whenReady().then(() => {
   wireDownloadsIpc();
   wireBrowserDataIpc();
   wireOrganizeIpc();
+  wireCompareIpc();
+  wirePrivIpc();
+  wirePasswordsIpc();
   wireWelcomeIpc();
   statsFile = path.join(app.getPath('userData'), 'stats.json');
+  zoomFile = path.join(app.getPath('userData'), 'zoom.json');
+  loadZooms();
   loadStats();
   blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
   blocker.load();

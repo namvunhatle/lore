@@ -106,6 +106,12 @@ jobs:
             if ($s.Status -ne 'Valid') { throw "$($_.Name) is not validly signed: $($s.Status)" }
           }
 
+      # The packaged app must open a window, draw the tab strip and load its ad-block engine. A release cannot skip this.
+      - name: Smoke test the packaged app
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then xvfb-run -a node scripts/smoke.js; else node scripts/smoke.js; fi
+
       - name: Record whether this build is signed
         shell: bash
         run: echo "${{ env.SIGN == 'true' }}" > dist/signed-${{ matrix.platform }}.txt
