@@ -11,7 +11,7 @@ function keep(s) {
   return {
     seq: s.seq, mode: ['summarize', 'ask', 'sel'].includes(s.mode) ? s.mode : 'ask', state: 'done', question: clip(s.question, 300),
     bullets: Array.isArray(s.bullets) ? s.bullets.slice(0, 8).map((b) => clip(b, 400)) : undefined,
-    answer: s.answer === undefined ? undefined : clip(s.answer, 3000), found: s.found, ai: !!s.ai, cut: s.cut ? true : undefined,
+    answer: s.answer === undefined ? undefined : clip(s.answer, 3000), found: s.found, ai: !!s.ai, tokens: s.tokens && Number.isFinite(s.tokens.in) ? { in: s.tokens.in | 0, out: s.tokens.out | 0, cached: !!s.tokens.cached } : undefined, cut: s.cut ? true : undefined,
     passages: Array.isArray(s.passages) ? s.passages.slice(0, 2).map((p) => clip(p, 500)) : undefined,
     cites: Array.isArray(s.cites) ? s.cites.filter(Number.isInteger).slice(0, 8) : undefined,
     srcs: Array.isArray(s.srcs) ? s.srcs.slice(0, 6).map((x) => ({ n: x.n | 0, title: clip(x.title, 160), host: clip(x.host, 100), url: /^https?:\/\//.test(x.url || '') ? clip(x.url, 2000) : '', passage: clip(x.passage, 300) })) : undefined,

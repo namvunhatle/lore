@@ -48,6 +48,7 @@ function ollama({ url, model }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = j.done_reason === 'length';
+      this.usage = { in: j.prompt_eval_count | 0, out: j.eval_count | 0 };
       return String((j.message && j.message.content) || '').trim();
     }
   };
@@ -69,6 +70,7 @@ function openai({ baseUrl, model, key }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = !!(j.choices && j.choices[0] && j.choices[0].finish_reason === 'length');
+      this.usage = { in: (j.usage && j.usage.prompt_tokens) | 0, out: (j.usage && j.usage.completion_tokens) | 0 };
       return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
     }
   };
@@ -89,6 +91,7 @@ function anthropic({ model, key }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = j.stop_reason === 'max_tokens';
+      this.usage = { in: (j.usage && j.usage.input_tokens) | 0, out: (j.usage && j.usage.output_tokens) | 0 };
       return String((j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('')).trim();
     }
   };

@@ -322,6 +322,7 @@ function body(s) {
     b.append(seg);
   }
   if (s.remote && (s.ai || s.mode === 'translate')) extra.push(T('pg.sentTo', { host: s.remote }));
+  if (s.tokens) extra.push(s.tokens.cached ? T('pg.cached') : T('pg.tokens', { i: s.tokens.in.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US'), o: s.tokens.out.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') }));
   if (s.safety) {
     const w = safetyNote(s.safety);
     if (w) b.prepend(w);

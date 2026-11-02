@@ -48,6 +48,8 @@ const { SitePerms } = require('./perms');
 const pwLib = require('./passwords');
 const pagenote = require('./pagenote');
 const chats = require('./chats');
+const { budgetFor } = require('./condense');
+const nodeCrypto = require('crypto');
 const breachLib = require('./breach');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
@@ -994,6 +996,18 @@ async function pageRead(tab) {
   return shield.prepare(raw, hidden);
 }
 
+// Answers already written for the same page text, model and question are shown again without asking the model (token saver).
+const answerCache = new Map();
+const cacheKey = (parts) => nodeCrypto.createHash('sha1').update(parts.join('\u0001')).digest('hex');
+const cacheGet = (k) => { const v = answerCache.get(k); if (v) { answerCache.delete(k); answerCache.set(k, v); } return v; };
+const cachePut = (k, v) => { answerCache.set(k, v); if (answerCache.size > 80) answerCache.delete(answerCache.keys().next().value); };
+// What a call cost, from the provider's own count; only calls that leave this computer are counted.
+function usedTokens(l) {
+  const u = l && l.remote && l.usage ? { in: l.usage.in, out: l.usage.out } : null;
+  if (u && pstats) { pstats.record('tin', '', u.in); pstats.record('tout', '', u.out); }
+  return u;
+}
+
 async function pageAssistant(action, question = '') {
   const tab = active();
   if (!tab) return;
@@ -1017,6 +1031,8 @@ async function pageAssistant(action, question = '') {
   try {
     if (action === 'translate') return await translatePage(tab, mine, meta, m, live);
     const l = m.ready ? llm : null;
+    const bud = budgetFor(settings.get().aiSaving);
+    if (l) l.usage = null;
     // Several pages: read each one the same safe way, then answer with numbered sources.
     if (action === 'ask' && others.length > 1 || (action === 'ask' && others.length === 1 && others[0] !== tab)) {
       const items = [];
@@ -1024,19 +1040,27 @@ async function pageAssistant(action, question = '') {
       const res = await recall.askSources({ items, question, llm: l, lang: L(), history: chats.context(conv.states) });
       const flagged = items.map((i) => i.report).find((r) => shield.worthWarning(r) || r.invisible || r.hiddenChars) || null;
       return sp({ ...meta, state: 'done', found: res.found, answer: res.answer, cites: res.cites, ai: !!res.answer, cut: !!res.cut, safety: flagged,
+        tokens: usedTokens(l),
         srcs: res.sources.map((x) => ({ n: x.n, title: x.title, host: x.host, url: items[x.n - 1].url, tabId: items[x.n - 1].tabId, passage: x.passages[0] || '' })) });
     }
     const { text, report } = await pageRead(tab);
     const safety = shield.worthWarning(report) || report.invisible || report.hiddenChars ? report : null;
     if (text.length < 120) return sp({ ...meta, state: 'error', error: 'pg.noText' });
     if (action === 'summarize') {
-      const s = await pageassist.summarize({ text, llm: l, lang: L() });
+      const ck = cacheKey(['sum', m.model, L(), settings.get().aiSaving, text]);
+      let s = cacheGet(ck);
+      const cached = !!s;
+      if (!s) { s = await pageassist.summarize({ text, llm: l, lang: L(), budget: bud.summary }); if (s.ai && !s.cut) cachePut(ck, s); }
       mine.text = text;
-      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, cut: s.cut, safety });
+      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, cut: s.cut, safety, tokens: cached ? { in: 0, out: 0, cached: true } : usedTokens(l) });
     }
-    const a = await pageassist.ask({ text, question, llm: l, lang: L(), history: chats.context(conv.states) });
+    const hist = chats.context(conv.states, 2);
+    const ck = hist.length ? '' : cacheKey(['ask', m.model, L(), settings.get().aiSaving, question, text]);
+    let a = ck ? cacheGet(ck) : null;
+    const cached = !!a;
+    if (!a) { a = await pageassist.ask({ text, question, llm: l, lang: L(), history: hist, passages: bud.passages }); if (ck && a.ai && !a.cut) cachePut(ck, a); }
     mine.text = text;
-    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, cut: a.cut, safety });
+    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, cut: a.cut, safety, tokens: cached ? { in: 0, out: 0, cached: true } : usedTokens(l) });
   } catch { sp({ ...meta, state: 'error', error: 'pg.error' }); }
 }
 
@@ -1956,7 +1980,7 @@ function wireCompareIpc() {
     const items = [];
     for (const [i, t] of picked.entries()) { const r = await pageRead(t); items.push({ n: i + 1, title: t.title || t.url, host: hostOfUrl(t.url).replace(/^www\./, ''), text: r.text }); }
     try {
-      const rows = await comparer.compare({ items, llm, lang: L() });
+      const rows = await comparer.compare({ items, llm, lang: L(), perPage: budgetFor(settings.get().aiSaving).compare });
       return { rows, pages: items.map((i) => ({ title: i.title, host: i.host })), remote: m.remote };
     } catch { return { error: 'failed' }; }
   });
@@ -2303,7 +2327,7 @@ function wireSettingsIpc() {
   const trusted = (e) => settingsWin && e.sender === settingsWin.webContents;
   const reject = () => { throw new Error('untrusted sender'); };
   const msg = (e) => (e && e.name === 'TimeoutError' ? T('set.err.timeout') : e && /^(llm|set)\./.test(e.message) ? T(e.message, { status: e.status, detail: e.detail ? ': ' + e.detail : '' }) : e && e.message ? e.message : T('set.err.connect'));
-  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L(), lockOk: lockAvailable() } : reject()));
+  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L(), lockOk: lockAvailable(), usage: { in: pstats.today().tin || 0, out: pstats.today().tout || 0 } } : reject()));
   ipcMain.handle('settings:save', (e, patch) => {
     if (!trusted(e)) return reject();
     const before = L();

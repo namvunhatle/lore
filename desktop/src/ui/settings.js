@@ -1,6 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const val = (id) => $(id).value.trim();
 let lockOk = false;
+let usage = { in: 0, out: 0 };
 let view;
 let lang = 'en';
 const T = (k, v) => LORE_I18N.t(lang, k, v);
@@ -25,6 +26,11 @@ function setLang(l) {
   mf.replaceChildren();
   for (const v of [0, 12, 14, 16, 18]) { const o = document.createElement('option'); o.value = String(v); o.textContent = v ? v + ' px' : T('set.a11y.off'); mf.append(o); }
   mf.value = view ? String(view.minFont) : keepMf || '0';
+  const sv = $('#saving');
+  const keepSv = sv.value;
+  sv.replaceChildren();
+  for (const v of ['save', 'balanced', 'detail']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.save.' + v); sv.append(o); }
+  sv.value = view ? view.aiSaving : keepSv || 'balanced';
   const se = $('#search');
   const keepSe = se.value;
   se.replaceChildren();
@@ -67,6 +73,8 @@ function fill(v) {
   $('#fp').checked = v.privacy.reduceFingerprint;
   $('#perm').value = v.privacy.permissions;
   $('#minfont').value = String(v.minFont);
+  $('#saving').value = v.aiSaving;
+  $('#usage').textContent = usage.in || usage.out ? T('set.usage', { i: usage.in.toLocaleString(), o: usage.out.toLocaleString() }) : T('set.usage0');
   $('#search').value = v.search;
   $('#search-custom').value = v.searchCustom;
   $('#search-custom-row').hidden = v.search !== 'custom';
@@ -123,6 +131,7 @@ function patch() {
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value, httpsFirst: $('#https').checked, stripTracking: $('#strip').checked, memory: $('#mem').checked, doh: $('#doh').value, lock: $('#lock').checked },
     alias: { provider: $('#alias').value, key: $('#alias-key').value },
     minFont: Number($('#minfont').value),
+    aiSaving: $('#saving').value,
     search: $('#search').value, searchCustom: $('#search-custom').value,
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },
@@ -276,7 +285,7 @@ $('#padd').addEventListener('submit', async (e) => {
 settings.profiles.list().then(paintProfiles);
 settings.onPane((id) => go(id));
 
-settings.get().then((r) => { view = r.view; lockOk = r.lockOk; setLang(r.lang); fill(r.view); });
+settings.get().then((r) => { view = r.view; lockOk = r.lockOk; usage = r.usage; setLang(r.lang); fill(r.view); });
 
 // Left-hand navigation: one pane at a time, arrow keys move between them.
 const navs = [...document.querySelectorAll('.nav')];
