@@ -360,7 +360,7 @@ async function paintHistory() {
     open.type = 'button';
     open.append(el('b', '', c.title), el('small', '', [c.host, new Date(c.ts).toLocaleDateString(lang === 'vi' ? 'vi-VN' : undefined, { day: 'numeric', month: 'short' }), T('chat.count', { n: c.count })].join(' · ')));
     if (c.preview) open.append(el('span', 'pv', c.preview));
-    open.addEventListener('click', () => agent.chats.open(c.key));
+    open.addEventListener('click', () => { agent.chats.open(c.key); showHistory(false); });
     const del = el('button', 'hdel', '×');
     del.type = 'button';
     del.setAttribute('aria-label', T('chat.delete'));

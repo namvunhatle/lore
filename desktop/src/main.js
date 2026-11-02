@@ -2390,7 +2390,10 @@ function wireIpc() {
     if (!t || !isAllowedNavigation(t.url)) return;
     assistOn = true;
     const open = tabs.find((x) => !x.private && !x.isHome && threadKey(x) === t.key);
-    if (open) selectTab(open.id); else openTab({ url: t.url });
+    let tab = open;
+    if (open) selectTab(open.id); else { tab = openTab({ url: t.url }); tab.url = t.url; }
+    // Show the conversation at once, without waiting for the page to load.
+    if (tab) { pa = null; claimPanel(tab); }
   });
   ipcMain.on('chats:delete', (e, key) => { if (fromPanel(e) && chatStore) { chatStore.remove(String(key)); threads.delete(String(key)); } });
   ipcMain.on('chat:new', (e) => {
