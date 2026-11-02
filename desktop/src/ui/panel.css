@@ -173,3 +173,25 @@ h4{font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:0}
 .askform input{font-size:13px}
 .send{border-radius:8px}
 #herotitle,.hero h4{font-size:15px;font-weight:600;margin:0 0 8px}
+
+/* Panel, second pass: the page it is about as a context row, actions as a list, answers as soft blocks, a quiet composer. */
+#herotitle{display:none}
+.hero{margin:0 0 10px}
+.pagechip{margin:0 0 10px;padding:8px 10px;border-radius:9px;background:var(--hover)}
+.trust{font-size:12px;margin:0 2px}
+.lead-act{min-height:38px;padding:0 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);margin:0 0 2px}
+.lead-act b{font-weight:600}
+.lead-act>svg{width:24px;height:24px;padding:5px;border-radius:7px;background:var(--win);stroke:var(--accent)}
+.lead-act:hover{opacity:1;background:color-mix(in srgb,var(--accent) 16%,var(--win))}
+.grid{margin:0 0 12px}
+.card{border:0;background:var(--hover);border-radius:10px}
+.ch{margin-bottom:6px}
+.cp{border:0;background:var(--win);border-radius:6px}
+blockquote{border-left-width:2px}
+#composer{border-top:0;padding:6px 10px 10px}
+.askform{padding:3px 3px 3px 12px;border:0;border-radius:10px;background:var(--hover)}
+.askform:focus-within{background:var(--win);box-shadow:inset 0 0 0 1px var(--accent)}
+.askform input{height:32px}
+.send{width:30px;height:30px;border-radius:8px}
+.send svg{width:16px;height:16px}
+.ph{border-bottom:0;padding-bottom:4px}

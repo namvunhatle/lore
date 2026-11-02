@@ -228,6 +228,7 @@ function pushState() {
   win.webContents.send('state', {
     lang: L(),
     side: settings.get().sidebar,
+    panel: agentOpen(),
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''

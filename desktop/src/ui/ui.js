@@ -248,6 +248,7 @@ function render(s) {
   $('#badge').textContent = s.blocked.toLocaleString('vi-VN');
   $('#shield').setAttribute('aria-pressed', String(s.adsOn));
   $('#assist').disabled = !/^https?:/.test(s.url);
+  $('#assist').classList.toggle('open', !!s.panel);
   if (!focused) { intent.value = s.url; edited = false; updateChip(); }
 }
 

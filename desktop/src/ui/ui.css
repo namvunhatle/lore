@@ -191,3 +191,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .aibtn:hover:not(:disabled){background:var(--accent-soft);opacity:1}
 .aibtn:disabled{background:transparent;border-color:var(--line);color:var(--muted)}
 #assist:not(:disabled){color:var(--accent)}
+
+/* Shield and AI as two quiet icon buttons: the shield carries a small count, the AI button is a soft tile that fills when its panel is open. */
+#shield{width:34px;min-width:34px;padding:0;gap:0;display:grid;place-items:center;background:transparent}
+#shield[aria-pressed="true"]{background:transparent}
+#shield .badge{position:absolute;top:2px;right:0;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font:600 9.5px/15px var(--f);text-align:center}
+#shield[aria-pressed="false"] .badge,#shield .badge:empty{display:none}
+.aibtn{width:34px;height:34px;padding:0;margin:0 2px 0 4px;border-radius:9px;border:0;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.aibtn span{display:none}
+.aibtn svg{width:18px;height:18px}
+.aibtn:hover:not(:disabled){background:var(--accent);color:var(--accent-ink)}
+.aibtn:disabled{background:transparent;color:var(--muted);opacity:.5}
+.aibtn.open{background:var(--accent);color:var(--accent-ink)}
+#assist:not(:disabled){color:var(--accent)}
+#assist.open:not(:disabled),#assist:hover:not(:disabled){color:var(--accent-ink)}
