@@ -264,8 +264,8 @@ function groupItem(g, edit) {
   };
 }
 
-// "Khám phá tiếp": rebuilt only when the list of pages changes. The letter tile stands in for a favicon on purpose:
-// fetching icons would contact sites the person has not chosen to visit.
+// "Khám phá tiếp": rebuilt only when the list of pages changes. No icon in front of a suggestion (fetching favicons would
+// contact sites the person has not chosen to visit); the text starts where the titles of the tabs start.
 let sugSig = '';
 function renderSuggest(items) {
   const box = $('#sug');
@@ -281,10 +281,6 @@ function renderSuggest(items) {
     b.type = 'button';
     b.className = 'sug-row';
     b.title = x.title;
-    const f = document.createElement('span');
-    f.className = 'fav ph';
-    f.setAttribute('aria-hidden', 'true');
-    f.textContent = (x.host || '?').charAt(0).toUpperCase();
     const st = document.createElement('span');
     st.className = 'st';
     const tt = document.createElement('span');
@@ -294,7 +290,7 @@ function renderSuggest(items) {
     dm.className = 'dm';
     dm.textContent = x.host;
     st.append(tt, dm);
-    b.append(f, st);
+    b.append(st);
     b.addEventListener('click', () => lore.send('suggest:open', x.url));
     return b;
   }));

@@ -77,6 +77,18 @@ app.whenReady().then(async () => {
     assert.ok(seen.h > 60 && seen.bottom <= seen.sideBottom + 1, 'it sits at the foot of the sidebar: ' + JSON.stringify(seen));
     assert.strictEqual(seen.title, 'Keep exploring');
 
+    // Margins: the heading, the titles and the domains of the suggestions start where the titles of the tabs start, with no
+    // icon in front of them; the refresh button ends where the close buttons of the tabs end.
+    const m = await side.executeJavaScript(`(() => {
+      const L = (q) => { const e = document.querySelector(q); return e ? Math.round(e.getBoundingClientRect().left * 10) / 10 : null; };
+      const R = (q) => { const e = document.querySelector(q); return e ? Math.round(e.getBoundingClientRect().right * 10) / 10 : null; };
+      return { tab: L('#slist .srow .ttl'), head: L('#sug-h'), title: L('.sug-row .tt'), domain: L('.sug-row .dm'), icons: document.querySelectorAll('.sug-row .fav').length, refresh: R('#sug-r'), close: R('#slist .srow .x') };
+    })()`);
+    assert.ok(m.tab !== null, 'a tab title to compare with: ' + JSON.stringify(m));
+    assert.strictEqual(m.icons, 0, 'no icon in front of a suggestion: ' + JSON.stringify(m));
+    for (const k of ['head', 'title', 'domain']) assert.ok(Math.abs(m[k] - m.tab) <= 0.5, k + ' starts where the tab titles start: ' + JSON.stringify(m));
+    if (m.close !== null) assert.ok(Math.abs(m.refresh - m.close) <= 0.5, 'the refresh button ends where the close buttons end: ' + JSON.stringify(m));
+
     // Opening one: a child tab of the page being read, at that address.
     const n = state.tabs.length;
     ui().executeJavaScript(`lore.send('suggest:open', ${JSON.stringify(state.suggest[0].url)})`);
