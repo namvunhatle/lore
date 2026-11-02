@@ -232,6 +232,7 @@ async function modelMenu(x, y) {
   if (!names.length) items.push({ label: T('mm.noLocal'), enabled: false });
   const cloud = [];
   if (c.openai.key) cloud.push({ label: 'OpenAI · ' + c.openai.model, type: 'radio', checked: c.provider === 'openai', click: pick({ provider: 'openai' }) });
+  if (c.mistral.key) cloud.push({ label: 'Mistral · ' + c.mistral.model, type: 'radio', checked: c.provider === 'mistral', click: pick({ provider: 'mistral' }) });
   if (c.gemini.key) cloud.push({ label: 'Gemini · ' + c.gemini.model, type: 'radio', checked: c.provider === 'gemini', click: pick({ provider: 'gemini' }) });
   if (c.anthropic.key) cloud.push({ label: 'Anthropic · ' + c.anthropic.model, type: 'radio', checked: c.provider === 'anthropic', click: pick({ provider: 'anthropic' }) });
   if (cloud.length) items.push({ type: 'separator' }, ...cloud);

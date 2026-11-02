@@ -187,6 +187,9 @@ function render(s) {
     el.append(label, x);
     if (t.pinned) { if (!pins) { pins = document.createElement('div'); pins.className = 'pins'; tabs.prepend(pins); } pins.append(el); } else tabs.append(el);
   }
+  // A small heading over the list says how many tabs there are.
+  const firstRow = tabs.querySelector(':scope > .tab, :scope > .grp');
+  if (firstRow) { const lab = document.createElement('div'); lab.className = 'tlabel'; lab.textContent = T('side.tabs', { n: s.tabs.filter((x) => !x.pinned).length }); tabs.insertBefore(lab, firstRow); }
   $('#org').hidden = s.tabs.length < 3;
 
   const dlb = $('#downloads');

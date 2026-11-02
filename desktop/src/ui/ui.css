@@ -231,3 +231,26 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .side-foot .ib:hover{color:var(--ink)}
 :root[data-side="rail"] .grow{display:none}
 :root[data-side="rail"] .tab .fav{width:26px;height:26px}
+
+/* Tab list, third pass: plain icons, darker text, a slim accent mark on the open tab, a labelled list. */
+.tlabel{flex:none;padding:6px 10px 4px;color:var(--muted);font:600 11px var(--f);letter-spacing:.04em;text-transform:uppercase}
+:root[data-side="rail"] .tlabel{display:none}
+.tabs{gap:1px}
+.tab{height:34px;gap:10px;padding:0 6px 0 10px;border-radius:8px;color:color-mix(in srgb,var(--ink) 74%,transparent);font-size:13px;font-weight:450}
+.tab:hover{background:var(--hv);color:var(--ink)}
+.tab .fav{width:18px;height:18px;border-radius:4px;background:none;box-shadow:none}
+.tab .fav img{width:16px;height:16px}
+.tab .fav.ph{background:none;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(20,20,40,.08),0 0 0 1px var(--line)}
+.tab[aria-selected="true"]::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+.tab[aria-selected="true"] .fav{background:none}
+.tab.pinned{width:40px;height:40px;border-radius:10px;background:var(--hv)}
+.tab.pinned[aria-selected="true"]{background:var(--card)}
+.tab.pinned[aria-selected="true"]::before{display:none}
+.tab.grouped{margin-left:12px}
+.tab.grouped[aria-selected="true"]::before{display:none}
+.newtab{height:36px;margin:0 0 8px;border:0;background:var(--hv);color:var(--ink);font-weight:500}
+.newtab svg{color:var(--accent)}
+.newtab:hover{background:color-mix(in srgb,var(--ink) 11%,transparent)}
+:root[data-side="rail"] .tab .fav{width:22px;height:22px}
+:root[data-side="rail"] .tab{height:40px}

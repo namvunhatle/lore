@@ -100,6 +100,7 @@
     <label class="pcard"><input type="radio" name="provider" value="off"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.off.t"></b><small data-i18n="set.off.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="openai"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.openai.t"></b><small data-i18n="set.openai.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="anthropic"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.anthropic.t"></b><small data-i18n="set.anthropic.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="mistral"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.mistral.t"></b><small data-i18n="set.mistral.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="gemini"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.gemini.t"></b><small data-i18n="set.gemini.d"></small></label>
   </div>
 
@@ -127,6 +128,12 @@
     <label class="f"><span data-i18n="set.f.model"></span><input id="openai-model" spellcheck="false" autocomplete="off"></label>
     <label class="f"><span data-i18n="set.f.key"></span><input id="openai-key" type="password" spellcheck="false" autocomplete="off"></label>
     <button class="link" id="openai-clear" type="button" data-i18n="set.clearKey" hidden></button>
+  </section>
+
+  <section id="p-mistral" hidden>
+    <label class="f"><span data-i18n="set.f.model"></span><input id="mistral-model" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.key"></span><input id="mistral-key" type="password" spellcheck="false" autocomplete="off"></label>
+    <button class="link" id="mistral-clear" type="button" data-i18n="set.clearKey" hidden></button>
   </section>
 
   <section id="p-gemini" hidden>

@@ -3,6 +3,7 @@
 //   openai     any OpenAI-compatible endpoint (OpenAI, OpenRouter, Groq, LM Studio, ...)
 //   anthropic  Anthropic Messages API
 //   gemini     Google Gemini API (OpenAI-compatible endpoint)
+//   mistral    Mistral AI (OpenAI-compatible endpoint, servers in the EU)
 // Remote providers send the user's question to that host, and answerQuery says so in the UI.
 
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ''; } };
@@ -98,6 +99,7 @@ function anthropic({ model, key }, f) {
   };
 }
 
+const MISTRAL_URL = 'https://api.mistral.ai/v1';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
 function createLlm(cfg, { fetchImpl = fetch } = {}) {
@@ -105,6 +107,7 @@ function createLlm(cfg, { fetchImpl = fetch } = {}) {
   if (cfg.provider === 'openai') return openai(cfg.openai, fetchImpl);
   if (cfg.provider === 'anthropic') return anthropic(cfg.anthropic, fetchImpl);
   // Google's Gemini API speaks the OpenAI chat format at this address, so the same client serves it.
+  if (cfg.provider === 'mistral') return openai({ baseUrl: MISTRAL_URL, model: cfg.mistral.model, key: cfg.mistral.key }, fetchImpl);
   if (cfg.provider === 'gemini') return openai({ baseUrl: GEMINI_URL, model: cfg.gemini.model, key: cfg.gemini.key }, fetchImpl);
   return null;
 }
