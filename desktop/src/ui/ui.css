@@ -205,3 +205,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .aibtn.open{background:var(--accent);color:var(--accent-ink)}
 #assist:not(:disabled){color:var(--accent)}
 #assist.open:not(:disabled),#assist:hover:not(:disabled){color:var(--accent-ink)}
+
+.aibtn{color:var(--muted);background:transparent}
+#assist:not(:disabled){color:var(--muted)}
+.aibtn:hover:not(:disabled){background:var(--hv);color:var(--ink)}
+#assist:hover:not(:disabled){color:var(--ink)}
+.aibtn.open,#assist.open:not(:disabled){background:var(--accent-soft);color:var(--accent)}

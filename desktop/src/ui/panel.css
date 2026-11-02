@@ -195,3 +195,23 @@ blockquote{border-left-width:2px}
 .send{width:30px;height:30px;border-radius:8px}
 .send svg{width:16px;height:16px}
 .ph{border-bottom:0;padding-bottom:4px}
+
+/* Prompt first: the box at the bottom is the main control; the home state is a short invitation and a few suggestions. */
+.logo{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 88%,#fff),var(--accent) 55%,color-mix(in srgb,var(--accent) 70%,#000));box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.logo svg{width:15px;height:15px;fill:#fff;stroke:none}
+#herotitle{display:block;font-size:17px;font-weight:600;line-height:1.3;margin:6px 2px 12px;letter-spacing:-.005em}
+.pagechip{display:none}
+.hero{margin:6px 0 4px}
+.trust{display:inline-flex;align-items:center;gap:6px;margin:0 0 16px;padding:3px 10px 3px 8px;border-radius:12px;background:var(--hover);color:var(--muted);font-size:11.5px;font-weight:500}
+.trust::before{margin:0;width:6px;height:6px}
+.trust.remote{background:var(--warn-soft);color:var(--warn)}
+.trust.remote::before{background:var(--warn)}
+.sugs2{display:flex;flex-wrap:wrap;gap:6px}
+.sug{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px 0 9px;border-radius:9px;background:var(--hover);font-size:13px;font-weight:500;transition:background .15s}
+.sug:hover{background:var(--accent-soft);color:var(--accent)}
+.sug svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--accent)}
+.sug.more{background:transparent;color:var(--muted);padding:0 8px}
+.sug.more:hover{background:var(--hover);color:var(--ink)}
+.askform{padding:4px 4px 4px 14px}
+/* Small print under an answer: quiet, one line, no sentences. */
+.fine{display:inline-block;margin:8px 6px 0 0;padding:1px 8px;border-radius:9px;background:var(--win);font-size:11px;line-height:1.6}

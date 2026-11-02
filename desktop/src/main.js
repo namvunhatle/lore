@@ -11,7 +11,7 @@ const stage = (n) => { global.__smokeStage = n; };
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { classify, setSearchEngine, searchUrl } = require('./router');
+const { classify, norm, setSearchEngine, searchUrl } = require('./router');
 const { createBlocker } = require('./adblock');
 const { isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected } = require('./privacy');
 const { hardenSession: harden } = require('./harden');
@@ -209,6 +209,15 @@ function paintTitleBar(priv) {
   if (process.platform === 'darwin' || !win.setTitleBarOverlay) return;
   const dark = priv || nativeTheme.shouldUseDarkColors;
   win.setTitleBarOverlay({ color: priv ? '#0E0A1C' : dark ? '#090D14' : '#E9ECF0', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
+}
+
+// Whatever is typed in the panel: a verb Lore knows runs that action, a writing request opens the writing task, anything else is a question about the page.
+function panelPrompt(q) {
+  const n = norm(q);
+  if (/^(tom tat|summari[sz]e|tl;?dr)\b/.test(n)) return pageAssistant('summarize');
+  if (/^(dich|translate)\b/.test(n)) return pageAssistant('translate');
+  if (classify(q).kind === 'write') return submit(q);
+  return pageAssistant('ask', q);
 }
 
 const hostOfUrl = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
@@ -2289,6 +2298,7 @@ function wireIpc() {
     if (e.sender !== panel.webContents || !['summarize', 'translate', 'ask', 'tasks', 'task'].includes(action)) return;
     if (action === 'tasks') return openTasks();
     if (action === 'task') return taskLib.BUILTIN.some((t) => t.id === arg && t.group === 'page') ? openTasks({ select: String(arg), auto: true }) : undefined;
+    if (action === 'ask') return panelPrompt(String(arg || ''));
     pageAssistant(action, String(arg || ''));
   });
   ipcMain.on('panel:copy', (e, text) => { if (e.sender === panel.webContents && typeof text === 'string') clipboard.writeText(text.slice(0, 20000)); });

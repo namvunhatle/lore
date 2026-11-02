@@ -119,17 +119,21 @@ function fillActions() {
   const go = el('span', 'go'); go.innerHTML = P('<path d="M5 12h14M13 6l6 6-6 6"/>');
   lead.append(lt, go);
   lead.onclick = first.run;
-  let n = 0;
-  for (const a of [...ACTIONS.slice(1, 5), MORE]) {
-    const b = el('button', a === MORE ? 'act wide' : 'act');
+  // Prompt first: a few suggestions as small chips, not a menu of tools. Typing in the box below does the same and more.
+  const sugs = $('#sugs');
+  sugs.replaceChildren();
+  for (const a of ACTIONS.slice(0, 4)) {
+    const b = el('button', 'sug');
     b.type = 'button';
-    b.style.setProperty('--i', String(n++));
     b.innerHTML = P(ICONS[a.id]); // fixed strings above
-    const t = el('span', 'at'); t.append(el('b', '', a.label()));
-    b.append(t);
+    b.append(el('span', '', a.label()));
     b.addEventListener('click', a.run);
-    grid.append(b);
+    sugs.append(b);
   }
+  const more = el('button', 'sug more', MORE.label());
+  more.type = 'button';
+  more.addEventListener('click', MORE.run);
+  sugs.append(more);
   for (const a of ACTIONS) {
     const c = el('button', 'chip', a.label());
     c.type = 'button';
@@ -151,6 +155,7 @@ function fillHero(s) {
   $('#ph').textContent = host;
   $('#pagechip').hidden = true;
   $('#herotitle').textContent = T('pg.hero.h');
+  setTimeout(() => { const q = $('#askq'); if (q && !$('#composer').hidden) q.focus(); }, 60);
   const trust = $('#trust');
   trust.className = 'trust ' + (!s.modelReady ? 'none' : s.remote ? 'remote' : 'local');
   trust.textContent = !s.modelReady ? T('pg.hero.none') : s.remote ? T('pg.hero.remote', { host: s.remote }) : T('pg.hero.local', { model: s.model });
