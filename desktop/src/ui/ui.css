@@ -283,3 +283,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .gbox .grp-edit,.grp-edit{height:30px;padding:0 10px;border-radius:9px;border:1px solid color-mix(in srgb,var(--g) 70%,var(--line));background:var(--card);color:var(--ink);font:700 12.5px var(--f);outline:0!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--g) 22%,transparent);caret-color:var(--g)}
 .grp-edit::selection{background:color-mix(in srgb,var(--g) 30%,transparent)}
 .grp-edit::placeholder{color:var(--muted);font-weight:500}
+
+/* Loading: a small round spinner in place of the icon, whatever the tab style. */
+.tab .fav.spin{width:16px;height:16px;margin:1px;border-radius:50%;background:none;box-shadow:none;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);animation:sp .7s linear infinite}
+.tab.pinned .fav.spin{width:18px;height:18px}
+:root[data-side="rail"] .tab .fav.spin{width:18px;height:18px}
+.ib.on{background:var(--accent-soft);color:var(--accent)}
+@media (prefers-reduced-motion:reduce){.tab .fav.spin{animation:none;border-top-color:var(--accent);border-right-color:var(--accent)}}

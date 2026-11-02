@@ -203,12 +203,10 @@ function pageRect(w, h) {
 // over the page area. One at a time; choosing a tab, pressing Esc or the × closes it.
 const CLOSE_MARK = '[[lore-close]]';
 let sheet = null;
-const SHEET_CSS = 'body{background:var(--win)!important}main,.shell main{border:0!important;border-radius:0!important;margin:0!important}'
-  + '#lore-sheet-x{position:fixed;top:12px;right:14px;z-index:99999;width:30px;height:30px;border:0;border-radius:8px;background:var(--hover,#eee);color:var(--muted,#667);font:20px/1 system-ui,sans-serif;cursor:pointer;display:grid;place-items:center;padding:0}'
-  + '#lore-sheet-x:hover{background:var(--line,#ddd);color:var(--ink,#111)}#lore-sheet-x:focus-visible{outline:2px solid var(--accent,#4726B8);outline-offset:2px}';
+const SHEET_CSS = 'body{background:var(--win)!important}main,.shell main{border:0!important;border-radius:0!important;margin:0!important}';
 class Sheet {
-  constructor({ webPreferences, title = '' }) {
-    this.title = title; this.dead = false; this.closedFns = [];
+  constructor({ webPreferences, title = '', name = '' }) {
+    this.title = title; this.name = name; this.dead = false; this.closedFns = [];
     if (sheet) sheet.close();
     this.view = new WebContentsView({ webPreferences });
     this.webContents = this.view.webContents;
@@ -218,11 +216,12 @@ class Sheet {
     wc.on('page-title-updated', (e, t) => { if (t === CLOSE_MARK) { e.preventDefault(); this.close(); } });
     wc.on('did-finish-load', () => {
       wc.insertCSS(SHEET_CSS).catch(() => {});
-      wc.executeJavaScript(`(() => { if (document.getElementById('lore-sheet-x')) return; const b = document.createElement('button'); b.id = 'lore-sheet-x'; b.type = 'button'; b.textContent = '×'; b.setAttribute('aria-label', ${JSON.stringify(T('sheet.close'))}); const bye = () => { document.title = ${JSON.stringify(CLOSE_MARK)}; }; b.addEventListener('click', bye); document.body.appendChild(b); window.close = bye; })()`).catch(() => {});
+      wc.executeJavaScript(`(() => { window.close = () => { document.title = ${JSON.stringify(CLOSE_MARK)}; }; })()`).catch(() => {});
     });
     sheet = this;
     win.contentView.addChildView(this.view);
     layout();
+    pushState();
   }
   loadFile(f, opts) { return this.webContents.loadFile(f, opts); }
   setTitle() {}
@@ -242,6 +241,7 @@ class Sheet {
     if (this.dead) return;
     this.dead = true;
     if (sheet === this) sheet = null;
+    try { if (win && !win.isDestroyed()) pushState(); } catch { /* closing */ }
     try { win.contentView.removeChildView(this.view); } catch { /* not attached */ }
     try { this.webContents.close(); } catch { /* gone */ }
     for (const fn of this.closedFns) { try { fn(); } catch { /* ignore */ } }
@@ -339,6 +339,7 @@ function pushState() {
   win.webContents.send('state', {
     lang: L(),
     side: settings.get().sidebar,
+    sheet: sheet && !sheet.dead ? sheet.name : '',
     panel: agentOpen(),
     tabs: tabs.map((x) => ({
       // A page without an icon of its own (or one still loading) uses the one this site had before.
@@ -1276,8 +1277,8 @@ function refreshEmbedder() {
 }
 
 function openMemory() {
-  if (memoryWin && !memoryWin.isDestroyed()) return memoryWin.focus();
-  memoryWin = new Sheet({
+  if (memoryWin && !memoryWin.isDestroyed()) return memoryWin.close();
+  memoryWin = new Sheet({ name: 'memory',
     width: 860, height: 780, minWidth: 560, minHeight: 480, title: T('mem.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'memory-preload.js'), contextIsolation: true, sandbox: true }
@@ -1405,7 +1406,7 @@ function openTasks(req) {
     if (req) tasksWin.webContents.send('tasks:open', req);
     return;
   }
-  tasksWin = new Sheet({
+  tasksWin = new Sheet({ name: 'tasks',
     width: 760, height: 700, minWidth: 520, minHeight: 480, title: T('task.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'tasks-preload.js'), contextIsolation: true, sandbox: true }
@@ -1705,8 +1706,8 @@ async function fillPassword() {
   Menu.buildFromTemplate(found.map((x) => ({ label: x.user || T('pw.noUser'), click: () => put(x) }))).popup({ window: win });
 }
 function openPasswords() {
-  if (pwWin && !pwWin.isDestroyed()) { pwWin.focus(); return; }
-  pwWin = new Sheet({
+  if (pwWin && !pwWin.isDestroyed()) { pwWin.close(); return; }
+  pwWin = new Sheet({ name: 'pw',
     width: 760, height: 620, minWidth: 520, minHeight: 420, title: T('pw.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'passwords-preload.js'), contextIsolation: true, sandbox: true }
@@ -1783,8 +1784,8 @@ async function createAlias() {
 
 let breachWin = null;
 function openBreach() {
-  if (breachWin && !breachWin.isDestroyed()) { breachWin.focus(); return; }
-  breachWin = new Sheet({
+  if (breachWin && !breachWin.isDestroyed()) { breachWin.close(); return; }
+  breachWin = new Sheet({ name: 'breach',
     width: 480, height: 330, resizable: false, minimizable: false, title: T('br.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'breach-preload.js'), contextIsolation: true, sandbox: true }
@@ -1859,8 +1860,8 @@ function openPriv() {
   privView.webContents.focus();
 }
 function openReport() {
-  if (reportWin && !reportWin.isDestroyed()) { reportWin.focus(); return; }
-  reportWin = new Sheet({
+  if (reportWin && !reportWin.isDestroyed()) { reportWin.close(); return; }
+  reportWin = new Sheet({ name: 'report',
     width: 600, height: 640, minWidth: 440, minHeight: 420, title: T('rep.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'report-preload.js'), contextIsolation: true, sandbox: true }
@@ -1963,7 +1964,7 @@ function wireFindIpc() {
 // ---- AI organize: tabs and bookmarks (AI-13) --------------------------------------------------------------------------
 function openOrganize(source) {
   if (organizeWin && !organizeWin.isDestroyed()) { organizeWin.close(); organizeWin = null; }
-  organizeWin = new Sheet({
+  organizeWin = new Sheet({ name: 'organize',
     width: 620, height: 680, minWidth: 460, minHeight: 420, title: T('org.title'), parent: win, modal: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'organize-preload.js'), contextIsolation: true, sandbox: true }
@@ -2046,7 +2047,7 @@ function wireOrganizeIpc() {
 function openCompare(ids) {
   compareDefault = Array.isArray(ids) ? ids : [];
   if (compareWin && !compareWin.isDestroyed()) { compareWin.close(); }
-  compareWin = new Sheet({
+  compareWin = new Sheet({ name: 'compare',
     width: 760, height: 640, minWidth: 520, minHeight: 420, title: T('cmp.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'compare-preload.js'), contextIsolation: true, sandbox: true }
@@ -2116,8 +2117,8 @@ function openFromBar(url, newTab) {
   t.view.webContents.loadURL(url);
 }
 function openBookmarks() {
-  if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.focus();
-  bookmarksWin = new Sheet({
+  if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.close();
+  bookmarksWin = new Sheet({ name: 'bookmarks',
     width: 780, height: 700, minWidth: 520, minHeight: 420, title: T('bm.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'bookmarks-preload.js'), contextIsolation: true, sandbox: true }
@@ -2127,8 +2128,8 @@ function openBookmarks() {
   bookmarksWin.on('closed', () => { bookmarksWin = null; });
 }
 function openHistory() {
-  if (historyWin && !historyWin.isDestroyed()) return historyWin.focus();
-  historyWin = new Sheet({
+  if (historyWin && !historyWin.isDestroyed()) return historyWin.close();
+  historyWin = new Sheet({ name: 'history',
     width: 780, height: 720, minWidth: 520, minHeight: 420, title: T('hist.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'history-preload.js'), contextIsolation: true, sandbox: true }
@@ -2230,8 +2231,8 @@ function wireBrowserDataIpc() {
 
 // ---- Downloads window (BRW-04) ---------------------------------------------------------------------------------------
 function openDownloads() {
-  if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.focus();
-  downloadsWin = new Sheet({
+  if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.close();
+  downloadsWin = new Sheet({ name: 'downloads',
     width: 640, height: 560, minWidth: 460, minHeight: 360, title: T('dl2.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'downloads-preload.js'), contextIsolation: true, sandbox: true }
@@ -2404,8 +2405,8 @@ function openLink(u) {
 
 function openSettings(pane) {
   const where = typeof pane === 'string' ? pane : '';
-  if (settingsWin && !settingsWin.isDestroyed()) { if (where) settingsWin.webContents.send('settings:pane', where); return settingsWin.focus(); }
-  settingsWin = new Sheet({
+  if (settingsWin && !settingsWin.isDestroyed()) { if (where) { settingsWin.webContents.send('settings:pane', where); return settingsWin.focus(); } return settingsWin.close(); }
+  settingsWin = new Sheet({ name: 'settings',
     width: 820, height: 680, minWidth: 620, minHeight: 520, title: T('set.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, sandbox: true }
@@ -2606,22 +2607,41 @@ function wireIpc() {
       { label: T('menu.newTab'), accelerator: 'CmdOrCtrl+T', click: () => openTab() },
       { label: T('more.private'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openPrivate() },
       { type: 'separator' },
-      { label: T('more.assist'), enabled: web, accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
-      { label: T('pg.summarize'), enabled: web, accelerator: 'CmdOrCtrl+Alt+S', click: () => pageAssistant('summarize') },
-      { label: T('pg.translate'), enabled: web, accelerator: 'CmdOrCtrl+Alt+T', click: () => pageAssistant('translate') },
+      { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
+      { label: T('pdf.print'), enabled: web, accelerator: 'CmdOrCtrl+P', click: printPage },
+      { label: T('pdf.save'), enabled: web, click: savePdf },
+      { label: T('rl.add'), enabled: web, accelerator: 'CmdOrCtrl+Shift+L', click: readLater },
+      { label: T('src.menu'), enabled: web, accelerator: 'CmdOrCtrl+U', click: viewSource },
       { label: T('menu.openExternal'), enabled: web, accelerator: 'CmdOrCtrl+Shift+O', click: () => { const t = active(); if (t) shell.openExternal(t.url); } },
       { type: 'separator' },
-      { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
-      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
+      { label: T('more.ai'), submenu: [
+        { label: T('more.assist'), enabled: web, accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
+        { label: T('pg.summarize'), enabled: web, accelerator: 'CmdOrCtrl+Alt+S', click: () => pageAssistant('summarize') },
+        { label: T('pg.translate'), enabled: web, accelerator: 'CmdOrCtrl+Alt+T', click: () => pageAssistant('translate') },
+        { type: 'separator' },
+        { label: T('cmp.menu'), click: () => openCompare() },
+        { label: T('org.menu'), accelerator: 'CmdOrCtrl+Alt+O', click: () => openOrganize('tabs') },
+        { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() }
+      ] },
+      { label: T('more.library'), submenu: [
+        { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
+        { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
+        { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
+        { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
+        { label: T('pw.menu'), accelerator: 'CmdOrCtrl+Alt+P', click: async () => { if (await unlock()) openPasswords(); } }
+      ] },
+      { label: T('more.privacy'), submenu: [
+        { label: T('rep.menu'), click: openReport },
+        { label: T('eph.menu'), submenu: [5, 15, 60].map((n) => ({ label: T('eph.min', { n }), click: () => openEphemeral(n) })) },
+        { type: 'separator' },
+        { label: T('pw.fill'), enabled: web, accelerator: 'CmdOrCtrl+Alt+L', click: fillPassword },
+        { label: T('alias.menu'), click: createAlias },
+        { label: T('br.menu'), click: openBreach }
+      ] },
+      { type: 'separator' },
       { label: T('menu.import'), click: () => openWelcome('import') },
       { label: T('menu.update'), click: () => checkForUpdates(true) },
-      { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
-      { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
-      { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
-      { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
-      { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings },
-      { type: 'separator' },
-      { label: T('more.shortcuts', { k: process.platform === 'darwin' ? '⌘' : 'Ctrl+' }), enabled: false }
+      { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings }
     ]).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
   });
   ipcMain.on('memory:open', (e) => { if (e.sender === win.webContents) openMemoryLocked(); });

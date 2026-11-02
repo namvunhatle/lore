@@ -195,6 +195,8 @@ function render(s) {
   // A small heading over the list says how many tabs there are.
   const firstRow = tabs.querySelector(':scope > .tab, :scope > .gbox');
   if (firstRow) { const lab = document.createElement('div'); lab.className = 'tlabel'; lab.textContent = T('side.tabs', { n: s.tabs.filter((x) => !x.pinned).length }); tabs.insertBefore(lab, firstRow); }
+  // The tool open over the page is marked in the side bar.
+  for (const [id, name] of [['memory', 'memory'], ['gear', 'settings'], ['downloads', 'downloads'], ['org', 'organize']]) $('#' + id).classList.toggle('on', s.sheet === name);
   $('#org').hidden = s.tabs.length < 3;
 
   const dlb = $('#downloads');
