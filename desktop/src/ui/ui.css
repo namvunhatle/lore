@@ -190,7 +190,7 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 .srow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 .srow:not([aria-selected="true"]) .ttl{color:color-mix(in srgb,var(--ink) 82%,var(--muted))}
 .srow[aria-selected="true"]{background:var(--win);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.05)}
-.srow .x{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;color:var(--muted);font-size:15px;line-height:1;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+.srow .x{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;color:var(--muted);transition:transform 120ms cubic-bezier(.23,1,.32,1)}
 .srow .x:active{transform:scale(.95)}
 .srow.in-g{--gi:12px}
 .srow.in-g,.srow.kid{margin-left:calc(var(--gi,0px) + var(--lv,0)*14px);width:calc(100% - var(--gi,0px) - var(--lv,0)*14px)}
@@ -207,7 +207,7 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 @media (prefers-reduced-motion:reduce){.srow .tg{transition:none}}
 .srow.in-split::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:1px;background:var(--accent)}
 .snew{margin-top:4px;color:var(--muted);font-weight:400}
-.snew .fav{color:var(--muted);font-size:17px;font-weight:300}
+.snew .fav{color:var(--muted)}
 .snew:active,.pin:active{transform:scale(.97)}
 .snew,.pin{transition:transform 120ms cubic-bezier(.23,1,.32,1)}
 @media (hover:hover) and (pointer:fine){
@@ -234,6 +234,24 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 /* Drag to reorder: a line shows where the tab will land. */
 .srow,.pin{user-select:none;-webkit-user-select:none}
 .srow img,.pin img{-webkit-user-drag:none}
+/* "Khám phá tiếp": pages like the one being read, pinned to the foot of the sidebar, apart from the tabs. */
+.sug{flex:none;margin:0 -8px;padding:8px 8px 0;border-top:1px solid var(--line)}
+.sug[hidden]{display:none}
+.sug-head{display:flex;align-items:center;justify-content:space-between;height:22px;padding:0 4px 0 8px}
+.sug-head h2{margin:0;font:600 11px/1 var(--f);letter-spacing:.02em;color:var(--muted)}
+.sug-r{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--muted);transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+.sug-r:active{transform:scale(.95)}
+.sug-list{display:flex;flex-direction:column;gap:1px;margin-top:2px}
+.sug-row{display:flex;align-items:flex-start;gap:8px;width:100%;padding:6px 8px;border-radius:8px;text-align:left;cursor:default;color:var(--ink);font:500 12.5px/1.3 var(--f)}
+.sug-row .fav{margin-top:1px}
+.sug-row .st{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.sug-row .tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:color-mix(in srgb,var(--ink) 88%,var(--muted))}
+.sug-row .dm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:400;color:var(--muted)}
+.sug-row:active{transform:scale(.98)}
+.sug-row,.sug-r{transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 120ms ease}
+@media (hover:hover) and (pointer:fine){.sug-row:hover,.sug-r:hover{background:var(--hover)}}
+@media (prefers-reduced-motion:reduce){.sug-row,.sug-r{transition:background-color 120ms ease}.sug-row:active,.sug-r:active{transform:none}}
+
 /* Dragging a tab (side-drag.js): a copy follows the pointer, the original stays behind as a faint placeholder. */
 .sdrag{opacity:.3}
 .sland{visibility:hidden}
@@ -266,9 +284,6 @@ html.dragging-tab,html.dragging-tab *{cursor:grabbing!important}
 }
 
 /* Sidebar hidden (Cmd+S): the toolbar takes the full width and gets the button to bring the sidebar back. */
-.sidetoggle[aria-pressed="true"]{color:var(--ink)}
-#navtoggle{display:contents}
-.navs .sidetoggle{width:36px;height:36px;border-radius:10px;display:grid;place-items:center}
 html.side-tabs.side-closed body{grid-template-columns:0 minmax(0,1fr)}
 html.side-tabs.side-closed .side{display:none}
 .darwin.side-tabs.side-closed .bar{padding-left:84px}

@@ -10,6 +10,7 @@ const { checkUrl, createScamList } = require('./scam');
 const { extractionScript } = require('./reader');
 const { cookieBannerScript } = require('./cookiebanner');
 const pageai = require('./pageai');
+const suggestLib = require('./suggest');
 const pageassist = require('./pageassist');
 const shield = require('./shield');
 const { Memory, fileStore, RANGES, isSensitiveHost } = require('./memory');
@@ -83,8 +84,6 @@ const BAR_H = 34; // the bookmarks bar, when it is shown
 const TABS_H = 40; // the tab strip, when tabs are along the top
 const SIDE_W = 240; // the tab sidebar, when tabs are down the left
 const sideOn = () => !!settings && settings.get().tabsLayout === 'side';
-const sideOpen = () => sideOn() && settings.get().sidebarOpen !== false;
-const sideW = () => (sideOpen() ? SIDE_W : 0);
 const PEEK_STRIP = 6, PEEK_W = SIDE_W + 32; // the hidden sidebar: an edge strip, and the view while it is out
 let sideView = null; // the hidden sidebar, a transparent view above the pages (ui/side.html)
 let peekOut = false;
@@ -171,8 +170,8 @@ function layout() {
   if (!win || win.isDestroyed() || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  // With the sidebar on, pages start to its right; the toolbar (drawn by the window itself) sits above them.
-  const x = sideW();
+  // The sidebar never takes room: it slides over the page when the pointer reaches the left edge.
+  const x = 0;
   const y = chromeHeight(), height = h - chromeHeight(), width = w - pw - x;
   if (t.fs) { t.view.setBounds({ x: 0, y: 0, width: w, height: h }); return; }
   if (splitOn()) {
@@ -192,7 +191,7 @@ function layout() {
 function layoutPeek() {
   if (!win || win.isDestroyed()) return;
   const t = active();
-  const want = sideOn() && !sideOpen() && !(t && t.fs);
+  const want = sideOn() && !(t && t.fs);
   if (!want) {
     if (sideView) { try { win.contentView.removeChildView(sideView); } catch { /* not attached */ } }
     peekOut = false;
@@ -259,7 +258,7 @@ function watchEdge(on) {
   edgeTimer = setTimeout(tick, 16);
 }
 function wireEdgeWatch() {
-  for (const ev of ['focus', 'restore', 'show']) win.on(ev, () => watchEdge(sideOn() && !sideOpen()));
+  for (const ev of ['focus', 'restore', 'show']) win.on(ev, () => watchEdge(sideOn()));
   for (const ev of ['blur', 'minimize', 'hide']) win.on(ev, () => watchEdge(false));
 }
 
@@ -292,7 +291,58 @@ function securityOf(t) {
   return c === 'https' && allowedCert.has(hostOfUrl(t.url)) ? 'cert' : c;
 }
 
+// ---- "Khám phá tiếp": pages like the one being read, at the foot of the sidebar (suggest.js) ----------------------
+// Only the title and a few extracted sentences go to the model. Not for private tabs, home, internal pages, search pages,
+// sites with AI turned off, or sensitive sites. Results are kept per address, so switching tabs back and forth costs nothing.
+const SUGGEST_DWELL = 3000;
+const suggestCache = new Map(); // address -> items
+let suggestKey = '';            // which tab and address the timer below is working for
+let suggestNow = { key: '', items: [] };
+let suggestTimer = null;
+let suggestSeq = 0;
+const suggestEligible = (t) => !!t && !t.private && !t.isHome && /^https?:/.test(t.url) && !aiOffFor(t.url)
+  && !isSensitiveHost(hostOfUrl(t.url)) && !suggestLib.isSearchHost(hostOfUrl(t.url));
+const suggestItems = () => { const t = active(); return t && suggestNow.key === t.id + '|' + t.url ? suggestNow.items : []; };
+function watchSuggest() {
+  const t = active();
+  const key = t && suggestEligible(t) ? t.id + '|' + t.url : '';
+  if (key === suggestKey) return;
+  suggestKey = key;
+  clearTimeout(suggestTimer);
+  suggestSeq++;
+  if (!key) return;
+  if (suggestCache.has(t.url)) { suggestNow = { key, items: suggestCache.get(t.url) }; return; }
+  runSuggest(t, false, SUGGEST_DWELL);
+}
+function runSuggest(t, again, delay, tries = 0) {
+  clearTimeout(suggestTimer);
+  const seq = ++suggestSeq;
+  const url = t.url;
+  const key = t.id + '|' + url;
+  suggestTimer = setTimeout(async () => {
+    const live = () => seq === suggestSeq && active() === t && t.url === url && !t.view.webContents.isDestroyed();
+    if (!live()) return;
+    if ((isLoading(t) || !(t.title || '').trim()) && tries < 5) return runSuggest(t, again, 1500, tries + 1);
+    try {
+      const m = await modelInfo();
+      if (!m.ready || !live()) return;
+      const { text } = await pageRead(t);
+      if (!live() || text.length < 400) return;
+      const before = suggestCache.get(url) || [];
+      const exclude = [...tabs.filter((x) => !x.private).map((x) => hostOfUrl(x.url)), ...(again ? before.map((x) => x.host) : [])];
+      const items = await suggestLib.suggest({ title: t.title, url, summary: pageai.extractiveSummary(text, 3), llm, lang: L(), exclude });
+      if (!live()) return;
+      if (!items.length) return; // nothing found: the section stays hidden
+      suggestCache.set(url, items);
+      if (suggestCache.size > 60) suggestCache.delete(suggestCache.keys().next().value);
+      suggestNow = { key, items };
+      pushState();
+    } catch { /* a suggestion is never worth an error */ }
+  }, delay);
+}
+
 function pushState() {
+  watchSuggest();
   scheduleSessionSave();
   const t = active();
   if (t) paintTitleBar(!!t.private);
@@ -320,7 +370,7 @@ function pushState() {
     media: !!t && !isDeniedSite(t.url) ? t.media.length : 0,
     web: !!t && !t.isHome && /^https?:/.test(t.url),
     layout: sideOn() ? 'side' : 'top',
-    sideOpen: sideOpen()
+    suggest: suggestItems()
   };
   win.webContents.send('state', state);
   if (sideView && sideReady) sideView.webContents.send('state', state);
@@ -1245,14 +1295,6 @@ function applyTabsLayout() {
   if (process.platform === 'darwin' && win.setWindowButtonPosition) win.setWindowButtonPosition({ x: 14, y: sideOn() ? 17 : 13 });
   layout();
   pushState();
-}
-// Cmd+S: keep the sidebar open, or hide it until the pointer reaches the left edge. Instant, like the layout switch.
-function toggleSidebar() {
-  if (!sideOn()) return;
-  settings.update({ sidebarOpen: !sideOpen() });
-  peekOut = false;
-  applyTabsLayout();
-  buildMenu();
 }
 function setTabsLayout(v) {
   if (settings.get().tabsLayout === v) return;
@@ -2385,12 +2427,17 @@ function wireIpc() {
   ipcMain.on('split:drag', (e, screenX) => {
     if (!splitHandle || e.sender !== splitHandle.webContents || !splitOn() || !Number.isFinite(screenX)) return;
     const [w] = win.getContentSize();
-    const width = w - (agentOpen() ? PANEL_W : 0) - sideW() - SPLIT_GAP;
-    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - sideW() - SPLIT_GAP / 2) / width));
+    const width = w - (agentOpen() ? PANEL_W : 0) - SPLIT_GAP;
+    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - SPLIT_GAP / 2) / width));
     layout();
   });
   ipcMain.on('split:reset', (e) => { if (splitHandle && e.sender === splitHandle.webContents && split) { split.ratio = 0.5; layout(); } });
-  ipcMain.on('side:toggle', (e) => { if (fromSidebar(e)) toggleSidebar(); });
+  ipcMain.on('suggest:refresh', (e) => { const t = active(); if (fromSidebar(e) && suggestEligible(t)) runSuggest(t, true, 0); });
+  ipcMain.on('suggest:open', (e, url) => {
+    const t = active();
+    if (!fromSidebar(e) || !t || typeof url !== 'string' || !suggestItems().some((x) => x.url === url) || !isAllowedNavigation(url)) return;
+    openTab({ url }, { parent: t.id });
+  });
   ipcMain.on('side:peek', (e, out) => { if (sideView && e.sender === sideView.webContents && peekOut !== !!out) { peekOut = !!out; layoutPeek(); } });
   ipcMain.on('profile:menu', (e, x, y) => { if (fromSidebar(e)) showProfileMenu(x, y); });
   ipcMain.on('tab:menu', (e, id) => { if (fromSidebar(e)) showTabMenu(Number(id)); });
@@ -2582,7 +2629,6 @@ function buildMenu() {
     // Not the stock viewMenu: its Reload (Cmd/Ctrl+R) reloads the browser's own window, which empties the tab strip.
     { label: T('menu.view'), submenu: [
       { label: T('menu.sidebar'), type: 'checkbox', checked: sideOn(), click: () => setTabsLayout(sideOn() ? 'top' : 'side') },
-      { label: T('menu.showSidebar'), type: 'checkbox', checked: sideOpen(), enabled: sideOn(), accelerator: 'CmdOrCtrl+S', click: toggleSidebar },
       { type: 'separator' },
       { label: T('nav.reload'), accelerator: 'CmdOrCtrl+R', click: () => { const t = active(); if (t) t.view.webContents.reload(); } },
       { label: T('menu.hardReload'), accelerator: 'CmdOrCtrl+Shift+R', click: () => { const t = active(); if (t) t.view.webContents.reloadIgnoringCache(); } },

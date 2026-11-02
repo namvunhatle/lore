@@ -13,8 +13,12 @@
     <div class="pins" id="pins" role="tablist" data-i18n-aria="side.pinned"></div>
     <div class="sscroll" id="sscroll">
       <div class="slist" id="slist" role="tablist" aria-orientation="vertical"></div>
-      <button type="button" class="srow snew" id="snew"><span class="fav" aria-hidden="true">+</span><span class="ttl" data-i18n="side.newTab"></span></button>
+      <button type="button" class="srow snew" id="snew"><span class="fav" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span class="ttl" data-i18n="side.newTab"></span></button>
     </div>
+    <section class="sug" id="sug" hidden aria-labelledby="sug-h">
+      <div class="sug-head"><h2 id="sug-h" data-i18n="sug.title"></h2><button type="button" class="sug-r" id="sug-r" data-i18n-aria="sug.refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button></div>
+      <div class="sug-list" id="sug-list"></div>
+    </section>
   </nav>
   <div id="tip" role="tooltip" hidden></div>
   <script src="i18n.js"></script>

@@ -55,13 +55,10 @@ function render(s) {
   tabs.replaceChildren();
   const side = s.layout === 'side';
   document.documentElement.classList.toggle('side-tabs', side);
-  document.documentElement.classList.toggle('side-closed', side && !s.sideOpen);
+  document.documentElement.classList.toggle('side-closed', side);
   renderChrome(s);
-  // With the sidebar hidden, the toolbar carries the button that brings it back (the sidebar itself is in side.html).
-  const nt = $('#navtoggle');
-  const ntSig = lang + '|' + (side && !s.sideOpen);
-  if (nt._sig !== ntSig) { nt._sig = ntSig; nt.replaceChildren(); if (side && !s.sideOpen) nt.append(sideToggleBtn(s)); }
-  if (side) { if (s.sideOpen) renderSide(s); return; }
+  // The sidebar itself is its own view (side.html); this page only draws the toolbar.
+  if (side) return;
   if (s.profiles && s.profiles.length > 1 && s.profile) tabs.append(avatarBtn(s));
   const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
   let lastGroup = 0;

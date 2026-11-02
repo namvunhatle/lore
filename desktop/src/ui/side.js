@@ -162,7 +162,7 @@ function rowItem(t, g, all, trail) {
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'x';
-      x.textContent = '×';
+      x.innerHTML = CLOSE;
       x.addEventListener('click', (e) => { e.stopPropagation(); markPointer(); lore.send('tab:close', el._t.id); });
       // Outline toggle: only on a tab whose page has one, shown on the tab in use or under the pointer.
       const tg = document.createElement('button');
@@ -235,6 +235,8 @@ function outlineItem(t, o, i, base, lv, enter) {
   };
 }
 
+// Same drawing family as the chevron (12px, 2.2 stroke) so the icons on a row share weight and optical centre.
+const CLOSE = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const CHEV = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 function groupItem(g, edit) {
   return {
@@ -262,32 +264,54 @@ function groupItem(g, edit) {
   };
 }
 
-// Hide or show the sidebar. Hidden, it slides over the page when the pointer reaches the left edge.
-const PANEL_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>';
-function sideToggleBtn(s) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'plus sidetoggle';
-  b.innerHTML = PANEL_ICON;
-  const label = T(s.sideOpen ? 'side.hide' : 'side.show', { k: key });
-  b.setAttribute('aria-label', label.replace(/\s*\(.*\)$/, ''));
-  b.setAttribute('aria-pressed', String(!!s.sideOpen));
-  b.dataset.tip = label;
-  b.addEventListener('click', () => lore.send('side:toggle'));
-  return b;
+// "Khám phá tiếp": rebuilt only when the list of pages changes. The letter tile stands in for a favicon on purpose:
+// fetching icons would contact sites the person has not chosen to visit.
+let sugSig = '';
+function renderSuggest(items) {
+  const box = $('#sug');
+  if (!box) return;
+  const sig = items.map((x) => x.url).join('\n');
+  if (sig === sugSig) return;
+  const had = sugSig !== '';
+  sugSig = sig;
+  box.hidden = !items.length;
+  const list = $('#sug-list');
+  list.replaceChildren(...items.map((x) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sug-row';
+    b.title = x.title;
+    const f = document.createElement('span');
+    f.className = 'fav ph';
+    f.setAttribute('aria-hidden', 'true');
+    f.textContent = (x.host || '?').charAt(0).toUpperCase();
+    const st = document.createElement('span');
+    st.className = 'st';
+    const tt = document.createElement('span');
+    tt.className = 'tt';
+    tt.textContent = x.title;
+    const dm = document.createElement('span');
+    dm.className = 'dm';
+    dm.textContent = x.host;
+    st.append(tt, dm);
+    b.append(f, st);
+    b.addEventListener('click', () => lore.send('suggest:open', x.url));
+    return b;
+  }));
+  // A fade only (opacity): the foot of the sidebar must not jump while someone is reading the tabs above it.
+  if (items.length && !calmSide.matches) box.animate([{ opacity: had ? 0.4 : 0 }, { opacity: 1 }], { duration: 200, easing: EASE });
 }
 
 function renderSide(s) {
   lastSide = s;
   // The top row is rebuilt only when what it shows changes, so a button under the pointer keeps its hover and press.
-  const topSig = [lang, s.sideOpen, s.tabs.length >= 3, s.profiles && s.profiles.length > 1 && s.profile ? s.profile.id + s.profile.name + s.profile.color : ''].join('|');
+  const topSig = [lang, s.tabs.length >= 3, s.profiles && s.profiles.length > 1 && s.profile ? s.profile.id + s.profile.name + s.profile.color : ''].join('|');
   const top = $('#side-top');
   if (top._sig !== topSig) {
     top._sig = topSig;
-    top.replaceChildren(sideToggleBtn(s));
     const spacer = document.createElement('i');
     spacer.className = 'grow';
-    top.append(spacer);
+    top.replaceChildren(spacer);
     if (s.profiles && s.profiles.length > 1 && s.profile) top.append(avatarBtn(s));
     top.append(orgBtn(s));
   }
@@ -334,6 +358,7 @@ function renderSide(s) {
     const el = sideStore.list.get('t' + act.id);
     if (el) el.scrollIntoView({ block: 'nearest' });
   }
+  renderSuggest(s.suggest || []);
   sideEdges();
   sideDrawn = true;
   dragRendered();
@@ -347,3 +372,4 @@ function sideEdges() {
 sscroll.addEventListener('scroll', sideEdges, { passive: true });
 addEventListener('resize', sideEdges);
 $('#snew').addEventListener('click', () => lore.send('tab:new'));
+if ($('#sug-r')) $('#sug-r').addEventListener('click', () => lore.send('suggest:refresh'));

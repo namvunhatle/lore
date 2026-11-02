@@ -7,7 +7,6 @@ const DEFAULTS = () => ({
   autoUpdate: true,   // look for a newer version on GitHub now and then
   appearance: 'system', // system | light | dark
   tabsLayout: 'top', // top (a strip above the page) | side (a list down the left)
-  sidebarOpen: true, // with tabs in a sidebar: kept open, or hidden until the pointer reaches the left edge
   startup: 'restore', // restore (continue where I left off) | new (start with a new tab)
   privacy: {
     blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask', // permissions: ask | block
@@ -55,7 +54,6 @@ class Settings {
     if (STARTUPS.includes(patch.startup)) out.startup = patch.startup;
     if (APPEARANCES.includes(patch.appearance)) out.appearance = patch.appearance;
     if (TAB_LAYOUTS.includes(patch.tabsLayout)) out.tabsLayout = patch.tabsLayout;
-    if (typeof patch.sidebarOpen === 'boolean') out.sidebarOpen = patch.sidebarOpen;
     if (typeof patch.autoUpdate === 'boolean') out.autoUpdate = patch.autoUpdate;
     const pv = patch.privacy || {};
     for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint', 'httpsFirst', 'stripTracking', 'memory', 'lock']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
@@ -112,7 +110,7 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, sidebarOpen: c.sidebarOpen, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },

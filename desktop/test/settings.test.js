@@ -21,11 +21,6 @@ test('tabs sit along the top by default and can move to a sidebar', () => {
   assert.strictEqual(s.get().tabsLayout, 'side', 'an unknown value changes nothing');
   assert.strictEqual(s.view().tabsLayout, 'side');
   assert.strictEqual(new Settings({ load: () => ({ tabsLayout: 'side' }) }).get().tabsLayout, 'side', 'kept across restarts');
-  assert.strictEqual(s.get().sidebarOpen, true, 'the sidebar starts open');
-  s.update({ sidebarOpen: false });
-  assert.strictEqual(s.get().sidebarOpen, false);
-  s.update({ sidebarOpen: 'no' });
-  assert.strictEqual(s.get().sidebarOpen, false, 'only true or false');
 });
 
 test('automatic update checks are on by default and can be turned off', () => {
