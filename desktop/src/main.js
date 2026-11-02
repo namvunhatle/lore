@@ -179,6 +179,59 @@ function pageRect(w, h) {
   return { x, y, width: Math.max(200, w - INSET - pw - x), height: Math.max(200, h - y - INSET) };
 }
 
+// ---- Sheets: Settings, Memory, History and the other tools open inside this window, over the page, not in a window of their own ----
+// A Sheet looks like a BrowserWindow to the code that opens it (webContents, loadFile, focus, close, 'closed') but is a view drawn
+// over the page area. One at a time; choosing a tab, pressing Esc or the × closes it.
+const CLOSE_MARK = '[[lore-close]]';
+let sheet = null;
+const SHEET_CSS = 'body{background:var(--win)!important}main,.shell main{border:0!important;border-radius:0!important;margin:0!important}'
+  + '#lore-sheet-x{position:fixed;top:12px;right:14px;z-index:99999;width:30px;height:30px;border:0;border-radius:8px;background:var(--hover,#eee);color:var(--muted,#667);font:20px/1 system-ui,sans-serif;cursor:pointer;display:grid;place-items:center;padding:0}'
+  + '#lore-sheet-x:hover{background:var(--line,#ddd);color:var(--ink,#111)}#lore-sheet-x:focus-visible{outline:2px solid var(--accent,#4726B8);outline-offset:2px}';
+class Sheet {
+  constructor({ webPreferences, title = '' }) {
+    this.title = title; this.dead = false; this.closedFns = [];
+    if (sheet) sheet.close();
+    this.view = new WebContentsView({ webPreferences });
+    this.webContents = this.view.webContents;
+    this.view.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF');
+    const wc = this.webContents;
+    wc.on('before-input-event', (e, input) => { if (input.type === 'keyDown' && input.key === 'Escape') { e.preventDefault(); this.close(); } });
+    wc.on('page-title-updated', (e, t) => { if (t === CLOSE_MARK) { e.preventDefault(); this.close(); } });
+    wc.on('did-finish-load', () => {
+      wc.insertCSS(SHEET_CSS).catch(() => {});
+      wc.executeJavaScript(`(() => { if (document.getElementById('lore-sheet-x')) return; const b = document.createElement('button'); b.id = 'lore-sheet-x'; b.type = 'button'; b.textContent = '×'; b.setAttribute('aria-label', ${JSON.stringify(T('sheet.close'))}); const bye = () => { document.title = ${JSON.stringify(CLOSE_MARK)}; }; b.addEventListener('click', bye); document.body.appendChild(b); window.close = bye; })()`).catch(() => {});
+    });
+    sheet = this;
+    win.contentView.addChildView(this.view);
+    layout();
+  }
+  loadFile(f, opts) { return this.webContents.loadFile(f, opts); }
+  setTitle() {}
+  setMenuBarVisibility() {}
+  on(ev, fn) { if (ev === 'closed') this.closedFns.push(fn); }
+  isDestroyed() { return this.dead || this.webContents.isDestroyed(); }
+  focus() {
+    if (this.dead) return;
+    if (sheet && sheet !== this) sheet.close();
+    sheet = this;
+    win.contentView.addChildView(this.view);
+    layout();
+    this.webContents.focus();
+  }
+  show() { this.focus(); }
+  close() {
+    if (this.dead) return;
+    this.dead = true;
+    if (sheet === this) sheet = null;
+    try { win.contentView.removeChildView(this.view); } catch { /* not attached */ }
+    try { this.webContents.close(); } catch { /* gone */ }
+    for (const fn of this.closedFns) { try { fn(); } catch { /* ignore */ } }
+    const t = active();
+    if (t && win && !win.isDestroyed()) t.view.webContents.focus();
+  }
+}
+const closeSheet = () => { if (sheet) sheet.close(); };
+
 function toggleSidebar() {
   settings.update({ sidebar: settings.get().sidebar === 'rail' ? 'full' : 'rail' });
   layout();
@@ -199,6 +252,7 @@ function layout() {
     tabById(split.b).view.setBounds({ x: r.x + left + SPLIT_GAP, y: r.y, width: r.width - SPLIT_GAP - left, height: r.height });
     if (splitHandle) splitHandle.setBounds({ x: r.x + left, y: r.y, width: SPLIT_GAP, height: r.height });
   } else t.view.setBounds(r);
+  if (sheet && !sheet.dead) { const q = pageRect(w, h); sheet.view.setBorderRadius(RADIUS); sheet.view.setBounds(q); }
   if (panel && pw) { panel.setBorderRadius(RADIUS); panel.setBounds({ x: w - INSET - pw, y: r.y, width: pw, height: r.height }); }
   layoutFind();
   layoutPriv();
@@ -656,6 +710,7 @@ function openSplit(withId) {
 }
 
 function selectTab(id) {
+  closeSheet();
   activeId = id;
   const t = active();
   syncViews();
@@ -1187,7 +1242,7 @@ function refreshEmbedder() {
 
 function openMemory() {
   if (memoryWin && !memoryWin.isDestroyed()) return memoryWin.focus();
-  memoryWin = new BrowserWindow({
+  memoryWin = new Sheet({
     width: 860, height: 780, minWidth: 560, minHeight: 480, title: T('mem.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'memory-preload.js'), contextIsolation: true, sandbox: true }
@@ -1232,7 +1287,7 @@ function wireMemoryIpc() {
     if (h && !memory.list({ host: h }).length) favicons.remove(h);
     return r;
   });
-  const confirm = async (message) => (await dialog.showMessageBox(memoryWin, { type: 'warning', buttons: [T('mem.delete'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message })).response === 0;
+  const confirm = async (message) => (await dialog.showMessageBox(win, { type: 'warning', buttons: [T('mem.delete'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message })).response === 0;
   ipcMain.handle('memory:removeHost', async (e, host) => {
     if (!trusted(e)) return reject();
     const n = memory.list({ host: String(host) }).length;
@@ -1250,7 +1305,7 @@ function wireMemoryIpc() {
   });
   ipcMain.handle('memory:export', async (e) => {
     if (!trusted(e)) return reject();
-    const r = await dialog.showSaveDialog(memoryWin, { defaultPath: 'lore-memory.json', filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'CSV', extensions: ['csv'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: 'lore-memory.json', filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'CSV', extensions: ['csv'] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     const rows = memory.export();
     const csv = ['url,title,visited', ...rows.map((x) => [x.url, x.title, x.visited].map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(','))].join('\n');
@@ -1315,7 +1370,7 @@ function openTasks(req) {
     if (req) tasksWin.webContents.send('tasks:open', req);
     return;
   }
-  tasksWin = new BrowserWindow({
+  tasksWin = new Sheet({
     width: 760, height: 700, minWidth: 520, minHeight: 480, title: T('task.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'tasks-preload.js'), contextIsolation: true, sandbox: true }
@@ -1616,7 +1671,7 @@ async function fillPassword() {
 }
 function openPasswords() {
   if (pwWin && !pwWin.isDestroyed()) { pwWin.focus(); return; }
-  pwWin = new BrowserWindow({
+  pwWin = new Sheet({
     width: 760, height: 620, minWidth: 520, minHeight: 420, title: T('pw.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'passwords-preload.js'), contextIsolation: true, sandbox: true }
@@ -1694,7 +1749,7 @@ async function createAlias() {
 let breachWin = null;
 function openBreach() {
   if (breachWin && !breachWin.isDestroyed()) { breachWin.focus(); return; }
-  breachWin = new BrowserWindow({
+  breachWin = new Sheet({
     width: 480, height: 330, resizable: false, minimizable: false, title: T('br.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'breach-preload.js'), contextIsolation: true, sandbox: true }
@@ -1770,7 +1825,7 @@ function openPriv() {
 }
 function openReport() {
   if (reportWin && !reportWin.isDestroyed()) { reportWin.focus(); return; }
-  reportWin = new BrowserWindow({
+  reportWin = new Sheet({
     width: 600, height: 640, minWidth: 440, minHeight: 420, title: T('rep.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'report-preload.js'), contextIsolation: true, sandbox: true }
@@ -1873,7 +1928,7 @@ function wireFindIpc() {
 // ---- AI organize: tabs and bookmarks (AI-13) --------------------------------------------------------------------------
 function openOrganize(source) {
   if (organizeWin && !organizeWin.isDestroyed()) { organizeWin.close(); organizeWin = null; }
-  organizeWin = new BrowserWindow({
+  organizeWin = new Sheet({
     width: 620, height: 680, minWidth: 460, minHeight: 420, title: T('org.title'), parent: win, modal: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'organize-preload.js'), contextIsolation: true, sandbox: true }
@@ -1956,7 +2011,7 @@ function wireOrganizeIpc() {
 function openCompare(ids) {
   compareDefault = Array.isArray(ids) ? ids : [];
   if (compareWin && !compareWin.isDestroyed()) { compareWin.close(); }
-  compareWin = new BrowserWindow({
+  compareWin = new Sheet({
     width: 760, height: 640, minWidth: 520, minHeight: 420, title: T('cmp.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'compare-preload.js'), contextIsolation: true, sandbox: true }
@@ -2027,7 +2082,7 @@ function openFromBar(url, newTab) {
 }
 function openBookmarks() {
   if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.focus();
-  bookmarksWin = new BrowserWindow({
+  bookmarksWin = new Sheet({
     width: 780, height: 700, minWidth: 520, minHeight: 420, title: T('bm.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'bookmarks-preload.js'), contextIsolation: true, sandbox: true }
@@ -2038,7 +2093,7 @@ function openBookmarks() {
 }
 function openHistory() {
   if (historyWin && !historyWin.isDestroyed()) return historyWin.focus();
-  historyWin = new BrowserWindow({
+  historyWin = new Sheet({
     width: 780, height: 720, minWidth: 520, minHeight: 420, title: T('hist.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'history-preload.js'), contextIsolation: true, sandbox: true }
@@ -2101,7 +2156,7 @@ function wireBrowserDataIpc() {
   ipcMain.on('bookmarks:go', (e, id) => { if (!bmTrusted(e)) return; const b = bookmarks.items.find((x) => x.id === Number(id)); if (b) openTab({ url: b.url }); });
   ipcMain.handle('bookmarks:export', async (e) => {
     if (!bmTrusted(e)) return false;
-    const r = await dialog.showSaveDialog(bookmarksWin, { defaultPath: path.join(app.getPath('downloads'), 'lore-bookmarks.html'), filters: [{ name: 'HTML', extensions: ['html'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), 'lore-bookmarks.html'), filters: [{ name: 'HTML', extensions: ['html'] }] });
     if (r.canceled || !r.filePath) return false;
     fs.writeFileSync(r.filePath, bookmarks.exportHtml());
     return true;
@@ -2130,7 +2185,7 @@ function wireBrowserDataIpc() {
   ipcMain.handle('history:remove', (e, url) => (hiTrusted(e) ? memory.remove(String(url)) : false));
   ipcMain.handle('history:clear', async (e, range) => {
     if (!hiTrusted(e) || !(range === 'all' || RANGES[range])) return false;
-    const ok = (await dialog.showMessageBox(historyWin, { type: 'warning', buttons: [T('hist.clearGo'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('hist.clearAsk.' + range), detail: T('hist.clearDetail') })).response === 0;
+    const ok = (await dialog.showMessageBox(win, { type: 'warning', buttons: [T('hist.clearGo'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('hist.clearAsk.' + range), detail: T('hist.clearDetail') })).response === 0;
     if (!ok) return false;
     memory.removeSince(range);
     return true;
@@ -2141,7 +2196,7 @@ function wireBrowserDataIpc() {
 // ---- Downloads window (BRW-04) ---------------------------------------------------------------------------------------
 function openDownloads() {
   if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.focus();
-  downloadsWin = new BrowserWindow({
+  downloadsWin = new Sheet({
     width: 640, height: 560, minWidth: 460, minHeight: 360, title: T('dl2.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'downloads-preload.js'), contextIsolation: true, sandbox: true }
@@ -2164,7 +2219,7 @@ function wireDownloadsIpc() {
     else if (action === 'reveal' && r.path) shell.showItemInFolder(r.path);
     else if (action === 'open' && r.state === 'done' && r.path && fs.existsSync(r.path)) {
       if (r.risky) {
-        const ask = await dialog.showMessageBox(downloadsWin, { type: 'warning', buttons: [T('dl2.openAnyway'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('dl2.riskyAsk', { name: r.name }), detail: T('dl2.riskyDetail', { host: r.host || '?' }) });
+        const ask = await dialog.showMessageBox(win, { type: 'warning', buttons: [T('dl2.openAnyway'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('dl2.riskyAsk', { name: r.name }), detail: T('dl2.riskyDetail', { host: r.host || '?' }) });
         if (ask.response !== 0) return false;
       }
       shell.openPath(r.path);
@@ -2315,7 +2370,7 @@ function openLink(u) {
 function openSettings(pane) {
   const where = typeof pane === 'string' ? pane : '';
   if (settingsWin && !settingsWin.isDestroyed()) { if (where) settingsWin.webContents.send('settings:pane', where); return settingsWin.focus(); }
-  settingsWin = new BrowserWindow({
+  settingsWin = new Sheet({
     width: 820, height: 680, minWidth: 620, minHeight: 520, title: T('set.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, sandbox: true }
@@ -2366,7 +2421,7 @@ function wireSettingsIpc() {
     if (!trusted(e)) return reject();
     const o = { history: !!opts.history, site: !!opts.site, cache: !!opts.cache, range: ['hour', 'day', 'week', 'month', 'all'].includes(opts.range) ? opts.range : 'all' };
     if (!o.history && !o.site && !o.cache) return { ok: false };
-    const r = await dialog.showMessageBox(settingsWin, {
+    const r = await dialog.showMessageBox(win, {
       type: 'warning', buttons: [T('set.priv.clearBtn'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('set.priv.confirm')
     });
     if (r.response !== 0) return { ok: false };
