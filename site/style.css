@@ -304,3 +304,14 @@ details p{margin:0 0 18px;color:var(--muted)}
   .showcase{text-align:left}
   .showcase .copy{margin-inline:0}
 }
+
+/* Window shots: the whole Lore window as one picture, no frame drawn around it. */
+.win.shot .win-body{display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:fill}
+.win.shot{border-radius:14px}
+.stack .front.shot{width:56%}
+.stack .front.shot .win-body,.stack .back.shot .win-body{aspect-ratio:auto}
+/* The demo bar follows the app: a plain address field, quiet icons. */
+.demo-url{border-radius:10px;background:#fff;border:1px solid #E6E8EE;box-shadow:none;height:38px}
+.demo-url:has(.caret){border-color:#4726B8;box-shadow:0 0 0 3px #EFEBFB}
+.demo-tools .ai{width:34px;height:34px;padding:0;border-radius:9px;background:transparent;color:#677080;justify-content:center}
+.demo-tools .ai svg{fill:none;stroke:#677080;stroke-width:1.8;width:18px;height:18px}

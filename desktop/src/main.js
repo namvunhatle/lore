@@ -2518,6 +2518,8 @@ function wireSettingsIpc() {
 
 function wireIpc() {
   ipcMain.handle('intent:classify', (e, text) => (e.sender === win.webContents && typeof text === 'string' ? classify(text.slice(0, 300)).kind : ''));
+  // For taking the website's screenshots: put the window at a fixed place and in front.
+  if (process.env.LORE_SHOTS) ipcMain.on('debug:shots', (e, o) => { if (e.sender !== win.webContents) return; if (o && o.bounds) win.setBounds(o.bounds); win.show(); app.focus({ steal: true }); win.moveTop(); });
   ipcMain.on('tab:new', () => openTab());
   ipcMain.on('model:menu', (e, x, y) => { if (panel && e.sender === panel.webContents && Number.isFinite(x) && Number.isFinite(y)) modelMenu(x, y); });
   ipcMain.on('side:toggle', (e) => { if (e.sender === win.webContents) toggleSidebar(); });
