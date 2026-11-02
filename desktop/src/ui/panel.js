@@ -140,6 +140,12 @@ function fillActions() {
     c.addEventListener('click', a.run);
     rail.append(c);
   }
+  for (const k of ['shorter', 'simpler', 'detail']) {
+    const f = el('button', 'chip fu', T('chat.fu.' + k));
+    f.type = 'button';
+    f.addEventListener('click', () => agent.pageDo('ask', T('chat.fu.' + k + '.q')));
+    rail.append(f);
+  }
   const c = el('button', 'chip', MORE.label());
   c.type = 'button';
   c.addEventListener('click', MORE.run);
@@ -313,6 +319,20 @@ function renderPage(s) {
   if (!$('#composer').hidden && s.state === 'idle') $('#askq').focus();
 }
 
+// A page's whole conversation arrives at once: when the tab or page in front changes, or the panel is opened.
+agent.onThread((t) => {
+  lang = t.lang || lang; LORE_I18N.apply(lang);
+  showHistory(false);
+  reset();
+  const base = { page: t.page, model: t.model, remote: t.remote };
+  last = { fn: renderPage, s: { state: 'idle', ...base, modelReady: t.modelReady } };
+  if (!t.states.length) return renderPage({ state: 'idle', seq: 0, ...base, modelReady: t.modelReady });
+  setModel({ ready: t.modelReady, model: t.model, remote: t.remote });
+  for (const s of t.states) renderPage({ ...s, reset: false });
+  setTitle(T('pg.title'), t.page ? t.page.host : '');
+  setMode(true);
+  $('#feed').scrollTop = $('#feed').scrollHeight;
+});
 agent.onPage((s) => { lang = s.lang || lang; LORE_I18N.apply(lang); last = { fn: renderPage, s }; renderPage(s); });
 $('#askform').addEventListener('submit', (e) => { e.preventDefault(); const q = $('#askq').value.trim(); if (!q) return; $('#askq').value = ''; agent.pageDo('ask', q); });
 
@@ -322,3 +342,32 @@ agent.onLang((l) => { lang = l; LORE_I18N.apply(lang); fillActions(); });
 $('#close').addEventListener('click', () => agent.close());
 LORE_I18N.apply(lang);
 fillActions();
+
+// History: every saved conversation, newest first. Opening one goes to its page.
+function showHistory(on) {
+  $('#hist').hidden = !on;
+  $('#histbtn').setAttribute('aria-pressed', String(on));
+  if (on) { $('#home').hidden = true; $('#thread').hidden = true; } else { $('#thread').hidden = false; $('#home').hidden = msgs.size > 0; }
+}
+async function paintHistory() {
+  const list = await agent.chats.list();
+  const ul = $('#histlist');
+  ul.replaceChildren();
+  $('#hist-empty').hidden = list.length > 0;
+  for (const c of list) {
+    const li = el('li', 'hrow');
+    const open = el('button', 'hopen');
+    open.type = 'button';
+    open.append(el('b', '', c.title), el('small', '', [c.host, new Date(c.ts).toLocaleDateString(lang === 'vi' ? 'vi-VN' : undefined, { day: 'numeric', month: 'short' }), T('chat.count', { n: c.count })].join(' · ')));
+    if (c.preview) open.append(el('span', 'pv', c.preview));
+    open.addEventListener('click', () => agent.chats.open(c.key));
+    const del = el('button', 'hdel', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', T('chat.delete'));
+    del.addEventListener('click', () => { agent.chats.remove(c.key); li.remove(); $('#hist-empty').hidden = ul.children.length > 0; });
+    li.append(open, del);
+    ul.append(li);
+  }
+}
+$('#histbtn').addEventListener('click', () => { const on = $('#hist').hidden; showHistory(on); if (on) paintHistory(); });
+$('#newchat').addEventListener('click', () => agent.chats.fresh());

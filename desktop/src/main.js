@@ -47,6 +47,7 @@ const aliasLib = require('./alias');
 const { SitePerms } = require('./perms');
 const pwLib = require('./passwords');
 const pagenote = require('./pagenote');
+const chats = require('./chats');
 const breachLib = require('./breach');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
@@ -144,6 +145,7 @@ function applyDoh() {
 function loadStats() { pstats = new PrivacyStats({ file: statsFile }); S.blocked = pstats.today().blocked; }
 function saveStats() { if (pstats) pstats.save(); }
 let statsFile = null;
+let chatStore;
 let vault;
 let perms;
 let memory;
@@ -162,7 +164,7 @@ let panel;          // trusted side panel (own preload); web pages never get thi
 let run = null;
 const PANEL_W = 380;
 let dl = null;      // current download session: { tab, state, options, pct, path, error, ctl }
-let paSeq = 0;
+let paSeq = Math.floor(Date.now() / 1000); // unique across runs, so saved messages never collide with new ones
 let pa = null;      // page assistant session: { tab, view }
 const agentOpen = () => !!run || !!dl || !!pa;
 
@@ -343,10 +345,11 @@ function openStores(id) {
   const bm = f('bookmarks.bin');
   const pm = f('perms.bin');
   const pv = f('passwords.bin');
-  return { vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
+  const ch = f('chats.bin');
+  return { chats: new chats.ChatStore({ load: () => ch.load(), save: (d) => ch.save(d) }), vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
 }
 function useStores(st) {
-  vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
+  chatStore = st.chats; threads.clear(); vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
   refreshEmbedder();
 }
 // Closes every tab without remembering it or opening a new one: the next profile's tabs take their place.
@@ -522,7 +525,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   wc.on('leave-html-full-screen', () => { tab.fs = false; if (tab.fsWindow) win.setFullScreen(false); tab.fsWindow = false; layout(); });
   // A page that crashed shows a page that says so, instead of a white tab.
   wc.on('render-process-gone', (_e, d) => { if (!tabs.includes(tab) || !win || win.isDestroyed() || wc.isDestroyed() || d.reason === 'clean-exit' || d.reason === 'killed' && tab.closing) return; tab.fs = false; tab.crashedUrl = tab.url; tab.isHome = true; wc.loadFile(NETERR, { query: { lang: L(), url: tab.crashedUrl, code: 'crash', search: searchUrl('%q').replace('%25q', '%s') } }); layout(); });
-  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); pushState(); });
+  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); if (tab.id === activeId) followTab(tab); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
     const url = wc.getURL();
@@ -654,6 +657,7 @@ function selectTab(id) {
   closeFind();
   if (t.isHome && !t.lazyUrl) focusIntent();
   if (t.group && groups.has(t.group)) groups.get(t.group).collapsed = false;
+  followTab(t);
   layout();
   pushState();
 }
@@ -776,7 +780,7 @@ function showTabMenu(id) {
 
 function startAgent(id) {
   if (run) run.cancel();
-  pa = null; dl = null;
+  pa = null; dl = null; assistOn = false;
   run = new AgentRun(id, {
     log: agentLog,
     driver: new PageDriver(active().view.webContents, T),
@@ -792,7 +796,7 @@ function startAgent(id) {
 function closePanel() {
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  pa = null;
+  pa = null; assistOn = false;
   win.contentView.removeChildView(panel);
   layout();
 }
@@ -810,7 +814,7 @@ async function openDownload() {
   const tab = active();
   if (!tab || !tab.media.length || isDeniedSite(tab.url)) return;
   if (run) { run.cancel(); run = null; }
-  pa = null;
+  pa = null; assistOn = false;
   if (dl && dl.ctl) dl.ctl.abort();
   const title = tab.title || 'video';
   dl = { tab, title, state: 'loading', options: [], pct: 0 };
@@ -862,16 +866,60 @@ async function runPageAction(r) {
 
 // ---- Page assistant (AI-03 summary and questions, AI-04 translation) -------------------------------------------------
 const pageMeta = (tab) => { let host = ''; try { host = new URL(tab.url).hostname.replace(/^www\./, ''); } catch { /* none */ } return { title: tab.title, host }; };
-// Opens (or keeps) the assistant for this tab. A new tab or a new address starts a fresh conversation.
+// ---- Conversations: one thread per page address, kept while the browser runs and (for normal tabs) saved ----------------
+const threads = new Map(); // key -> { url, title, states: [] } for private tabs and the current run
+let assistOn = false;      // the person opened the assistant and has not closed it
+let chatSaveTimer = null;
+const threadKey = (tab) => { if (tab.private) return 'private:' + tab.id; try { const u = new URL(tab.url); u.hash = ''; return u.toString(); } catch { return tab.url; } };
+function threadOf(tab) {
+  const key = threadKey(tab);
+  if (!threads.has(key)) {
+    const saved = !tab.private && chatStore ? chatStore.get(key) : null;
+    threads.set(key, { url: tab.url, title: tab.title, states: saved ? saved.states.map((x) => ({ ...x })) : [] });
+  }
+  return threads.get(key);
+}
+function recordState(tab, s) {
+  if (!Number.isFinite(s.seq) || s.state === 'idle') return;
+  const th = threadOf(tab);
+  th.title = tab.title; th.url = tab.url;
+  const { reset, lang, ...rest } = s;
+  th.states = th.states.filter((x) => x.seq !== s.seq);
+  if (s.state === 'done' || s.state === 'error') th.states.push(rest);
+  th.states = th.states.slice(-chats.MAX_STATES);
+  if (!tab.private && chatStore) { clearTimeout(chatSaveTimer); chatSaveTimer = setTimeout(() => { if (chatStore) chatStore.put(threadKey(tab), th); }, 800); }
+}
+// Draws the thread of this page in the panel: what was said before, or the opening state when nothing was.
+function sendThread(tab) {
+  const th = threadOf(tab);
+  panel.webContents.send('page:thread', {
+    lang: L(), page: pageMeta(tab), states: th.states.filter((x) => x.state === 'done'),
+    modelReady: lastModel.ready, remote: lastModel.remote, model: lastModel.model
+  });
+}
+// Opens (or keeps) the assistant for this tab. A different page shows its own conversation.
 function claimPanel(tab) {
-  const fresh = !pa || pa.tab !== tab || pa.url !== tab.url;
+  const changed = !pa || pa.tab !== tab || pa.url !== tab.url;
   pa = { tab, view: 'both', url: tab.url };
   win.contentView.addChildView(panel);
   layout();
-  return fresh;
+  if (changed) sendThread(tab);
+  return false;
 }
-const sendPage = (s) => { if (pa) panel.webContents.send('page:state', { ...s, lang: L() }); };
-const modelInfo = async () => ({ ready: !!llm && (await llm.available()), remote: !!llm && llm.remote ? llm.host : '', model: llm ? llm.model : '' });
+// The tab in front changed (or its address did): follow it with the panel.
+function followTab(tab) {
+  if (!assistOn || run || dl) return;
+  const web = tab && !tab.isHome && /^https?:/.test(tab.url);
+  if (web) { if (!pa || pa.tab !== tab || pa.url !== tab.url) claimPanel(tab); return; }
+  if (pa) { pa = null; try { win.contentView.removeChildView(panel); } catch { /* hidden */ } layout(); }
+}
+const sendPageFor = (tab, s) => {
+  recordState(tab, s);
+  if (pa && pa.tab === tab) panel.webContents.send('page:state', { ...s, lang: L() });
+};
+const sendPage = (s) => { if (pa) sendPageFor(pa.tab, s); };
+let lastModel = { ready: false, remote: '', model: '' };
+const modelInfo = async () => (lastModel = { ready: !!llm && (await llm.available()), remote: !!llm && llm.remote ? llm.host : '', model: llm ? llm.model : '' });
 
 // Everything a model reads from a page comes through here (AI-10): visible text only, invisible characters stripped,
 // and a report of anything that looked like an order to the assistant.
@@ -908,32 +956,32 @@ async function pageRead(tab) {
 async function pageAssistant(action, question = '') {
   const tab = active();
   if (!tab) return;
-  if (aiOffFor(tab.url)) { claimPanel(tab); return sendPage({ mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), reset: true, state: 'error', error: 'pg.aiOff' }); }
+  if (aiOffFor(tab.url)) { claimPanel(tab); return sendPageFor(tab, { mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), reset: true, state: 'error', error: 'pg.aiOff' }); }
   if (tab.isHome || !/^https?:/.test(tab.url)) return loadHome(tab.view.webContents, { kind: 'nopage' });
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
   const fresh = claimPanel(tab);
   const mine = pa;
+  const sp = (x) => sendPageFor(tab, x);
   const live = () => pa === mine && active() === tab;
   const m = await modelInfo();
   const meta = { mode: action, question, remote: m.remote, model: m.model, seq: ++paSeq, page: pageMeta(tab) };
-  sendPage({ ...meta, reset: fresh, state: 'working' });
+  sp({ ...meta, state: 'working' });
   try {
     if (action === 'translate') return await translatePage(tab, mine, meta, m, live);
     const { text, report } = await pageRead(tab);
     const safety = shield.worthWarning(report) || report.invisible || report.hiddenChars ? report : null;
-    if (!live()) return;
-    if (text.length < 120) return sendPage({ ...meta, state: 'error', error: 'pg.noText' });
+    if (text.length < 120) return sp({ ...meta, state: 'error', error: 'pg.noText' });
     const l = m.ready ? llm : null;
     if (action === 'summarize') {
       const s = await pageassist.summarize({ text, llm: l, lang: L() });
       mine.text = text;
-      return live() && sendPage({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
+      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
     }
-    const a = await pageassist.ask({ text, question, llm: l, lang: L() });
+    const a = await pageassist.ask({ text, question, llm: l, lang: L(), history: chats.context(threadOf(tab).states) });
     mine.text = text;
-    if (live()) sendPage({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
-  } catch { if (live()) sendPage({ ...meta, state: 'error', error: 'pg.error' }); }
+    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
+  } catch { sp({ ...meta, state: 'error', error: 'pg.error' }); }
 }
 
 // Opens the page tools without running anything, so the options are visible before the user asks for one.
@@ -942,9 +990,9 @@ async function openAssist() {
   if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  const fresh = claimPanel(tab);
-  const m = await modelInfo();
-  sendPage({ mode: 'idle', question: '', state: 'idle', reset: fresh, page: pageMeta(tab), modelReady: m.ready, remote: m.remote, model: m.model });
+  assistOn = true;
+  pa = null; // always draw the page's own thread
+  claimPanel(tab);
 }
 
 async function translatePage(tab, mine, meta, m, live) {
@@ -2333,6 +2381,25 @@ function wireIpc() {
     pageAssistant(action, String(arg || ''));
   });
   ipcMain.on('panel:copy', (e, text) => { if (e.sender === panel.webContents && typeof text === 'string') clipboard.writeText(text.slice(0, 20000)); });
+  // Past conversations, newest first; opening one goes to its page (an open tab, or a new one) where its thread is shown.
+  const fromPanel = (e) => panel && e.sender === panel.webContents;
+  ipcMain.handle('chats:list', (e) => (fromPanel(e) && chatStore ? chatStore.list() : []));
+  ipcMain.on('chats:open', (e, key) => {
+    if (!fromPanel(e) || !chatStore) return;
+    const t = chatStore.get(String(key));
+    if (!t || !isAllowedNavigation(t.url)) return;
+    assistOn = true;
+    const open = tabs.find((x) => !x.private && !x.isHome && threadKey(x) === t.key);
+    if (open) selectTab(open.id); else openTab({ url: t.url });
+  });
+  ipcMain.on('chats:delete', (e, key) => { if (fromPanel(e) && chatStore) { chatStore.remove(String(key)); threads.delete(String(key)); } });
+  ipcMain.on('chat:new', (e) => {
+    if (!fromPanel(e) || !pa) return;
+    const th = threadOf(pa.tab);
+    th.states = [];
+    if (chatStore && !pa.tab.private) chatStore.remove(threadKey(pa.tab));
+    sendThread(pa.tab);
+  });
   ipcMain.on('page:view', (e, view) => {
     if (e.sender !== panel.webContents || !pa || !['both', 'translation', 'original'].includes(view)) return;
     pa.tab.view.webContents.executeJavaScriptInIsolatedWorld(1004, [{ code: pageassist.viewScript(view) }]).catch(() => {});

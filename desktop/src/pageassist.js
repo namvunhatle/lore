@@ -38,15 +38,18 @@ async function summarize({ text, llm, lang = 'en' }) {
 }
 
 // Always returns the page's own passages as evidence. A model, if present, only phrases the answer from them.
-async function ask({ text, question, llm, lang = 'en' }) {
-  const passages = bestPassages(text, question, 3);
+async function ask({ text, question, llm, lang = 'en', history = [] }) {
+  // A follow-up ("shorter", "and the price?") borrows the words of the question before it to find its passages.
+  const prev = history.length ? history[history.length - 1].q : '';
+  const passages = bestPassages(text, prev ? question + ' ' + prev : question, 3);
   if (!passages.length) return { found: false, passages: [], answer: '', ai: false };
   if (!llm || !(await llm.available())) return { found: true, passages, answer: '', ai: false };
   try {
     const ctx = passages.map((p, i) => `[${i + 1}] ${p}`).join('\n');
+    const earlier = history.slice(-3).map((h) => `Q: ${String(h.q).slice(0, 200)}\nA: ${String(h.a).slice(0, 500)}`).join('\n');
     const reply = await llm.chat([
-      { role: 'system', content: `Answer the question in at most 3 sentences in ${NAME[lang]}, using ONLY the numbered passages. If they do not answer it, reply exactly NO_ANSWER. ${UNTRUSTED}` },
-      { role: 'user', content: `QUESTION: ${question}\n\nPASSAGES:\n<<<\n${ctx}\n>>>` }
+      { role: 'system', content: `Answer the question in at most 3 sentences in ${NAME[lang]}, using ONLY the numbered passages. If the question refers to the earlier conversation (shorter, simpler, more detail, translate that), rework the earlier answer using the passages. If they do not answer it, reply exactly NO_ANSWER. ${UNTRUSTED}` },
+      { role: 'user', content: (earlier ? `EARLIER IN THIS CONVERSATION:\n${earlier}\n\n` : '') + `QUESTION: ${question}\n\nPASSAGES:\n<<<\n${ctx}\n>>>` }
     ], { timeoutMs: 45000, maxTokens: 700 });
     if (!reply || /NO_ANSWER/.test(reply)) return { found: true, passages, answer: '', ai: false };
     return { found: true, passages, answer: cutAtSentence(reply.replace(/\[\d+\]/g, '').trim(), llm.truncated), ai: true };
