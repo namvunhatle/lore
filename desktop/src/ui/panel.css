@@ -1,6 +1,6 @@
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f);border-left:1px solid var(--line)}
+body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f);}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -145,3 +145,31 @@ blockquote.fold{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vert
 #herotitle{font-size:22px;margin:0 0 6px}
 .lead-act{min-height:48px}
 .act{min-height:46px}
+
+/* A tool panel, not a web page: a card beside the page, small type, quiet rows. */
+html,body{background:var(--win)}
+body{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ph{padding:9px 8px 9px 12px;gap:9px}
+.logo{width:26px;height:26px;border-radius:8px}
+.logo svg{width:16px;height:16px}
+h3{font-size:13px;font-weight:600}
+#sub{font-size:11.5px}
+.x{width:28px;height:28px;font-size:18px}
+#feed{padding:12px}
+h4{font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:0}
+.lead-act{min-height:40px;padding:0 12px;border-radius:9px;gap:10px}
+.lead-act b{font-size:13px}
+.lead-act small{display:none}
+.grid{grid-template-columns:1fr;gap:0;margin:6px 0 16px}
+.act{min-height:38px;padding:0 8px;border:0;border-radius:8px;gap:10px;font-size:13px;font-weight:500}
+.act:hover{background:var(--hover);border-color:transparent;transform:none}
+.act svg{width:24px;height:24px;padding:5px;border-radius:7px}
+.act.wide{justify-content:flex-start;color:var(--muted);min-height:34px}
+.card{border-radius:10px;padding:10px 12px}
+.chip{border-radius:8px;padding:5px 10px;font-size:12.5px}
+.me{border-radius:12px 12px 3px 12px;font-size:13px}
+#composer{padding:8px 10px 10px}
+.askform{border-radius:10px}
+.askform input{font-size:13px}
+.send{border-radius:8px}
+#herotitle,.hero h4{font-size:15px;font-weight:600;margin:0 0 8px}

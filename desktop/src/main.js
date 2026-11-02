@@ -86,7 +86,10 @@ const realWorkflows = require('./workflows').real;
 const { classifyResponse, isDeniedSite } = require('./media');
 const downloader = require('./downloader');
 
-const CHROME_BASE = 88;
+// The window is a frame (tab list at the left, address bar on top) with the page and the AI panel as cards inside it.
+const CHROME_BASE = 52;
+const SIDE_FULL = 252, SIDE_RAIL = 72, INSET = 8, RADIUS = 10;
+const sideWidth = () => (settings && settings.get().sidebar === 'rail' ? SIDE_RAIL : SIDE_FULL);
 const BAR_H = 34; // the bookmarks bar, when it is shown
 const chromeHeight = () => CHROME_BASE + (bookmarks && bookmarks.bar ? BAR_H : 0);
 const HOME = path.join(__dirname, 'ui', 'home.html');
@@ -165,20 +168,34 @@ const agentOpen = () => !!run || !!dl || !!pa;
 
 const active = () => tabs.find((t) => t.id === activeId);
 
+// Where the page card sits: right of the tab list, under the address bar, with the AI panel (when open) beside it.
+function pageRect(w, h) {
+  const pw = agentOpen() ? PANEL_W + SPLIT_GAP : 0;
+  const x = sideWidth(), y = chromeHeight();
+  return { x, y, width: Math.max(200, w - INSET - pw - x), height: Math.max(200, h - y - INSET) };
+}
+
+function toggleSidebar() {
+  settings.update({ sidebar: settings.get().sidebar === 'rail' ? 'full' : 'rail' });
+  layout();
+  pushState();
+}
+
 function layout() {
   const t = active();
   if (!win || win.isDestroyed() || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  const y = chromeHeight(), height = h - chromeHeight(), width = w - pw;
+  for (const x of tabs) x.view.setBorderRadius(t.fs ? 0 : RADIUS);
   if (t.fs) { t.view.setBounds({ x: 0, y: 0, width: w, height: h }); return; }
+  const r = pageRect(w, h);
   if (splitOn()) {
-    const left = Math.round((width - SPLIT_GAP) * split.ratio);
-    tabById(split.a).view.setBounds({ x: 0, y, width: left, height });
-    tabById(split.b).view.setBounds({ x: left + SPLIT_GAP, y, width: width - SPLIT_GAP - left, height });
-    if (splitHandle) splitHandle.setBounds({ x: left, y, width: SPLIT_GAP, height });
-  } else t.view.setBounds({ x: 0, y, width, height });
-  if (panel && pw) panel.setBounds({ x: w - pw, y: chromeHeight(), width: pw, height: h - chromeHeight() });
+    const left = Math.round((r.width - SPLIT_GAP) * split.ratio);
+    tabById(split.a).view.setBounds({ x: r.x, y: r.y, width: left, height: r.height });
+    tabById(split.b).view.setBounds({ x: r.x + left + SPLIT_GAP, y: r.y, width: r.width - SPLIT_GAP - left, height: r.height });
+    if (splitHandle) splitHandle.setBounds({ x: r.x + left, y: r.y, width: SPLIT_GAP, height: r.height });
+  } else t.view.setBounds(r);
+  if (panel && pw) { panel.setBorderRadius(RADIUS); panel.setBounds({ x: w - INSET - pw, y: r.y, width: pw, height: r.height }); }
   layoutFind();
   layoutPriv();
 }
@@ -191,7 +208,7 @@ function isLoading(tab) {
 function paintTitleBar(priv) {
   if (process.platform === 'darwin' || !win.setTitleBarOverlay) return;
   const dark = priv || nativeTheme.shouldUseDarkColors;
-  win.setTitleBarOverlay({ color: priv ? '#1A1330' : dark ? '#10151E' : '#FFFFFF', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
+  win.setTitleBarOverlay({ color: priv ? '#0E0A1C' : dark ? '#090D14' : '#E9ECF0', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
 }
 
 const hostOfUrl = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
@@ -210,6 +227,7 @@ function pushState() {
   const wc = t && t.view.webContents;
   win.webContents.send('state', {
     lang: L(),
+    side: settings.get().sidebar,
     tabs: tabs.map((x) => ({
       id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
@@ -980,11 +998,11 @@ function createWindow() {
       : {
           titleBarStyle: 'hidden', autoHideMenuBar: true,
           titleBarOverlay: {
-            color: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+            color: nativeTheme.shouldUseDarkColors ? '#090D14' : '#E9ECF0',
             symbolColor: nativeTheme.shouldUseDarkColors ? '#E9EDF3' : '#12161C', height: 40
           }
         }),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#090D14' : '#E9ECF0',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true }
   });
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
@@ -1534,7 +1552,7 @@ function layoutPriv() {
   if (!privView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  privView.setBounds({ x: Math.max(0, w - pw - PRIV_W - 12), y: chromeHeight() + 4, width: PRIV_W, height: PRIV_H });
+  privView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - PRIV_W - 12), y: chromeHeight() - 6, width: PRIV_W, height: PRIV_H });
 }
 function closePriv(refocus = true) {
   if (!privView || !win || win.isDestroyed()) return;
@@ -1606,7 +1624,7 @@ function layoutFind() {
   if (!findView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  findView.setBounds({ x: Math.max(0, w - pw - FIND_W - 12), y: chromeHeight() + 8, width: FIND_W, height: 46 });
+  findView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - FIND_W - 12), y: chromeHeight() + 8, width: FIND_W, height: 46 });
 }
 function openFind() {
   const t = active();
@@ -2200,6 +2218,7 @@ function wireSettingsIpc() {
 function wireIpc() {
   ipcMain.handle('intent:classify', (e, text) => (e.sender === win.webContents && typeof text === 'string' ? classify(text.slice(0, 300)).kind : ''));
   ipcMain.on('tab:new', () => openTab());
+  ipcMain.on('side:toggle', (e) => { if (e.sender === win.webContents) toggleSidebar(); });
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
   ipcMain.on('update:check', (e) => { if (e.sender === win.webContents) checkForUpdates(true); });
@@ -2208,9 +2227,9 @@ function wireIpc() {
   ipcMain.on('split:toggle', (e) => { if (e.sender === win.webContents) openSplit(); });
   ipcMain.on('split:drag', (e, screenX) => {
     if (!splitHandle || e.sender !== splitHandle.webContents || !splitOn() || !Number.isFinite(screenX)) return;
-    const [w] = win.getContentSize();
-    const width = w - (agentOpen() ? PANEL_W : 0) - SPLIT_GAP;
-    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - SPLIT_GAP / 2) / width));
+    const [w, h] = win.getContentSize();
+    const r = pageRect(w, h);
+    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - r.x - SPLIT_GAP / 2) / (r.width - SPLIT_GAP)));
     layout();
   });
   ipcMain.on('split:reset', (e) => { if (splitHandle && e.sender === splitHandle.webContents && split) { split.ratio = 0.5; layout(); } });
@@ -2412,6 +2431,7 @@ function buildMenu() {
       { label: T('pdf.save'), click: savePdf },
       { label: T('src.menu'), accelerator: 'CmdOrCtrl+U', click: viewSource },
       { type: 'separator' },
+      { label: T('side.toggle'), accelerator: 'CmdOrCtrl+Shift+E', click: toggleSidebar },
       { role: 'togglefullscreen' },
       { label: T('menu.devtools'), accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => { const t = active(); if (t) t.view.webContents.toggleDevTools(); } }
     ] },

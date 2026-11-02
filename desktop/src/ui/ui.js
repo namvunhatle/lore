@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const intent = $('#intent');
 document.documentElement.classList.add(lore.platform);
-if (lore.platform !== 'darwin') document.querySelector('kbd').textContent = 'Ctrl+L';
+if (lore.platform !== 'darwin') { $('#omni kbd').textContent = 'Ctrl+L'; document.querySelector('.nk').textContent = 'Ctrl+T'; }
 let lang = 'en';
 const T = (k, v) => LORE_I18N.t(lang, k, v);
 let focused = false;
@@ -46,37 +46,37 @@ let waiting = null;
 
 // Where on a tab a drag lands: the outer thirds reorder, the middle one makes a group with that tab.
 function zone(e, r, t) {
-  const f = (e.clientX - r.left) / r.width;
-  if (t.pinned) return f < 0.5 ? 'l' : 'r';
+  if (t.pinned) return (e.clientX - r.left) / r.width < 0.5 ? 'l' : 'r';
+  const f = (e.clientY - r.top) / r.height;
   return f < 0.3 ? 'l' : f > 0.7 ? 'r' : 'mid';
 }
 
-// A small + at the end of a group opens a new tab inside it.
-function groupPlus(g) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'gplus g-' + g.color;
-  b.textContent = '+';
-  b.setAttribute('aria-label', T('group.newTab', { name: g.name }));
-  b.dataset.tip = T('group.newTab', { name: g.name });
-  b.addEventListener('click', () => lore.send('group:newTab', g.id));
-  return b;
-}
-
 function groupChip(g, edit) {
-  const b = document.createElement('button');
-  b.type = 'button';
+  const b = document.createElement('div');
   b.className = 'grp g-' + g.color + (g.collapsed ? ' collapsed' : '');
+  b.setAttribute('role', 'button');
+  b.tabIndex = 0;
   b.setAttribute('aria-expanded', String(!g.collapsed));
   const dot = document.createElement('i');
   const label = document.createElement('span');
   label.textContent = g.name || T('group.unnamed');
+  const count = document.createElement('em');
+  count.textContent = String(g.count || '');
+  const plus = document.createElement('button');
+  plus.type = 'button';
+  plus.className = 'gplus';
+  plus.textContent = '+';
+  plus.setAttribute('aria-label', T('group.newTab', { name: g.name }));
+  plus.dataset.tip = T('group.newTab', { name: g.name });
+  plus.addEventListener('click', (e) => { e.stopPropagation(); lore.send('group:newTab', g.id); });
   const chev = document.createElement('em');
+  chev.className = 'chev';
   chev.textContent = g.collapsed ? '▸' : '▾';
   chev.setAttribute('aria-hidden', 'true');
-  b.append(dot, label, chev);
+  b.append(dot, label, count, plus, chev);
   b.dataset.tip = T(g.collapsed ? 'group.expandTip' : 'group.collapseTip');
   b.addEventListener('click', () => lore.send('group:toggle', g.id));
+  b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lore.send('group:toggle', g.id); } });
   b.addEventListener('contextmenu', (e) => { e.preventDefault(); lore.send('group:menu', g.id); });
   b.addEventListener('dblclick', (e) => { e.preventDefault(); startEdit(b, g); });
   // Drop a tab on the group's name to add it.
@@ -112,8 +112,12 @@ function render(s) {
   const active = s.tabs.find((t) => t.active);
   document.documentElement.toggleAttribute('data-private', !!(active && active.private));
   $('#bar').classList.toggle('loading', !!(active && active.loading));
+  document.documentElement.dataset.side = s.side === 'rail' ? 'rail' : 'full';
   const tabs = $('#tabs');
   tabs.replaceChildren();
+  const who = $('#who');
+  who.replaceChildren();
+  let pins = null;
   if (s.profiles && s.profiles.length > 1 && s.profile) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -122,14 +126,15 @@ function render(s) {
     b.setAttribute('aria-label', T('prof.menuAria', { name: s.profile.name }));
     b.dataset.tip = s.profile.name;
     b.addEventListener('click', () => { const r = b.getBoundingClientRect(); lore.send('profile:menu', Math.round(r.left), Math.round(r.bottom)); });
-    tabs.append(b);
+    who.append(b);
   }
   const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
   let lastGroup = 0;
+  const sizes = new Map();
+  for (const t of s.tabs) if (t.group) sizes.set(t.group, (sizes.get(t.group) || 0) + 1);
   for (const t of s.tabs) {
     const g = t.group ? gmap.get(t.group) : null;
-    if (lastGroup && (!g || g.id !== lastGroup) && gmap.get(lastGroup)) tabs.append(groupPlus(gmap.get(lastGroup)));
-    if (g && g.id !== lastGroup) tabs.append(groupChip(g, s.editGroup === g.id));
+    if (g && g.id !== lastGroup) tabs.append(groupChip({ ...g, count: sizes.get(g.id) }, s.editGroup === g.id));
     lastGroup = g ? g.id : 0;
     // A collapsed group shows only its header, unless the tab being used is inside it.
     if (g && g.collapsed && !t.active) continue;
@@ -147,23 +152,24 @@ function render(s) {
     // Drag to reorder: dropping on the left half of a tab puts the dragged tab before it, on the right half after it.
     el.draggable = true;
     el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(t.id)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
-    el.addEventListener('dragend', () => { el.classList.remove('dragging'); for (const x of tabs.children) x.classList.remove('over-l', 'over-r', 'over-mid'); });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); for (const x of tabs.querySelectorAll('.tab')) x.classList.remove('over-t', 'over-b', 'over-l', 'over-r', 'over-mid'); });
     el.addEventListener('dragover', (e) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
       const z = zone(e, r, t);
-      el.classList.toggle('over-l', z === 'l');
-      el.classList.toggle('over-r', z === 'r');
+      const vertical = !t.pinned;
+      el.classList.toggle(vertical ? 'over-t' : 'over-l', z === 'l');
+      el.classList.toggle(vertical ? 'over-b' : 'over-r', z === 'r');
       el.classList.toggle('over-mid', z === 'mid');
     });
-    el.addEventListener('dragleave', () => el.classList.remove('over-l', 'over-r', 'over-mid'));
+    el.addEventListener('dragleave', () => el.classList.remove('over-t', 'over-b', 'over-l', 'over-r', 'over-mid'));
     el.addEventListener('drop', (e) => {
       e.preventDefault();
       const id = Number(e.dataTransfer.getData('text/plain'));
       const z = zone(e, el.getBoundingClientRect(), t);
       const i = s.tabs.findIndex((x) => x.id === t.id);
       const before = z === 'l' ? t.id : (s.tabs[i + 1] ? s.tabs[i + 1].id : null);
-      el.classList.remove('over-l', 'over-r', 'over-mid');
+      el.classList.remove('over-t', 'over-b', 'over-l', 'over-r', 'over-mid');
       if (!id || id === t.id) return;
       if (z === 'mid') lore.send('tab:groupWith', id, t.id);
       else if (id !== before) lore.send('tab:move', id, before);
@@ -178,23 +184,9 @@ function render(s) {
     x.dataset.tip = T('tab.close') + ' (' + key + 'W)';
     x.addEventListener('click', (e) => { e.stopPropagation(); lore.send('tab:close', t.id); });
     el.append(label, x);
-    tabs.append(el);
+    if (t.pinned) { if (!pins) { pins = document.createElement('div'); pins.className = 'pins'; tabs.prepend(pins); } pins.append(el); } else tabs.append(el);
   }
-  if (lastGroup && gmap.get(lastGroup)) tabs.append(groupPlus(gmap.get(lastGroup)));
-  const org = document.createElement('button');
-  org.className = 'plus org';
-  org.hidden = s.tabs.length < 3;
-  org.setAttribute('aria-label', T('org.menu'));
-  org.dataset.tip = T('org.tip', { k: key });
-  org.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
-  org.addEventListener('click', () => lore.send('organize:open'));
-  const plus = document.createElement('button');
-  plus.className = 'plus';
-  plus.textContent = '+';
-  plus.setAttribute('aria-label', T('tab.open'));
-  plus.dataset.tip = T('tip.newTab', { k: key });
-  plus.addEventListener('click', () => lore.send('tab:new'));
-  tabs.append(plus, org);
+  $('#org').hidden = s.tabs.length < 3;
 
   const dlb = $('#downloads');
   dlb.hidden = !s.downloads || !s.downloads.count;
@@ -249,7 +241,7 @@ function render(s) {
   }
 
   $('#media').hidden = !s.media;
-  $('.sep').hidden = $('#media').hidden && $('#downloads').hidden;
+  $('.sep').hidden = $('#media').hidden;
   $('#media .badge').textContent = s.media;
   $('#back').disabled = !s.canBack;
   $('#fwd').disabled = !s.canForward;
@@ -331,9 +323,16 @@ function showTip(target) {
   const r = target.getBoundingClientRect();
   const w = tipEl.offsetWidth;
   // Above the button, kept inside the window and clear of the macOS window buttons.
-  const min = lore.platform === 'darwin' && r.left < 90 ? 92 : 8;
+  if (target.closest('#side')) {
+    // Beside the tab list, not above it.
+    const rail = document.documentElement.dataset.side === 'rail';
+    tipEl.style.left = (rail || target.closest('.side-foot') ? r.right + 8 : Math.min(r.left + 24, innerWidth - w - 8)) + 'px';
+    tipEl.style.top = Math.max(8, r.top + r.height / 2 - tipEl.offsetHeight / 2) + 'px';
+    return;
+  }
+  const min = 8;
   tipEl.style.left = Math.max(min, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-  tipEl.style.top = '10px';
+  tipEl.style.top = Math.max(6, r.bottom + 6) + 'px';
 }
 function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; }
 document.addEventListener('mouseover', (e) => {
@@ -374,13 +373,17 @@ $('#omni').addEventListener('submit', (e) => {
   lore.send('nav:submit', intent.value);
   intent.blur();
 });
-document.querySelector('kbd').textContent = key + 'L';
+$('#omni kbd').textContent = key + 'L';
+document.querySelector('.nk').textContent = key + 'T';
 LORE_I18N.apply(lang);
 tips();
 // Tooltips are drawn by the page (see below) so they appear fast and can show the shortcut as a key cap.
 function tips() {
   for (const e of document.querySelectorAll('[data-i18n-title]')) { e.dataset.tip = T(e.dataset.i18nTitle, { k: key }); e.removeAttribute('title'); }
 }
+$('#newtab').addEventListener('click', () => lore.send('tab:new'));
+$('#org').addEventListener('click', () => lore.send('organize:open'));
+$('#sidetoggle').addEventListener('click', () => lore.send('side:toggle'));
 $('#assist').addEventListener('click', () => lore.send('assist:open'));
 $('#more').addEventListener('click', () => { const r = $('#more').getBoundingClientRect(); lore.send('menu:more', Math.round(r.left), Math.round(r.bottom)); });
 $('#back').addEventListener('click', () => lore.send('nav:back'));
