@@ -107,7 +107,7 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .tab.split-a{border-bottom-right-radius:0}
 .tab.split-b{border-bottom-left-radius:0}
 
-/* ---- Tabs in a sidebar (Settings → Appearance → Tabs, or View → Tabs in Sidebar) ---------------------------------
+/* ---- Tabs in a sidebar ------------------------------------------------------------------------------------------
    The window draws the sidebar down the left and the toolbar to its right; pages sit under the toolbar, right of the
    sidebar. Switching layouts is instant on purpose: it is a keyboard shortcut people use many times a day. */
 :root{--side-bg:color-mix(in srgb,var(--bg) 55%,var(--win))}

@@ -6,7 +6,7 @@ const DEFAULTS = () => ({
   language: 'auto', // auto | en | vi
   autoUpdate: true,   // look for a newer version on GitHub now and then
   appearance: 'system', // system | light | dark
-  tabsLayout: 'top', // top (a strip above the page) | side (a list down the left)
+  tabsLayout: 'side', // the tab list down the left (it slides over the page); the strip along the top no longer exists
   startup: 'restore', // restore (continue where I left off) | new (start with a new tab)
   privacy: {
     blockThirdPartyCookies: true, scamProtection: true, cookieBanners: true, reduceFingerprint: true, permissions: 'ask', // permissions: ask | block
@@ -29,7 +29,7 @@ const PROVIDERS = ['local', 'openai', 'anthropic', 'gemini', 'mistral', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
 const APPEARANCES = ['system', 'light', 'dark'];
-const TAB_LAYOUTS = ['top', 'side'];
+const TAB_LAYOUTS = ['side'];
 const DOH = ['off', 'automatic', 'cloudflare', 'quad9'];
 const ALIAS = ['off', 'addy', 'simplelogin'];
 const hostList = (v) => (Array.isArray(v) ? [...new Set(v.filter((h) => typeof h === 'string' && /^[a-z0-9.-]{1,100}$/i.test(h)).map((h) => h.toLowerCase()))].slice(0, 200) : null);

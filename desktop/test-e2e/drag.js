@@ -43,9 +43,7 @@ app.whenReady().then(async () => {
     await until(() => state && state.tabs.length, 'first state');
     BrowserWindow.fromWebContents(ui()).showInactive(); // animation frames only run in a window that is shown
     if (process.env.DRAG_DEBUG) ui().on('console-message', (...a) => console.log('UI', a.slice(1, 4).join(' | '))); // dbg-console
-    // Tabs in the sidebar, through the real View menu.
-    const find = (items) => { for (const i of items) { if (i.label === 'Tabs in Sidebar') return i; if (i.submenu) { const f = find(i.submenu.items); if (f) return f; } } return null; };
-    find(Menu.getApplicationMenu().items).click();
+    // The tabs are in the sidebar by default.
     await until(() => state.layout === 'side', 'sidebar layout');
     for (let i = 0; i < 3; i++) ui().executeJavaScript(`lore.send('tab:new')`);
     await until(() => state.tabs.length === 4, 'four tabs');

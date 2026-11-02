@@ -1591,12 +1591,6 @@ function applyTabsLayout() {
   layout();
   pushState();
 }
-function setTabsLayout(v) {
-  if (settings.get().tabsLayout === v) return;
-  settings.update({ tabsLayout: v });
-  applyTabsLayout();
-  buildMenu();
-}
 
 // A new tab is for typing: the cursor goes straight into the address and ask box.
 const focusIntent = () => { if (win && !win.isDestroyed()) { win.webContents.focus(); win.webContents.send('focus-intent'); } };
@@ -3015,8 +3009,6 @@ function buildMenu() {
     { role: 'editMenu' },
     // Not the stock viewMenu: its Reload (Cmd/Ctrl+R) reloads the browser's own window, which empties the tab strip.
     { label: T('menu.view'), submenu: [
-      { label: T('menu.sidebar'), type: 'checkbox', checked: sideOn(), click: () => setTabsLayout(sideOn() ? 'top' : 'side') },
-      { type: 'separator' },
       { label: T('nav.reload'), accelerator: 'CmdOrCtrl+R', click: () => { const t = active(); if (t) t.view.webContents.reload(); } },
       { label: T('menu.hardReload'), accelerator: 'CmdOrCtrl+Shift+R', click: () => { const t = active(); if (t) t.view.webContents.reloadIgnoringCache(); } },
       { type: 'separator' },

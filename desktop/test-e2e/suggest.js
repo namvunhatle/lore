@@ -1,7 +1,7 @@
 // "Khám phá tiếp" in the real app: reading an article for a few seconds makes the model write queries from its title and
 // summary, a search returns pages, and the list reaches the sidebar state, without the address or the full text going to the
 // model. A short page, a search page and a private tab get nothing. Runs main.js itself; the model and the search are stubs.
-const { app, BrowserWindow, Menu, webContents } = require('electron');
+const { app, BrowserWindow, webContents } = require('electron');
 const fs = require('fs'), os = require('os'), path = require('path'), http = require('http');
 app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'lore-suggest-')));
 process.env.LORE_NO_WELCOME = '1';
@@ -62,8 +62,6 @@ app.whenReady().then(async () => {
     assert.ok(sent[0].length < 2500, 'a few sentences, not the whole page');
 
     // What the person sees: tabs in the sidebar, the sidebar slid out, the section drawn at its foot.
-    const item = (m) => m.items.flatMap((i) => [i, ...(i.submenu ? item(i.submenu) : [])]);
-    item(Menu.getApplicationMenu()).find((i) => i.label === 'Tabs in Sidebar').click();
     await until(() => webContents.getAllWebContents().some((w) => w.getURL().includes('side.html')), 'the sidebar view exists');
     const side = webContents.getAllWebContents().find((w) => w.getURL().includes('side.html'));
     await sleep(500);

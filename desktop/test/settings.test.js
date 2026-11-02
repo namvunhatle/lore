@@ -11,16 +11,14 @@ test('appearance defaults to the system and accepts only light, dark or system',
   assert.strictEqual(s.view().appearance, 'dark');
 });
 
-test('tabs sit along the top by default and can move to a sidebar', () => {
+test('tabs are in the sidebar; the old strip along the top is gone, also for settings saved with it', () => {
   const { Settings } = require('../src/settings');
   const s = new Settings({});
-  assert.strictEqual(s.get().tabsLayout, 'top');
-  s.update({ tabsLayout: 'side' });
   assert.strictEqual(s.get().tabsLayout, 'side');
-  s.update({ tabsLayout: 'bottom' });
-  assert.strictEqual(s.get().tabsLayout, 'side', 'an unknown value changes nothing');
+  s.update({ tabsLayout: 'top' });
+  assert.strictEqual(s.get().tabsLayout, 'side', 'the top strip no longer exists, so it cannot be chosen');
   assert.strictEqual(s.view().tabsLayout, 'side');
-  assert.strictEqual(new Settings({ load: () => ({ tabsLayout: 'side' }) }).get().tabsLayout, 'side', 'kept across restarts');
+  assert.strictEqual(new Settings({ load: () => ({ tabsLayout: 'top' }) }).get().tabsLayout, 'side', 'a profile saved with the strip opens with the sidebar');
 });
 
 test('automatic update checks are on by default and can be turned off', () => {

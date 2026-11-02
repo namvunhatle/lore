@@ -55,10 +55,6 @@ function setLang(l) {
   ap.replaceChildren();
   for (const [v, k] of [['system', 'set.look.system'], ['light', 'set.look.light'], ['dark', 'set.look.dark']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); ap.append(o); }
   ap.value = view ? view.appearance : 'system';
-  const tl = $('#tabslayout');
-  tl.replaceChildren();
-  for (const [v, k] of [['top', 'set.look.tabsTop'], ['side', 'set.look.tabsSide']]) { const o = document.createElement('option'); o.value = v; o.textContent = T(k); tl.append(o); }
-  tl.value = view ? view.tabsLayout : 'top';
   $('#autoupdate').checked = view ? view.autoUpdate !== false : true;
   const st = $('#startup');
   st.replaceChildren();
@@ -133,7 +129,6 @@ function patch() {
     language: $('#language').value,
     startup: $('#startup').value,
     appearance: $('#appearance').value,
-    tabsLayout: $('#tabslayout').value,
     autoUpdate: $('#autoupdate').checked,
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value, httpsFirst: $('#https').checked, stripTracking: $('#strip').checked, memory: $('#mem').checked, doh: $('#doh').value, lock: $('#lock').checked },
     alias: { provider: $('#alias').value, key: $('#alias-key').value },
