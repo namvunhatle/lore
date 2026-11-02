@@ -18,12 +18,13 @@ const DEFAULTS = () => ({
   minFont: 0, // smallest text size a page may use, in px; 0 leaves pages alone
   search: 'duckduckgo', searchCustom: '', // duckduckgo | google | bing | brave | coccoc | custom
   alias: { provider: 'off', key: '' }, // off | addy | simplelogin
-  provider: 'local', // local | openai | anthropic | off
+  provider: 'local', // local | openai | anthropic | gemini | off
   local: { url: process.env.LORE_LLM_URL || 'http://127.0.0.1:11434', model: process.env.LORE_LLM_MODEL || 'qwen2.5:3b', embedModel: 'bge-m3' },
   openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', key: '' },
-  anthropic: { model: 'claude-haiku-5-5', key: '' }
+  anthropic: { model: 'claude-haiku-5-5', key: '' },
+  gemini: { model: 'gemini-2.5-flash', key: '' }
 });
-const PROVIDERS = ['local', 'openai', 'anthropic', 'off'];
+const PROVIDERS = ['local', 'openai', 'anthropic', 'gemini', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
 const APPEARANCES = ['system', 'light', 'dark'];
@@ -67,7 +68,7 @@ class Settings {
     if (ALIAS.includes(al.provider)) out.alias.provider = al.provider;
     if (typeof al.key === 'string' && al.key.trim()) out.alias.key = al.key.trim();
     if (pv.permissions !== undefined) out.privacy.permissions = pv.permissions;
-    for (const k of ['local', 'openai', 'anthropic']) {
+    for (const k of ['local', 'openai', 'anthropic', 'gemini']) {
       for (const f of Object.keys(out[k])) {
         const v = patch[k] && patch[k][f];
         if (typeof v !== 'string') continue;
@@ -89,6 +90,10 @@ class Settings {
       httpUrl(cfg.openai.baseUrl, { allowPlainLocal: true });
       if (!cfg.openai.model) throw new Error('set.v.model');
       if (!cfg.openai.key && !isLocalHost(cfg.openai.baseUrl)) throw new Error('set.v.key');
+    }
+    if (cfg.provider === 'gemini') {
+      if (!cfg.gemini.model) throw new Error('set.v.model');
+      if (!cfg.gemini.key) throw new Error('set.v.key');
     }
     if (cfg.provider === 'anthropic') {
       if (!cfg.anthropic.model) throw new Error('set.v.model');
@@ -115,6 +120,7 @@ class Settings {
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },
+      gemini: { model: c.gemini.model, hasKey: !!c.gemini.key },
       alias: { provider: c.alias.provider, hasKey: !!c.alias.key }
     };
   }

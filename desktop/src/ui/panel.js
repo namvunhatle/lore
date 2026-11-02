@@ -298,9 +298,9 @@ function body(s) {
       const q = el('blockquote', s.passages[0].length > 280 ? 'fold' : '', s.passages[0]);
       b.append(el('p', 'fine', T('pg.fromPage')), q);
       if (q.classList.contains('fold')) {
-        const more = el('button', 'more', T('pg.more'));
+        const more = el('button', 'more', T('pg.foldMore'));
         more.type = 'button';
-        more.addEventListener('click', () => { const f = q.classList.toggle('fold'); more.textContent = T(f ? 'pg.more' : 'pg.less'); });
+        more.addEventListener('click', () => { const f = q.classList.toggle('fold'); more.textContent = T(f ? 'pg.foldMore' : 'pg.less'); });
         b.append(more);
       }
       const show = el('button', 'small', T('pg.showInPage'));

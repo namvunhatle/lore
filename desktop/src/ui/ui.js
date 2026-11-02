@@ -29,7 +29,8 @@ function icon(t) {
   const wrap = document.createElement('span');
   wrap.className = 'fav';
   const letter = t.home ? 'L' : (t.title || '?').trim().charAt(0).toUpperCase();
-  const fallback = () => { wrap.className = 'fav ph' + (t.home ? ' lore' : ''); wrap.textContent = letter; };
+  // No icon: a plain globe, not a letter.
+  const fallback = () => { wrap.className = 'fav ph' + (t.home ? ' lore' : ''); wrap.textContent = ''; wrap.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.300 6.400-3.800 9c-2.500-2.600-3.800-5.600-3.800-9S9.500 5.600 12 3z"/></svg>'; };
   if (t.favicon && !t.home) {
     const img = document.createElement('img');
     img.alt = '';
@@ -389,6 +390,7 @@ function tips() {
 $('#newtab').addEventListener('click', () => lore.send('tab:new'));
 $('#org').addEventListener('click', () => lore.send('organize:open'));
 $('#sidetoggle').addEventListener('click', () => lore.send('side:toggle'));
+$('#gear').addEventListener('click', () => lore.send('settings:open'));
 $('#assist').addEventListener('click', () => lore.send('assist:open'));
 $('#more').addEventListener('click', () => { const r = $('#more').getBoundingClientRect(); lore.send('menu:more', Math.round(r.left), Math.round(r.bottom)); });
 $('#back').addEventListener('click', () => lore.send('nav:back'));

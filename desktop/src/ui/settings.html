@@ -97,13 +97,14 @@
   <div class="bar" id="setup-bar" hidden><i></i></div>
   <div class="cardsel" role="radiogroup" data-i18n-aria="set.ai.h">
     <label class="pcard"><input type="radio" name="provider" value="local"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.local.t"></b><small data-i18n="set.local.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="off"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.off.t"></b><small data-i18n="set.off.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="openai"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.openai.t"></b><small data-i18n="set.openai.d"></small></label>
     <label class="pcard"><input type="radio" name="provider" value="anthropic"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.anthropic.t"></b><small data-i18n="set.anthropic.d"></small></label>
-    <label class="pcard"><input type="radio" name="provider" value="off"><span class="badge priv" data-i18n="set.badge.local"></span><b data-i18n="set.off.t"></b><small data-i18n="set.off.d"></small></label>
+    <label class="pcard"><input type="radio" name="provider" value="gemini"><span class="badge" data-i18n="set.badge.cloud"></span><b data-i18n="set.gemini.t"></b><small data-i18n="set.gemini.d"></small></label>
   </div>
 
-  <label class="f gap-s"><span data-i18n="set.save"></span><select id="saving"></select></label>
-  <p class="hint tight" data-i18n="set.save.d"></p>
+  <label class="f gap-s"><span data-i18n="set.data"></span><select id="saving"></select></label>
+  <p class="hint tight" data-i18n="set.data.d"></p>
   <p class="hint" id="usage"></p>
   <section id="p-local" hidden>
     <label class="f"><span data-i18n="set.f.ollamaUrl"></span><input id="local-url" spellcheck="false" autocomplete="off"></label>
@@ -126,6 +127,13 @@
     <label class="f"><span data-i18n="set.f.model"></span><input id="openai-model" spellcheck="false" autocomplete="off"></label>
     <label class="f"><span data-i18n="set.f.key"></span><input id="openai-key" type="password" spellcheck="false" autocomplete="off"></label>
     <button class="link" id="openai-clear" type="button" data-i18n="set.clearKey" hidden></button>
+  </section>
+
+  <section id="p-gemini" hidden>
+    <label class="f"><span data-i18n="set.f.model"></span><input id="gemini-model" spellcheck="false" autocomplete="off"></label>
+    <label class="f"><span data-i18n="set.f.key"></span><input id="gemini-key" type="password" spellcheck="false" autocomplete="off"></label>
+    <button class="link" id="gemini-clear" type="button" data-i18n="set.clearKey" hidden></button>
+    <p class="hint" data-i18n="set.gemini.note"></p>
   </section>
 
   <section id="p-anthropic" hidden>

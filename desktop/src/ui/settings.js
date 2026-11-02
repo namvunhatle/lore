@@ -29,7 +29,7 @@ function setLang(l) {
   const sv = $('#saving');
   const keepSv = sv.value;
   sv.replaceChildren();
-  for (const v of ['save', 'balanced', 'detail']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.save.' + v); sv.append(o); }
+  for (const v of ['save', 'balanced', 'detail']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.data.' + v); sv.append(o); }
   sv.value = view ? view.aiSaving : keepSv || 'balanced';
   const se = $('#search');
   const keepSe = se.value;
@@ -95,7 +95,8 @@ function fill(v) {
   $('#openai-url').value = v.openai.baseUrl;
   $('#openai-model').value = v.openai.model;
   $('#anthropic-model').value = v.anthropic.model;
-  for (const k of ['openai', 'anthropic']) {
+  $('#gemini-model').value = v.gemini.model;
+  for (const k of ['openai', 'anthropic', 'gemini']) {
     $('#' + k + '-key').value = '';
     $('#' + k + '-key').placeholder = v[k].hasKey ? T('set.keySaved') : T('set.keyPh');
     $('#' + k + '-clear').hidden = !v[k].hasKey;
@@ -106,9 +107,9 @@ function fill(v) {
 function show() {
   const p = provider();
   $('#test').hidden = p === 'off';
-  for (const k of ['local', 'openai', 'anthropic']) $('#p-' + k).hidden = p !== k;
+  for (const k of ['local', 'openai', 'anthropic', 'gemini']) $('#p-' + k).hidden = p !== k;
   const w = $('#remote-warn');
-  const remoteHost = p === 'anthropic' ? 'api.anthropic.com' : p === 'openai' ? safeHost($('#openai-url').value) : '';
+  const remoteHost = p === 'anthropic' ? 'api.anthropic.com' : p === 'gemini' ? 'generativelanguage.googleapis.com' : p === 'openai' ? safeHost($('#openai-url').value) : '';
   w.hidden = !(remoteHost && !isLocal(remoteHost));
   if (!w.hidden) w.textContent = T('set.warnRemote', { host: remoteHost });
   const h = $('#store-hint');
@@ -135,7 +136,8 @@ function patch() {
     search: $('#search').value, searchCustom: $('#search-custom').value,
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },
-    anthropic: { model: val('#anthropic-model'), key: $('#anthropic-key').value }
+    anthropic: { model: val('#anthropic-model'), key: $('#anthropic-key').value },
+    gemini: { model: val('#gemini-model'), key: $('#gemini-key').value }
   };
 }
 
@@ -184,7 +186,7 @@ $('#test').addEventListener('click', async () => {
   say(r.ok ? T('set.testOk') : r.message, !r.ok);
 });
 
-for (const k of ['openai', 'anthropic']) {
+for (const k of ['openai', 'anthropic', 'gemini']) {
   $('#' + k + '-clear').addEventListener('click', async () => {
     const r = await settings.save({ clearKey: [k], provider: 'off' });
     if (r.error) return say(r.error, true);

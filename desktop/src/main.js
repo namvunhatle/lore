@@ -232,6 +232,7 @@ async function modelMenu(x, y) {
   if (!names.length) items.push({ label: T('mm.noLocal'), enabled: false });
   const cloud = [];
   if (c.openai.key) cloud.push({ label: 'OpenAI · ' + c.openai.model, type: 'radio', checked: c.provider === 'openai', click: pick({ provider: 'openai' }) });
+  if (c.gemini.key) cloud.push({ label: 'Gemini · ' + c.gemini.model, type: 'radio', checked: c.provider === 'gemini', click: pick({ provider: 'gemini' }) });
   if (c.anthropic.key) cloud.push({ label: 'Anthropic · ' + c.anthropic.model, type: 'radio', checked: c.provider === 'anthropic', click: pick({ provider: 'anthropic' }) });
   if (cloud.length) items.push({ type: 'separator' }, ...cloud);
   items.push({ type: 'separator' }, { label: T('mm.off'), type: 'radio', checked: c.provider === 'off', click: pick({ provider: 'off' }) }, { type: 'separator' }, { label: T('mm.more'), click: () => openSettings('ai') });
@@ -266,7 +267,8 @@ function pushState() {
     side: settings.get().sidebar,
     panel: agentOpen(),
     tabs: tabs.map((x) => ({
-      id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
+      // A page without an icon of its own (or one still loading) uses the one this site had before.
+      id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon || (!x.private && favicons && !x.isHome ? favicons.get(hostOfUrl(x.lazyUrl || x.url)) : ''), home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
     })),
     profile: profiles ? { id: profiles.active, name: profiles.current.name, color: profiles.current.color } : null,

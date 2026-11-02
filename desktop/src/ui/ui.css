@@ -211,3 +211,23 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .aibtn:hover:not(:disabled){background:var(--hv);color:var(--ink)}
 #assist:hover:not(:disabled){color:var(--ink)}
 .aibtn.open,#assist.open:not(:disabled){background:var(--accent-soft);color:var(--accent)}
+
+/* Tab list, second pass: icon tiles, a little more air, a clear selected row, and the tools along the bottom. */
+.tabs{gap:3px}
+.tab{height:38px;gap:11px;padding:0 6px 0 8px;border-radius:10px;font-weight:500;transition:background .12s,color .12s}
+.tab .fav{width:22px;height:22px;border-radius:7px;background:color-mix(in srgb,var(--card) 75%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent)}
+.tab .fav img{width:16px;height:16px;border-radius:3px}
+.tab .fav.ph{color:var(--muted)}
+.tab .fav.ph svg{display:block}
+.tab[aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(20,20,40,.1),0 0 0 1px var(--line)}
+.tab[aria-selected="true"] .fav{background:var(--hover);box-shadow:none}
+.tab.pinned{width:42px;height:42px;border-radius:12px}
+.tab.pinned .fav{width:24px;height:24px}
+.newtab{height:38px;border-radius:10px;margin-bottom:10px;border:1px dashed var(--line)}
+.newtab:hover{border-color:transparent}
+.grow{flex:1}
+.side-foot{padding:10px 2px 0;gap:4px}
+.side-foot .ib{width:36px;height:36px;border-radius:10px;color:var(--muted)}
+.side-foot .ib:hover{color:var(--ink)}
+:root[data-side="rail"] .grow{display:none}
+:root[data-side="rail"] .tab .fav{width:26px;height:26px}
