@@ -1,4 +1,9 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences } = require('electron');
+// In the CI smoke test an error at start-up must end the run with its stack, not leave an error dialog nobody can see.
+if (process.env.LORE_SMOKE) {
+  process.on('uncaughtException', (e) => { console.error('LORE_SMOKE_FAIL uncaught: ' + (e && e.stack || e)); process.exit(1); });
+  process.on('unhandledRejection', (e) => console.error('LORE_SMOKE_WARN unhandled rejection: ' + (e && e.stack || e)));
+}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
