@@ -57,7 +57,7 @@ function ground(rows, texts) {
 
 async function compare({ items, llm, lang = 'en' }) {
   if (!llm) throw new Error('no model');
-  const reply = await llm.chat(messages({ items, lang }), { maxTokens: 900, timeoutMs: 90000, temperature: 0.1 });
+  const reply = await llm.chat(messages({ items, lang }), { maxTokens: 1500, timeoutMs: 90000, temperature: 0.1 });
   const rows = ground(parse(reply, items.length), items.map((i) => i.text));
   if (!rows.length) throw new Error('no table');
   return rows;

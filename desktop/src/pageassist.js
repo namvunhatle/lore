@@ -31,9 +31,10 @@ async function summarize({ text, llm, lang = 'en' }) {
     const reply = await llm.chat([
       { role: 'system', content: `Summarize the page in 3 to 5 short bullet points, one per line, in ${NAME[lang]}. Use only what the page says. No preamble. ${UNTRUSTED}` },
       { role: 'user', content: 'PAGE:\n<<<\n' + samplePage(text) + '\n>>>' }
-    ], { timeoutMs: 60000, maxTokens: 900 });
-    const bullets = complete(reply.split(/\n+/).map(stripBullet).filter((l) => l.length > 10).slice(0, 5), llm.truncated);
-    return bullets.length ? { bullets, ai: true } : { bullets: key, ai: false };
+    ], { timeoutMs: 60000, maxTokens: 1600 });
+    const all = reply.split(/\n+/).map(stripBullet).filter((l) => l.length > 10).slice(0, 5);
+    const bullets = complete(all, llm.truncated);
+    return bullets.length ? { bullets, ai: true, cut: !!llm.truncated } : { bullets: key, ai: false };
   } catch { return { bullets: key, ai: false }; }
 }
 
@@ -50,9 +51,9 @@ async function ask({ text, question, llm, lang = 'en', history = [] }) {
     const reply = await llm.chat([
       { role: 'system', content: `Answer the question in at most 3 sentences in ${NAME[lang]}, using ONLY the numbered passages. If the question refers to the earlier conversation (shorter, simpler, more detail, translate that), rework the earlier answer using the passages. If they do not answer it, reply exactly NO_ANSWER. ${UNTRUSTED}` },
       { role: 'user', content: (earlier ? `EARLIER IN THIS CONVERSATION:\n${earlier}\n\n` : '') + `QUESTION: ${question}\n\nPASSAGES:\n<<<\n${ctx}\n>>>` }
-    ], { timeoutMs: 45000, maxTokens: 700 });
+    ], { timeoutMs: 45000, maxTokens: 1200 });
     if (!reply || /NO_ANSWER/.test(reply)) return { found: true, passages, answer: '', ai: false };
-    return { found: true, passages, answer: cutAtSentence(reply.replace(/\[\d+\]/g, '').trim(), llm.truncated), ai: true };
+    return { found: true, passages, answer: cutAtSentence(reply.replace(/\[\d+\]/g, '').trim(), llm.truncated), ai: true, cut: !!llm.truncated };
   } catch { return { found: true, passages, answer: '', ai: false }; }
 }
 

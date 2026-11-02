@@ -66,3 +66,11 @@ test('a summary drops a last bullet that was cut off, but only when the model ra
   const b = await require('../src/pageassist').summarize({ text, llm: mk(false), lang: 'vi' });
   assert.strictEqual(b.bullets.length, 3);
 });
+
+test('an answer the model had to stop is marked as cut, not shown as finished', async () => {
+  const llm = { available: async () => true, truncated: true, chat: async () => 'The city is on the coast of Vietnam and known for beaches. It has grown quickly as' };
+  const text = 'The city is on the coast of Vietnam and known for beaches. '.repeat(10);
+  const a = await ask({ text, question: 'where is the city', llm });
+  assert.ok(a.cut);
+  assert.ok(a.answer.endsWith('beaches.'));
+});

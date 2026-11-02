@@ -328,6 +328,16 @@ function body(s) {
     const n = s.safety.invisible || 0;
     if (n) extra.push(T('safe.cleaned', { n }));
   }
+  // The model ran out of room: say so and offer to carry on, instead of leaving a cut answer looking finished.
+  if (s.cut) {
+    const n = el('div', 'cutnote');
+    n.append(el('span', '', T('pg.cut')));
+    const go = el('button', 'small', T('pg.cutGo'));
+    go.type = 'button';
+    go.addEventListener('click', () => agent.pageDo('ask', T('pg.cutGo.q')));
+    n.append(go);
+    b.append(n);
+  }
   if (extra.length) { const m = el('div', 'metas'); for (const t of extra) m.append(el('span', 'fine', t)); b.append(m); }
   return { b, copy };
 }

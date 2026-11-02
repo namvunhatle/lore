@@ -1023,7 +1023,7 @@ async function pageAssistant(action, question = '') {
       for (const t of others) { const r = await pageRead(t); items.push({ url: t.url, title: t.title || hostOfUrl(t.url), text: r.text, tabId: t.id, report: r.report }); }
       const res = await recall.askSources({ items, question, llm: l, lang: L(), history: chats.context(conv.states) });
       const flagged = items.map((i) => i.report).find((r) => shield.worthWarning(r) || r.invisible || r.hiddenChars) || null;
-      return sp({ ...meta, state: 'done', found: res.found, answer: res.answer, cites: res.cites, ai: !!res.answer, safety: flagged,
+      return sp({ ...meta, state: 'done', found: res.found, answer: res.answer, cites: res.cites, ai: !!res.answer, cut: !!res.cut, safety: flagged,
         srcs: res.sources.map((x) => ({ n: x.n, title: x.title, host: x.host, url: items[x.n - 1].url, tabId: items[x.n - 1].tabId, passage: x.passages[0] || '' })) });
     }
     const { text, report } = await pageRead(tab);
@@ -1032,11 +1032,11 @@ async function pageAssistant(action, question = '') {
     if (action === 'summarize') {
       const s = await pageassist.summarize({ text, llm: l, lang: L() });
       mine.text = text;
-      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
+      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, cut: s.cut, safety });
     }
     const a = await pageassist.ask({ text, question, llm: l, lang: L(), history: chats.context(conv.states) });
     mine.text = text;
-    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
+    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, cut: a.cut, safety });
   } catch { sp({ ...meta, state: 'error', error: 'pg.error' }); }
 }
 

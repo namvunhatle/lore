@@ -49,7 +49,7 @@ async function ask({ question, memory, llm, lang = 'en', now = Date.now() }) {
   const sources = sourcesFor(items, question);
   if (!llm) return { found: true, sources, answer: '', cites: [] };
   try {
-    const reply = await llm.chat(messages({ question, sources, lang }), { maxTokens: 700, timeoutMs: 60000, temperature: 0.2 });
+    const reply = await llm.chat(messages({ question, sources, lang }), { maxTokens: 1200, timeoutMs: 60000, temperature: 0.2 });
     const r = parse(reply, sources.length);
     return { found: true, sources, ...r };
   } catch { return { found: true, sources, answer: '', cites: [] }; }
@@ -61,8 +61,8 @@ async function askSources({ items, question, llm, lang = 'en', history = [] }) {
   if (!sources.some((s) => s.passages.length)) return { found: false, sources, answer: '', cites: [] };
   if (!llm) return { found: true, sources, answer: '', cites: [] };
   try {
-    const reply = await llm.chat(messages({ question, sources, lang, history }), { maxTokens: 700, timeoutMs: 60000, temperature: 0.2 });
-    return { found: true, sources, ...parse(reply, sources.length) };
+    const reply = await llm.chat(messages({ question, sources, lang, history }), { maxTokens: 1200, timeoutMs: 60000, temperature: 0.2 });
+    return { found: true, sources, ...parse(reply, sources.length), cut: !!llm.truncated };
   } catch { return { found: true, sources, answer: '', cites: [] }; }
 }
 
