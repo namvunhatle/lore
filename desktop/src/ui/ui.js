@@ -319,8 +319,11 @@ function showTip(target) {
   const [, text, cap] = /^(.*?)(?:\s*\(([^)]+)\))?$/.exec(target.dataset.tip);
   tipEl.replaceChildren(document.createTextNode(text));
   if (cap) { const k = document.createElement('kbd'); k.textContent = cap; tipEl.append(k); }
-  tipEl.hidden = false;
   const r = target.getBoundingClientRect();
+  // Drawn by the main process in a view above the page, so nothing can hide it.
+  lore.send('tip:show', { text, cap: cap || '', x: r.left, y: r.top, w: r.width, h: r.height, place: target.closest('#side') ? 'right' : 'below' });
+  return;
+  tipEl.hidden = false;
   const w = tipEl.offsetWidth;
   // Above the button, kept inside the window and clear of the macOS window buttons.
   if (target.closest('#side')) {
@@ -335,7 +338,7 @@ function showTip(target) {
   tipEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, left ? r.right + 8 : r.left - w - 8)) + 'px';
   tipEl.style.top = Math.max(6, r.top + r.height / 2 - tipEl.offsetHeight / 2) + 'px';
 }
-function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; }
+function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; lore.send('tip:hide'); }
 document.addEventListener('mouseover', (e) => {
   const t = e.target.closest && e.target.closest('[data-tip]');
   clearTimeout(tipTimer);

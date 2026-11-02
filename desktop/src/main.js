@@ -1544,6 +1544,33 @@ function openBreach() {
   });
 }
 
+// ---- Tooltips -------------------------------------------------------------------------------------------------------------
+// The browser window's own page sits under the page card, so a tip drawn there can be hidden. This small view is drawn on top.
+let tipView = null;
+let tipWant = null;
+function hideTip() { tipWant = null; if (tipView && win && !win.isDestroyed()) { try { win.contentView.removeChildView(tipView); } catch { /* not shown */ } } }
+function wireTipIpc() {
+  ipcMain.on('tip:show', (e, d) => {
+    if (e.sender !== win.webContents || !d || typeof d.text !== 'string' || ![d.x, d.y, d.w, d.h].every(Number.isFinite)) return;
+    tipWant = { x: d.x, y: d.y, w: d.w, h: d.h, place: d.place === 'right' ? 'right' : 'below' };
+    if (!tipView) {
+      tipView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'tip-preload.js'), contextIsolation: true, sandbox: true } });
+      tipView.setBackgroundColor('#00000000');
+      tipView.webContents.loadFile(path.join(__dirname, 'ui', 'tip.html')).then(() => tipView && tipView.webContents.send('tip:text', { text: d.text.slice(0, 200), cap: String(d.cap || '').slice(0, 12) }));
+    } else tipView.webContents.send('tip:text', { text: d.text.slice(0, 200), cap: String(d.cap || '').slice(0, 12) });
+  });
+  ipcMain.on('tip:size', (e, w, h) => {
+    if (!tipView || e.sender !== tipView.webContents || !tipWant || !Number.isFinite(w) || !Number.isFinite(h)) return;
+    const [cw, ch] = win.getContentSize();
+    const a = tipWant;
+    const x = a.place === 'right' ? a.x + a.w + 2 : a.x + a.w / 2 - w / 2;
+    const y = a.place === 'right' ? a.y + a.h / 2 - h / 2 : a.y + a.h - 2;
+    tipView.setBounds({ x: Math.round(Math.max(2, Math.min(cw - w - 2, x))), y: Math.round(Math.max(2, Math.min(ch - h - 2, y))), width: w, height: h });
+    win.contentView.addChildView(tipView);
+  });
+  ipcMain.on('tip:hide', (e) => { if (e.sender === win.webContents) hideTip(); });
+}
+
 // ---- Privacy at a glance (PRV-15) and the weekly report (PRV-04) -----------------------------------------------------------
 let privView = null;
 let reportWin = null;
@@ -2485,6 +2512,7 @@ app.whenReady().then(() => {
   wireOrganizeIpc();
   wireCompareIpc();
   wirePrivIpc();
+  wireTipIpc();
   wirePasswordsIpc();
   wireWelcomeIpc();
   stage('ipc');
