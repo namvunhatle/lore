@@ -133,8 +133,7 @@ const downloader = require('./downloader');
 
 // The window is a frame (tab list at the left, address bar on top) with the page and the AI panel as cards inside it.
 const CHROME_BASE = 52;
-const SIDE_FULL = 252, SIDE_RAIL = 72, INSET = 8, RADIUS = 10;
-const sideWidth = () => 0; // the tab sidebar slides over the page and takes no room (ui/side.html)
+const INSET = 8, RADIUS = 10; // the page is a card inside the frame; the tab sidebar slides over it and takes no room (ui/side.html)
 const BAR_H = 34; // the bookmarks bar, when it is shown
 const TABS_H = 40; // the tab strip, when tabs are along the top
 const SIDE_W = 240; // the tab sidebar, when tabs are down the left
@@ -224,7 +223,7 @@ const active = () => tabs.find((t) => t.id === activeId);
 // Where the page card sits: right of the tab list, under the address bar, with the AI panel (when open) beside it.
 function pageRect(w, h) {
   const pw = agentOpen() ? PANEL_W + SPLIT_GAP : 0;
-  const x = sideWidth() || INSET, y = chromeHeight();
+  const x = INSET, y = chromeHeight();
   return { x, y, width: Math.max(200, w - INSET - pw - x), height: Math.max(200, h - y - INSET) };
 }
 
@@ -280,12 +279,6 @@ class Sheet {
   }
 }
 const closeSheet = () => { if (sheet) sheet.close(); };
-
-function toggleSidebar() {
-  settings.update({ sidebar: settings.get().sidebar === 'rail' ? 'full' : 'rail' });
-  layout();
-  pushState();
-}
 
 function layout() {
   const t = active();
@@ -505,7 +498,6 @@ function pushState() {
   const wc = t && t.view.webContents;
   const state = {
     lang: L(),
-    side: settings.get().sidebar,
     sheet: sheet && !sheet.dead ? sheet.name : '',
     panel: agentOpen(),
     tabs: tabs.map((x) => ({
@@ -2727,7 +2719,6 @@ function wireIpc() {
   if (process.env.LORE_SHOTS) ipcMain.on('debug:shots', (e, o) => { if (e.sender !== win.webContents) return; if (o && o.bounds) win.setBounds(o.bounds); win.show(); app.focus({ steal: true }); win.moveTop(); });
   ipcMain.on('tab:new', () => openTab());
   ipcMain.on('model:menu', (e, x, y) => { if (panel && e.sender === panel.webContents && Number.isFinite(x) && Number.isFinite(y)) modelMenu(x, y); });
-  ipcMain.on('side:toggle', (e) => { if (e.sender === win.webContents) toggleSidebar(); });
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   // Outline: the page reports its headings and the one at the reading line; the sidebar asks to go to one or open it.
   ipcMain.on('outline:set', (e, raw) => {
@@ -3037,7 +3028,6 @@ function buildMenu() {
       { label: T('pdf.save'), click: savePdf },
       { label: T('src.menu'), accelerator: 'CmdOrCtrl+U', click: viewSource },
       { type: 'separator' },
-      { label: T('side.toggle'), accelerator: 'CmdOrCtrl+Shift+E', click: toggleSidebar },
       { role: 'togglefullscreen' },
       { label: T('menu.devtools'), accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => { const t = active(); if (t) t.view.webContents.toggleDevTools(); } }
     ] },

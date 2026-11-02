@@ -273,9 +273,7 @@ html.peek:not(.open) .fav.spin{animation-play-state:paused}
 /* ---- The window frame: a tab list at the left, the address bar on top, the page as a card inside ------------------------ */
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.5 var(--f);-webkit-user-select:none;user-select:none}
 :root{--sw:0px;--hv:color-mix(in srgb,var(--ink) 7%,transparent);--card:var(--win)}
-:root[data-side="rail"]{--sw:72px}
 .ib:hover:not(:disabled){background:var(--hv)}
-.side-foot{flex:none;display:flex;align-items:center;gap:2px;padding-top:8px;border-top:1px solid var(--line);margin:0 -2px}
 /* Groups: a header row, its tabs indented under it. */
 .g-blue{--g:#4C8DF6}.g-green{--g:#2FA36B}.g-amber{--g:#E0A030}.g-red{--g:#E5594F}.g-purple{--g:#8E6BE8}.g-grey{--g:#8A93A3}
 /* The top bar */
@@ -293,7 +291,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .bmbar .hint{color:var(--muted);font-size:12px;padding:0 6px}
 #bar.loading::after{left:0;bottom:2px}
 @media (max-width:980px){.aibtn span{display:none}.aibtn{padding:0 10px;margin:0 2px}.bar{column-gap:8px}}
-#org[hidden]{display:none}
 /* Narrow rail: icons only. */
 
 /* Shield and AI: quieter. The shield is an icon with a small count; the AI button is a soft accent chip, not a filled pill. */
@@ -328,11 +325,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .aibtn.open,#assist.open:not(:disabled){background:var(--accent-soft);color:var(--accent)}
 
 /* Tab list, second pass: icon tiles, a little more air, a clear selected row, and the tools along the bottom. */
-.grow{flex:1}
-.side-foot{padding:10px 2px 0;gap:4px}
-.side-foot .ib{width:36px;height:36px;border-radius:10px;color:var(--muted)}
-.side-foot .ib:hover{color:var(--ink)}
-:root[data-side="rail"] .grow{display:none}
 
 /* Tab list, third pass: plain icons, darker text, a slim accent mark on the open tab, a labelled list. */
 
@@ -342,5 +334,4 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 /* Renaming a group: a quiet field in the group's own colour, no browser outline. */
 
 /* Loading: a small round spinner in place of the icon, whatever the tab style. */
-.ib.on{background:var(--accent-soft);color:var(--accent)}
 @media (prefers-reduced-motion:reduce){.tab .fav.spin{animation:none;border-top-color:var(--accent);border-right-color:var(--accent)}}

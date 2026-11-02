@@ -302,19 +302,6 @@ function renderSuggest(items) {
   if (items.length && !calmSide.matches) box.animate([{ opacity: had ? 0.4 : 0 }, { opacity: 1 }], { duration: 200, easing: EASE });
 }
 
-// The tools (Memory, Settings, Downloads) open as a sheet over the page; their buttons sit in a slim row at the foot.
-const SIDE_TOOLS = [['memory', 'memory:open', 'memory'], ['gear', 'settings:open', 'settings'], ['downloads', 'downloads:open', 'downloads']];
-for (const [id, msg] of SIDE_TOOLS) { const b = $('#' + id); if (b) b.addEventListener('click', () => lore.send(msg)); }
-function renderTools(s) {
-  for (const [id, , sheet] of SIDE_TOOLS) { const b = $('#' + id); if (b) b.classList.toggle('on', s.sheet === sheet); }
-  const dl = $('#downloads');
-  if (!dl) return;
-  dl.hidden = !s.downloads || !s.downloads.count;
-  dl.classList.toggle('busy', !!(s.downloads && s.downloads.active));
-  const bd = dl.querySelector('.badge');
-  if (bd) { bd.textContent = s.downloads ? s.downloads.active : 0; bd.hidden = !(s.downloads && s.downloads.active); }
-}
-
 function renderSide(s) {
   lastSide = s;
   // The top row is rebuilt only when what it shows changes, so a button under the pointer keeps its hover and press.
@@ -372,7 +359,6 @@ function renderSide(s) {
     if (el) el.scrollIntoView({ block: 'nearest' });
   }
   renderSuggest(s.suggest || []);
-  renderTools(s);
   sideEdges();
   sideDrawn = true;
   dragRendered();

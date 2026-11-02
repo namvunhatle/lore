@@ -136,11 +136,6 @@ function render(s) {
 
 // Everything outside the tabs: toolbar, lock, star, bookmarks bar. Same in both layouts.
 function renderChrome(s) {
-  const dlb = $('#downloads');
-  dlb.hidden = !s.downloads || !s.downloads.count;
-  dlb.classList.toggle('busy', !!(s.downloads && s.downloads.active));
-  $('#downloads .badge').textContent = s.downloads ? s.downloads.active : 0;
-  $('#downloads .badge').hidden = !(s.downloads && s.downloads.active);
 
   // Lock area: what kind of connection this page has. Plain http and an ignored certificate error are called out.
   const sec = $('#sec');
@@ -300,9 +295,6 @@ $('#back').addEventListener('click', () => lore.send('nav:back'));
 $('#fwd').addEventListener('click', () => lore.send('nav:forward'));
 $('#reload').addEventListener('click', () => lore.send('nav:reload'));
 $('#shield').addEventListener('click', () => lore.send('priv:open'));
-$('#memory').addEventListener('click', () => lore.send('memory:open'));
 $('#media').addEventListener('click', () => lore.send('media:open'));
-$('#downloads').addEventListener('click', () => lore.send('downloads:open'));
-$('#gear').addEventListener('click', () => lore.send('settings:open'));
 $('#star').addEventListener('click', () => lore.send('bookmark:toggle'));
 $('#sec').addEventListener('click', () => { const r = $('#sec').getBoundingClientRect(); lore.send('security:menu', Math.round(r.left), Math.round(r.bottom)); });

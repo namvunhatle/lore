@@ -15,7 +15,6 @@ const DEFAULTS = () => ({
     trackingOff: [], aiOff: [] // sites where link cleaning / AI reading are switched off
   },
   aiSaving: 'balanced', // save | balanced | detail: how much of a page is sent to a model
-  sidebar: 'full', // full | rail: the tab list at the left of the window
   minFont: 0, // smallest text size a page may use, in px; 0 leaves pages alone
   search: 'duckduckgo', searchCustom: '', // duckduckgo | google | bing | brave | coccoc | custom
   alias: { provider: 'off', key: '' }, // off | addy | simplelogin
@@ -64,7 +63,6 @@ class Settings {
     if (DOH.includes(pv.doh)) out.privacy.doh = pv.doh;
     for (const k of ['trackingOff', 'aiOff']) { const l = hostList(pv[k]); if (l) out.privacy[k] = l; }
     if (['save', 'balanced', 'detail'].includes(patch.aiSaving)) out.aiSaving = patch.aiSaving;
-    if (['full', 'rail'].includes(patch.sidebar)) out.sidebar = patch.sidebar;
     if ([0, 12, 14, 16, 18].includes(patch.minFont)) out.minFont = patch.minFont;
     if (['duckduckgo', 'google', 'bing', 'brave', 'coccoc', 'custom'].includes(patch.search)) out.search = patch.search;
     if (typeof patch.searchCustom === 'string') out.searchCustom = patch.searchCustom.trim().slice(0, 300);
@@ -124,7 +122,7 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, aiSaving: c.aiSaving, sidebar: c.sidebar, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, aiSaving: c.aiSaving, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },
