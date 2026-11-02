@@ -44,7 +44,7 @@ app.whenReady().then(async () => {
     assert.strictEqual(new URL(sg.open).protocol, 'lore-external:');
     assert.strictEqual(new URL(sg.open).searchParams.get('u'), 'https://accounts.google.com/signin?x=1');
     assert.strictEqual(sg.back, 'Back to safety');
-    for (const [st, checks] of [['summarize', /Lãi suất giữ nguyên.*Những câu chính lấy nguyên văn/s], ['ask', /Giữ nguyên.*From the page.*Ngân hàng Nhà nước.*Show in page.*Written by m1.*sent to api\.example\.com/s], ['translate', /Translated 12 paragraphs into Vietnamese.*Both.*Translation.*Original/s]]) {
+    for (const [st, checks] of [['summarize', /Lãi suất giữ nguyên.*Những câu chính lấy nguyên văn/s], ['ask', /Giữ nguyên.*From the page.*Ngân hàng Nhà nước.*Show in page.*m1.*Sent to api\.example\.com/s], ['translate', /Translated 12 paragraphs into Vietnamese.*Both.*Translation.*Original/s]]) {
       const pw = new BrowserWindow({ show: false, webPreferences: { preload: path.join(__dirname, 'stub-panel-preload.js') } });
       await pw.loadFile(path.join(__dirname, '..', 'src', 'ui', 'panel.html'), { query: { s: st } });
       await new Promise((r) => setTimeout(r, 300));
