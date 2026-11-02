@@ -34,3 +34,15 @@ test('follow-up context is the last answers, short, from finished messages only'
   assert.deepStrictEqual(ctx.map((c) => c.a), ['a2', 'x y']);
   assert.strictEqual(ctx[1].q, 'Summarize this page');
 });
+
+test('a conversation remembers its sources and shows their sites in the list', () => {
+  let saved;
+  const c = new ChatStore({ save: (d) => { saved = d; } });
+  c.put('c1', { url: 'https://a.example/x', title: 'Trip', states: [S(1, { cites: [1, 2], srcs: [{ n: 1, title: 'A', host: 'a.example', url: 'https://a.example/x', passage: 'p' }, { n: 2, title: 'B', host: 'b.example', url: 'javascript:1', passage: 'q' }] })], sources: [{ url: 'https://a.example/x', title: 'A' }, { url: 'https://b.example/y', title: 'B' }, { url: 'file:///no', title: 'N' }] });
+  const l = new ChatStore({ load: () => saved }).list()[0];
+  assert.strictEqual(l.host, 'a.example · b.example');
+  assert.strictEqual(l.pages, 2);
+  const st = new ChatStore({ load: () => saved }).get('c1');
+  assert.strictEqual(st.states[0].srcs[1].url, '');
+  assert.deepStrictEqual(st.states[0].cites, [1, 2]);
+});

@@ -263,6 +263,34 @@ function body(s) {
     b.append(ul);
     copy = s.bullets.map((x) => '- ' + x).join('\n');
     extra.push(s.ai ? T('pg.byModel', { m: s.model }) : T('pg.extractive'));
+  } else if (s.mode === 'ask' && s.srcs) {
+    // Answer drawn from several pages: numbers in the text lead to the page each claim came from.
+    if (!s.found) b.append(el('p', '', T('pg.nofind')));
+    else {
+      if (s.answer) {
+        const p = el('p', 'cited');
+        for (const part of s.answer.split(/(\[\d{1,2}\])/)) {
+          const m = /^\[(\d{1,2})\]$/.exec(part);
+          const src = m && s.srcs[Number(m[1]) - 1];
+          if (src) { const a = el('button', 'cite', m[1]); a.type = 'button'; a.title = src.title; a.addEventListener('click', () => agent.chats.goto(src.url)); p.append(a); } else p.append(document.createTextNode(part));
+        }
+        b.append(p);
+        copy = s.answer.replace(/\[\d{1,2}\]/g, '');
+      }
+      const list = el('ol', 'srcs');
+      for (const x of s.srcs) {
+        const li = el('li', (s.cites || []).includes(x.n) ? 'used' : '');
+        const a = el('button', 'sl2');
+        a.type = 'button';
+        a.append(el('b', '', x.title), el('small', '', x.host));
+        a.addEventListener('click', () => agent.chats.goto(x.url));
+        li.append(a);
+        if (!s.answer && x.passage) li.append(el('p', 'pass', x.passage.slice(0, 200)));
+        list.append(li);
+      }
+      b.append(el('p', 'fine ln', T('pg.sources')), list);
+      if (s.ai) extra.push(T('pg.byModel', { m: s.model }));
+    }
   } else if (s.mode === 'ask') {
     if (!s.found) b.append(el('p', '', T('pg.nofind')));
     else {
@@ -320,8 +348,29 @@ function renderPage(s) {
 }
 
 // A page's whole conversation arrives at once: when the tab or page in front changes, or the panel is opened.
+// The pages this conversation reads: one chip each. The tab in front is offered as a dashed chip until something is asked about it.
+function paintSources(list) {
+  const row = $('#srcrow');
+  row.replaceChildren();
+  row.hidden = !list || list.length === 0 || (list.length === 1 && list[0].ghost);
+  for (const c of list || []) {
+    const chip = el('span', 'src' + (c.current ? ' cur' : '') + (c.ghost ? ' ghost' : '') + (c.open ? '' : ' shut'));
+    const b = el('button', 'sb');
+    b.type = 'button';
+    b.append(el('i', 'sl', (c.host || '?').charAt(0).toUpperCase()), el('span', 'st', c.title || c.host));
+    b.title = c.ghost ? T('src.add', { host: c.host }) : c.open ? c.title : T('src.reopen', { host: c.host });
+    b.addEventListener('click', () => (c.ghost ? agent.chats.addHere() : agent.chats.goto(c.key)));
+    chip.append(b);
+    if (!c.ghost) { const x = el('button', 'sx', '×'); x.type = 'button'; x.setAttribute('aria-label', T('src.drop')); x.addEventListener('click', () => agent.chats.drop(c.key)); chip.append(x); }
+    row.append(chip);
+  }
+  row.hidden = row.children.length === 0 || (list.length === 1 && list[0].ghost);
+}
+agent.onCtx((c) => { setTitle(T('pg.title'), c.page ? c.page.host : ''); paintSources(c.sources); });
+
 agent.onThread((t) => {
   lang = t.lang || lang; LORE_I18N.apply(lang);
+  paintSources(t.sources);
   showHistory(false);
   reset();
   const base = { page: t.page, model: t.model, remote: t.remote };

@@ -51,3 +51,16 @@ test('nothing in memory means nothing found', async () => {
   const r = await recall.ask({ question: 'x', memory: { items: [], search: async () => [] }, llm: null });
   assert.strictEqual(r.found, false);
 });
+
+test('open pages can be asked about together, with earlier answers as context', async () => {
+  let seen;
+  const llm = { chat: async (m) => { seen = m; return 'The first page covers cars [1]. The second covers cities [2].'; } };
+  const items = [{ url: 'https://a.example/', title: 'Cars', text: 'Electric cars use lithium batteries and charge fast.' }, { url: 'https://b.example/', title: 'Cities', text: 'Cities grow fast and need new transport.' }];
+  const r = await recall.askSources({ items, question: 'compare them', llm, history: [{ q: 'what are cars', a: 'Cars use batteries.' }] });
+  assert.ok(r.found);
+  assert.deepStrictEqual(r.cites, [1, 2]);
+  assert.match(seen[1].content, /EARLIER IN THIS CONVERSATION/);
+  assert.match(seen[1].content, /Cars use batteries/);
+  const none = await recall.askSources({ items: [{ url: 'https://a.example/', title: 'x', text: '' }], question: 'anything', llm });
+  assert.strictEqual(none.found, false);
+});

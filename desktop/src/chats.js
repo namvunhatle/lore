@@ -13,6 +13,8 @@ function keep(s) {
     bullets: Array.isArray(s.bullets) ? s.bullets.slice(0, 8).map((b) => clip(b, 400)) : undefined,
     answer: s.answer === undefined ? undefined : clip(s.answer, 3000), found: s.found, ai: !!s.ai,
     passages: Array.isArray(s.passages) ? s.passages.slice(0, 2).map((p) => clip(p, 500)) : undefined,
+    cites: Array.isArray(s.cites) ? s.cites.filter(Number.isInteger).slice(0, 8) : undefined,
+    srcs: Array.isArray(s.srcs) ? s.srcs.slice(0, 6).map((x) => ({ n: x.n | 0, title: clip(x.title, 160), host: clip(x.host, 100), url: /^https?:\/\//.test(x.url || '') ? clip(x.url, 2000) : '', passage: clip(x.passage, 300) })) : undefined,
     model: clip(s.model, 60), remote: clip(s.remote, 100), page: s.page ? { title: clip(s.page.title, 200), host: clip(s.page.host, 100) } : undefined
   };
 }
@@ -34,15 +36,18 @@ class ChatStore {
     for (const t of raw) {
       if (!t || typeof t.key !== 'string' || !/^https?:\/\//.test(t.url || '') || !Array.isArray(t.states)) continue;
       const states = t.states.map(keep).filter(Boolean).slice(-MAX_STATES);
-      if (states.length) this.map.set(t.key, { key: t.key, url: clip(t.url, 2000), title: clip(t.title, 200), ts: Number(t.ts) || Date.now(), states });
+      const sources = (Array.isArray(t.sources) ? t.sources : []).filter((x) => x && /^https?:\/\//.test(x.url || '')).slice(0, 8).map((x) => ({ url: clip(x.url, 2000), title: clip(x.title, 200) }));
+      if (!sources.length) sources.push({ url: clip(t.url, 2000), title: clip(t.title, 200) });
+      if (states.length) this.map.set(t.key, { key: t.key, url: clip(t.url, 2000), title: clip(t.title, 200), ts: Number(t.ts) || Date.now(), states, sources });
     }
   }
   _persist() { this._save({ v: 1, threads: [...this.map.values()] }); }
   get(key) { return this.map.get(key) || null; }
-  put(key, { url, title, states }) {
+  put(key, { url, title, states, sources = [] }) {
     const kept = states.map(keep).filter(Boolean).slice(-MAX_STATES);
     if (!kept.length) { this.remove(key); return; }
-    this.map.set(key, { key, url: clip(url, 2000), title: clip(title, 200), ts: Date.now(), states: kept });
+    const src = sources.filter((x) => x && /^https?:\/\//.test(x.url || '')).slice(0, 8).map((x) => ({ url: clip(x.url, 2000), title: clip(x.title, 200) }));
+    this.map.set(key, { key, url: clip(url, 2000), title: clip(title, 200), ts: Date.now(), states: kept, sources: src.length ? src : [{ url: clip(url, 2000), title: clip(title, 200) }] });
     if (this.map.size > MAX_THREADS) { const old = [...this.map.values()].sort((a, b) => a.ts - b.ts)[0]; this.map.delete(old.key); }
     this._persist();
   }
@@ -51,9 +56,9 @@ class ChatStore {
   // Newest first, for the history list.
   list() {
     return [...this.map.values()].sort((a, b) => b.ts - a.ts).map((t) => {
-      let host = ''; try { host = new URL(t.url).hostname.replace(/^www\./, ''); } catch { /* none */ }
+      const hosts = [...new Set(t.sources.map((x) => { try { return new URL(x.url).hostname.replace(/^www\./, ''); } catch { return ''; } }).filter(Boolean))];
       const first = t.states.find((s) => s.question) || t.states[0];
-      return { key: t.key, url: t.url, title: t.title || host, host, ts: t.ts, count: t.states.length, preview: clip(first.question || (first.mode === 'summarize' ? '' : first.answer), 120) };
+      return { key: t.key, url: t.url, title: t.title || hosts[0] || '', host: hosts.slice(0, 3).join(' · ') + (hosts.length > 3 ? ' …' : ''), pages: hosts.length, ts: t.ts, count: t.states.length, preview: clip(first.question || (first.mode === 'summarize' ? '' : first.answer), 120) };
     });
   }
 }

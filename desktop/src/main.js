@@ -349,7 +349,7 @@ function openStores(id) {
   return { chats: new chats.ChatStore({ load: () => ch.load(), save: (d) => ch.save(d) }), vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
 }
 function useStores(st) {
-  chatStore = st.chats; threads.clear(); vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
+  chatStore = st.chats; mainConv = newConv(); vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
   refreshEmbedder();
 }
 // Closes every tab without remembering it or opening a new one: the next profile's tabs take their place.
@@ -866,56 +866,97 @@ async function runPageAction(r) {
 
 // ---- Page assistant (AI-03 summary and questions, AI-04 translation) -------------------------------------------------
 const pageMeta = (tab) => { let host = ''; try { host = new URL(tab.url).hostname.replace(/^www\./, ''); } catch { /* none */ } return { title: tab.title, host }; };
-// ---- Conversations: one thread per page address, kept while the browser runs and (for normal tabs) saved ----------------
-const threads = new Map(); // key -> { url, title, states: [] } for private tabs and the current run
+// ---- Conversations ---------------------------------------------------------------------------------------------------
+// One conversation follows the person from tab to tab. Every page asked about becomes a source of it; a later question reads all
+// the sources that are still open (the newest four), so "compare it with the other one" works. Normal tabs share one conversation
+// that is saved (encrypted, on this computer); private tabs have a conversation of their own that never leaves memory.
+const MAX_SOURCES_OPEN = 4;
+const newConv = () => ({ id: 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), url: '', title: '', states: [], sources: [] });
+let mainConv = newConv();
+let privConv = newConv();
 let assistOn = false;      // the person opened the assistant and has not closed it
 let chatSaveTimer = null;
-const threadKey = (tab) => { if (tab.private) return 'private:' + tab.id; try { const u = new URL(tab.url); u.hash = ''; return u.toString(); } catch { return tab.url; } };
-function threadOf(tab) {
-  const key = threadKey(tab);
-  if (!threads.has(key)) {
-    const saved = !tab.private && chatStore ? chatStore.get(key) : null;
-    threads.set(key, { url: tab.url, title: tab.title, states: saved ? saved.states.map((x) => ({ ...x })) : [] });
-  }
-  return threads.get(key);
+const convFor = (tab) => (tab && tab.private ? privConv : mainConv);
+const normUrl = (u) => { try { const x = new URL(u); x.hash = ''; return x.toString(); } catch { return String(u || ''); } };
+// A page joins the conversation when something is asked about it.
+function addSource(conv, tab) {
+  if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
+  const key = normUrl(tab.url);
+  let src = conv.sources.find((x) => x.tabId === tab.id) || conv.sources.find((x) => x.key === key);
+  if (!src) { src = { key }; conv.sources.push(src); if (conv.sources.length > 8) conv.sources.shift(); }
+  Object.assign(src, { key, url: tab.url, title: tab.title || hostOfUrl(tab.url), tabId: tab.id });
+  if (!conv.url) conv.url = tab.url;
+}
+// The tab a source belongs to, if it is still open: by tab, then by address.
+function tabOfSource(conv, src) {
+  const t = tabs.find((x) => x.id === src.tabId && !x.isHome) || tabs.find((x) => !x.isHome && normUrl(x.lazyUrl || x.url) === src.key);
+  return t && !!t.private === (conv === privConv) ? t : null;
+}
+// Tabs the next question will read: the one in front first, then the newest sources, each allowed and still open.
+function readableTabs(conv, tab) {
+  const out = [];
+  const add = (t) => { if (t && !out.includes(t) && !t.lazyUrl && /^https?:/.test(t.url) && !aiOffFor(t.url) && !isSensitiveHost(hostOfUrl(t.url))) out.push(t); };
+  if (tab && tab.private === (conv === privConv)) add(tab);
+  for (const src of [...conv.sources].reverse()) add(tabOfSource(conv, src));
+  return out.slice(0, MAX_SOURCES_OPEN);
+}
+function sourceChips(conv, tab) {
+  const here = tab && !tab.isHome && /^https?:/.test(tab.url) && !!tab.private === (conv === privConv) ? tab : null;
+  const chips = conv.sources.map((src) => { const t = tabOfSource(conv, src); return { key: src.key, title: src.title, host: hostOfUrl(src.url).replace(/^www\./, ''), tabId: t ? t.id : 0, open: !!t, current: !!(here && t === here) }; });
+  if (here && !chips.some((c) => c.current)) chips.push({ key: normUrl(here.url), title: here.title || hostOfUrl(here.url), host: hostOfUrl(here.url).replace(/^www\./, ''), tabId: here.id, open: true, current: true, ghost: true });
+  return chips;
+}
+function saveConv(conv) {
+  if (conv === privConv || !chatStore) return;
+  clearTimeout(chatSaveTimer);
+  chatSaveTimer = setTimeout(() => {
+    const first = conv.states.find((x) => x.question);
+    chatStore.put(conv.id, { url: conv.url, title: (first && first.question) || (conv.sources[0] && conv.sources[0].title) || '', states: conv.states, sources: conv.sources });
+  }, 800);
 }
 function recordState(tab, s) {
   if (!Number.isFinite(s.seq) || s.state === 'idle') return;
-  const th = threadOf(tab);
-  th.title = tab.title; th.url = tab.url;
+  const conv = convFor(tab);
   const { reset, lang, ...rest } = s;
-  th.states = th.states.filter((x) => x.seq !== s.seq);
-  if (s.state === 'done' || s.state === 'error') th.states.push(rest);
-  th.states = th.states.slice(-chats.MAX_STATES);
-  if (!tab.private && chatStore) { clearTimeout(chatSaveTimer); chatSaveTimer = setTimeout(() => { if (chatStore) chatStore.put(threadKey(tab), th); }, 800); }
+  conv.states = conv.states.filter((x) => x.seq !== s.seq);
+  if (s.state === 'done' || s.state === 'error') conv.states.push(rest);
+  conv.states = conv.states.slice(-chats.MAX_STATES);
+  saveConv(conv);
 }
-// Draws the thread of this page in the panel: what was said before, or the opening state when nothing was.
+// Draws the conversation in the panel: what was said before, or the opening state when nothing was.
 function sendThread(tab) {
-  const th = threadOf(tab);
+  const conv = convFor(tab);
   panel.webContents.send('page:thread', {
-    lang: L(), page: pageMeta(tab), states: th.states.filter((x) => x.state === 'done'),
+    lang: L(), page: pageMeta(tab), states: conv.states.filter((x) => x.state === 'done'), sources: sourceChips(conv, tab),
     modelReady: lastModel.ready, remote: lastModel.remote, model: lastModel.model
   });
 }
-// Opens (or keeps) the assistant for this tab. A different page shows its own conversation.
+// Only the sources row and the page name change when the tab in front changes.
+function sendContext(tab) {
+  panel.webContents.send('page:ctx', { page: pageMeta(tab), sources: sourceChips(convFor(tab), tab) });
+}
+// Opens (or keeps) the assistant for this tab. Moving between normal tabs keeps the conversation; a private tab has its own.
 function claimPanel(tab) {
-  const changed = !pa || pa.tab !== tab || pa.url !== tab.url;
+  const swap = !pa || !!pa.tab.private !== !!tab.private;
   pa = { tab, view: 'both', url: tab.url };
   win.contentView.addChildView(panel);
   layout();
-  if (changed) sendThread(tab);
+  if (swap) sendThread(tab); else sendContext(tab);
   return false;
 }
 // The tab in front changed (or its address did): follow it with the panel.
 function followTab(tab) {
-  if (!assistOn || run || dl) return;
-  const web = tab && !tab.isHome && /^https?:/.test(tab.url);
+  if (!assistOn || run || dl || !tab) return;
+  const web = !tab.isHome && /^https?:/.test(tab.url);
   if (web) { if (!pa || pa.tab !== tab || pa.url !== tab.url) claimPanel(tab); return; }
-  if (pa) { pa = null; try { win.contentView.removeChildView(panel); } catch { /* hidden */ } layout(); }
+  // On a new tab page the conversation stays open: it can still be asked about the pages it already read.
+  if (!pa || !!pa.tab.private !== !!tab.private) { pa = null; claimPanel(tab); return; }
+  pa = { tab, view: 'both', url: tab.url };
+  sendContext(tab);
 }
 const sendPageFor = (tab, s) => {
   recordState(tab, s);
-  if (pa && pa.tab === tab) panel.webContents.send('page:state', { ...s, lang: L() });
+  if (pa && convFor(pa.tab) === convFor(tab)) panel.webContents.send('page:state', { ...s, lang: L() });
 };
 const sendPage = (s) => { if (pa) sendPageFor(pa.tab, s); };
 let lastModel = { ready: false, remote: '', model: '' };
@@ -956,11 +997,17 @@ async function pageRead(tab) {
 async function pageAssistant(action, question = '') {
   const tab = active();
   if (!tab) return;
-  if (aiOffFor(tab.url)) { claimPanel(tab); return sendPageFor(tab, { mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), reset: true, state: 'error', error: 'pg.aiOff' }); }
-  if (tab.isHome || !/^https?:/.test(tab.url)) return loadHome(tab.view.webContents, { kind: 'nopage' });
+  const web = !tab.isHome && /^https?:/.test(tab.url);
+  const conv = convFor(tab);
+  if (web && aiOffFor(tab.url)) { assistOn = true; claimPanel(tab); return sendPageFor(tab, { mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), state: 'error', error: 'pg.aiOff' }); }
+  // A question can also be about the pages the conversation already read, even from a tab that has no page.
+  const others = readableTabs(conv, web ? tab : null);
+  if (!web && !(action === 'ask' && others.length)) return loadHome(tab.view.webContents, { kind: 'nopage' });
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  const fresh = claimPanel(tab);
+  assistOn = true;
+  claimPanel(tab);
+  if (web) { addSource(conv, tab); sendContext(tab); }
   const mine = pa;
   const sp = (x) => sendPageFor(tab, x);
   const live = () => pa === mine && active() === tab;
@@ -969,16 +1016,25 @@ async function pageAssistant(action, question = '') {
   sp({ ...meta, state: 'working' });
   try {
     if (action === 'translate') return await translatePage(tab, mine, meta, m, live);
+    const l = m.ready ? llm : null;
+    // Several pages: read each one the same safe way, then answer with numbered sources.
+    if (action === 'ask' && others.length > 1 || (action === 'ask' && others.length === 1 && others[0] !== tab)) {
+      const items = [];
+      for (const t of others) { const r = await pageRead(t); items.push({ url: t.url, title: t.title || hostOfUrl(t.url), text: r.text, tabId: t.id, report: r.report }); }
+      const res = await recall.askSources({ items, question, llm: l, lang: L(), history: chats.context(conv.states) });
+      const flagged = items.map((i) => i.report).find((r) => shield.worthWarning(r) || r.invisible || r.hiddenChars) || null;
+      return sp({ ...meta, state: 'done', found: res.found, answer: res.answer, cites: res.cites, ai: !!res.answer, safety: flagged,
+        srcs: res.sources.map((x) => ({ n: x.n, title: x.title, host: x.host, url: items[x.n - 1].url, tabId: items[x.n - 1].tabId, passage: x.passages[0] || '' })) });
+    }
     const { text, report } = await pageRead(tab);
     const safety = shield.worthWarning(report) || report.invisible || report.hiddenChars ? report : null;
     if (text.length < 120) return sp({ ...meta, state: 'error', error: 'pg.noText' });
-    const l = m.ready ? llm : null;
     if (action === 'summarize') {
       const s = await pageassist.summarize({ text, llm: l, lang: L() });
       mine.text = text;
       return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
     }
-    const a = await pageassist.ask({ text, question, llm: l, lang: L(), history: chats.context(threadOf(tab).states) });
+    const a = await pageassist.ask({ text, question, llm: l, lang: L(), history: chats.context(conv.states) });
     mine.text = text;
     sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
   } catch { sp({ ...meta, state: 'error', error: 'pg.error' }); }
@@ -991,7 +1047,8 @@ async function openAssist() {
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
   assistOn = true;
-  pa = null; // always draw the page's own thread
+  pa = null; // always draw the conversation again
+  await modelInfo();
   claimPanel(tab);
 }
 
@@ -2381,26 +2438,53 @@ function wireIpc() {
     pageAssistant(action, String(arg || ''));
   });
   ipcMain.on('panel:copy', (e, text) => { if (e.sender === panel.webContents && typeof text === 'string') clipboard.writeText(text.slice(0, 20000)); });
-  // Past conversations, newest first; opening one goes to its page (an open tab, or a new one) where its thread is shown.
+  // Past conversations, newest first; opening one restores its messages and goes to the page it read last.
   const fromPanel = (e) => panel && e.sender === panel.webContents;
+  const rebind = (conv) => { for (const src of conv.sources) { const t = tabOfSource(conv, src); src.tabId = t ? t.id : 0; } };
+  const show = (tab) => { pa = null; claimPanel(tab); };
   ipcMain.handle('chats:list', (e) => (fromPanel(e) && chatStore ? chatStore.list() : []));
   ipcMain.on('chats:open', (e, key) => {
     if (!fromPanel(e) || !chatStore) return;
     const t = chatStore.get(String(key));
     if (!t || !isAllowedNavigation(t.url)) return;
+    mainConv = { id: t.key, url: t.url, title: t.title, states: t.states.map((x) => ({ ...x })), sources: t.sources.map((x) => ({ key: normUrl(x.url), url: x.url, title: x.title, tabId: 0 })) };
+    rebind(mainConv);
     assistOn = true;
-    const open = tabs.find((x) => !x.private && !x.isHome && threadKey(x) === t.key);
-    let tab = open;
-    if (open) selectTab(open.id); else { tab = openTab({ url: t.url }); tab.url = t.url; }
-    // Show the conversation at once, without waiting for the page to load.
-    if (tab) { pa = null; claimPanel(tab); }
+    const last = mainConv.sources[mainConv.sources.length - 1];
+    let tab = last && tabOfSource(mainConv, last);
+    if (tab) selectTab(tab.id); else if (last && isAllowedNavigation(last.url)) { tab = openTab({ url: last.url }); tab.url = last.url; last.tabId = tab.id; }
+    // Show it at once, without waiting for the page to load.
+    if (tab) show(tab);
   });
-  ipcMain.on('chats:delete', (e, key) => { if (fromPanel(e) && chatStore) { chatStore.remove(String(key)); threads.delete(String(key)); } });
+  // A source chip: go to its tab, or open the page again when the tab was closed.
+  ipcMain.on('chats:goto', (e, key) => {
+    if (!fromPanel(e) || !pa) return;
+    const conv = convFor(pa.tab);
+    const src = conv.sources.find((x) => x.key === normUrl(key));
+    if (!src) return;
+    const t = tabOfSource(conv, src);
+    if (t) return selectTab(t.id);
+    if (!isAllowedNavigation(src.url)) return;
+    const nt = openTab({ url: src.url }, { private: conv === privConv });
+    nt.url = src.url; src.tabId = nt.id;
+    sendContext(nt);
+  });
+  ipcMain.on('chats:addhere', (e) => { if (fromPanel(e) && pa) { const t = active(); if (t) { addSource(convFor(t), t); sendContext(t); saveConv(convFor(t)); } } });
+  ipcMain.on('chats:drop', (e, key) => {
+    if (!fromPanel(e) || !pa) return;
+    const conv = convFor(pa.tab);
+    conv.sources = conv.sources.filter((x) => x.key !== normUrl(key));
+    saveConv(conv);
+    sendContext(pa.tab);
+  });
+  ipcMain.on('chats:delete', (e, key) => {
+    if (!fromPanel(e) || !chatStore) return;
+    chatStore.remove(String(key));
+    if (mainConv.id === String(key)) { mainConv = newConv(); if (pa) sendThread(pa.tab); }
+  });
   ipcMain.on('chat:new', (e) => {
     if (!fromPanel(e) || !pa) return;
-    const th = threadOf(pa.tab);
-    th.states = [];
-    if (chatStore && !pa.tab.private) chatStore.remove(threadKey(pa.tab));
+    if (pa.tab.private) privConv = newConv(); else mainConv = newConv();
     sendThread(pa.tab);
   });
   ipcMain.on('page:view', (e, view) => {
