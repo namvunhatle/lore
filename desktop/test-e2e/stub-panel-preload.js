@@ -6,6 +6,7 @@ const states = {
 };
 contextBridge.exposeInMainWorld('agent', {
   platform: 'darwin', onState() {}, onDl() {}, onLang() {},
+  modelMenu: () => {}, onModel: () => {},
   onPage: (fn) => setTimeout(() => fn(states[new URLSearchParams(location.search).get('s')]), 50),
   pageDo() {}, copy() {}, pageView() {}, pageShow() {}, decide() {}, close() {}, dlStart() {}, dlReveal() {}
 });
