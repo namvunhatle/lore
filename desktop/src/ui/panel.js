@@ -147,6 +147,17 @@ function fillActions() {
 }
 
 // The opening state: which page this is, and what stays private.
+// The model chip under the prompt box, as in other AI apps: what answers, where it runs, and a menu to change it.
+function setModel(m) {
+  const b = $('#modelbtn');
+  b.dataset.kind = !m.ready ? 'none' : m.remote ? 'remote' : 'local';
+  $('#mname').textContent = !m.ready ? T('pg.hero.none') : (m.model || T('pg.hero.local')) + (m.remote ? ' · ' + m.remote : '');
+  b.dataset.tip = !m.ready ? T('pg.hero.none') : m.remote ? T('pg.hero.remote', { host: m.remote }) : T('pg.hero.local', { model: m.model });
+  b.title = b.dataset.tip;
+}
+$('#modelbtn').addEventListener('click', () => { const r = $('#modelbtn').getBoundingClientRect(); agent.modelMenu(r.left, r.top); });
+agent.onModel(setModel);
+
 function fillHero(s) {
   const p = s.page || {};
   const host = p.host || '';
@@ -156,6 +167,7 @@ function fillHero(s) {
   $('#pagechip').hidden = true;
   $('#herotitle').textContent = T('pg.hero.h');
   setTimeout(() => { const q = $('#askq'); if (q && !$('#composer').hidden) q.focus(); }, 60);
+  setModel({ ready: !!s.modelReady, model: s.model, remote: s.remote });
   const trust = $('#trust');
   trust.className = 'trust ' + (!s.modelReady ? 'none' : s.remote ? 'remote' : 'local');
   trust.textContent = !s.modelReady ? T('pg.hero.none') : s.remote ? T('pg.hero.remote', { host: s.remote }) : T('pg.hero.local', { model: s.model });

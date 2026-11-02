@@ -215,3 +215,22 @@ blockquote{border-left-width:2px}
 .askform{padding:4px 4px 4px 14px}
 /* Small print under an answer: quiet, one line, no sentences. */
 .fine{display:inline-block;margin:8px 6px 0 0;padding:1px 8px;border-radius:9px;background:var(--win);font-size:11px;line-height:1.6}
+
+/* Header mark: just the glyph. */
+.logo{width:22px;height:22px;background:none;box-shadow:none;border-radius:0}
+.logo svg{width:20px;height:20px;fill:var(--accent)}
+/* Suggestions: two columns, "All tasks" as a quiet row of its own. */
+.sugs2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sug{justify-content:flex-start}
+.sug.more{grid-column:1/-1;justify-content:flex-start;padding:0 9px;height:30px}
+.trust{display:none}
+/* Model chip under the prompt box. */
+#composer{padding-bottom:6px}
+.mrow{display:flex;padding:6px 2px 0}
+.mbtn{display:inline-flex;align-items:center;gap:7px;max-width:100%;height:26px;padding:0 8px 0 7px;border-radius:7px;color:var(--muted);font:500 12px var(--f)}
+.mbtn:hover{background:var(--hover);color:var(--ink)}
+.mbtn .md{flex:none;width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.mbtn[data-kind="local"] .md{background:#2fa36b}
+.mbtn[data-kind="remote"] .md{background:var(--warn)}
+.mbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbtn::after{content:"";flex:none;width:5px;height:5px;margin:-3px 0 0 1px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}

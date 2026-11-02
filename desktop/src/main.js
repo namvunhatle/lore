@@ -212,6 +212,29 @@ function paintTitleBar(priv) {
 }
 
 // Whatever is typed in the panel: a verb Lore knows runs that action, a writing request opens the writing task, anything else is a question about the page.
+// The model chip's menu: local models, the cloud providers that have a key, or off.
+async function modelMenu(x, y) {
+  const c = settings.get();
+  let names = [];
+  try { names = await listLocalModels(c.local.url); } catch { /* Ollama not running */ }
+  const pick = (patch) => () => {
+    try { settings.update(patch); } catch { return openSettings('ai'); }
+    llm = createLlm(settings.get());
+    refreshEmbedder();
+    pushState();
+    modelInfo().then((m) => { if (panel && !panel.webContents.isDestroyed()) panel.webContents.send('model:info', m); });
+  };
+  const items = names.map((n) => ({ label: n, type: 'radio', checked: c.provider === 'local' && c.local.model === n, click: pick({ provider: 'local', local: { model: n } }) }));
+  if (!names.length) items.push({ label: T('mm.noLocal'), enabled: false });
+  const cloud = [];
+  if (c.openai.key) cloud.push({ label: 'OpenAI · ' + c.openai.model, type: 'radio', checked: c.provider === 'openai', click: pick({ provider: 'openai' }) });
+  if (c.anthropic.key) cloud.push({ label: 'Anthropic · ' + c.anthropic.model, type: 'radio', checked: c.provider === 'anthropic', click: pick({ provider: 'anthropic' }) });
+  if (cloud.length) items.push({ type: 'separator' }, ...cloud);
+  items.push({ type: 'separator' }, { label: T('mm.off'), type: 'radio', checked: c.provider === 'off', click: pick({ provider: 'off' }) }, { type: 'separator' }, { label: T('mm.more'), click: () => openSettings('ai') });
+  const b = panel.getBounds();
+  Menu.buildFromTemplate(items).popup({ window: win, x: b.x + x, y: b.y + y });
+}
+
 function panelPrompt(q) {
   const n = norm(q);
   if (/^(tom tat|summari[sz]e|tl;?dr)\b/.test(n)) return pageAssistant('summarize');
@@ -2255,6 +2278,7 @@ function wireSettingsIpc() {
 function wireIpc() {
   ipcMain.handle('intent:classify', (e, text) => (e.sender === win.webContents && typeof text === 'string' ? classify(text.slice(0, 300)).kind : ''));
   ipcMain.on('tab:new', () => openTab());
+  ipcMain.on('model:menu', (e, x, y) => { if (panel && e.sender === panel.webContents && Number.isFinite(x) && Number.isFinite(y)) modelMenu(x, y); });
   ipcMain.on('side:toggle', (e) => { if (e.sender === win.webContents) toggleSidebar(); });
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   ipcMain.on('tab:close', (_e, id) => closeTab(id));
