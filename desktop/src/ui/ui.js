@@ -330,9 +330,10 @@ function showTip(target) {
     tipEl.style.top = Math.max(8, r.top + r.height / 2 - tipEl.offsetHeight / 2) + 'px';
     return;
   }
-  const min = 8;
-  tipEl.style.left = Math.max(min, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-  tipEl.style.top = Math.max(6, r.bottom + 6) + 'px';
+  // The page card is drawn over everything below the bar, so a tip for the bar goes beside its button, never under it.
+  const left = r.left + r.width / 2 < innerWidth / 2;
+  tipEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, left ? r.right + 8 : r.left - w - 8)) + 'px';
+  tipEl.style.top = Math.max(6, r.top + r.height / 2 - tipEl.offsetHeight / 2) + 'px';
 }
 function hideTip() { clearTimeout(tipTimer); tipEl.hidden = true; }
 document.addEventListener('mouseover', (e) => {
