@@ -294,7 +294,7 @@ function body(s) {
     const n = s.safety.invisible || 0;
     if (n) extra.push(T('safe.cleaned', { n }));
   }
-  for (const t of extra) b.append(el('p', 'fine', t));
+  if (extra.length) { const m = el('div', 'metas'); for (const t of extra) m.append(el('span', 'fine', t)); b.append(m); }
   return { b, copy };
 }
 

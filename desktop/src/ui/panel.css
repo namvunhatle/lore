@@ -234,3 +234,6 @@ blockquote{border-left-width:2px}
 .mbtn[data-kind="remote"] .md{background:var(--warn)}
 .mbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mbtn::after{content:"";flex:none;width:5px;height:5px;margin:-3px 0 0 1px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+
+.metas{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.metas .fine{margin:0}

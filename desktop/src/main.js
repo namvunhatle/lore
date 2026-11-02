@@ -1607,12 +1607,13 @@ function wireTipIpc() {
 // ---- Privacy at a glance (PRV-15) and the weekly report (PRV-04) -----------------------------------------------------------
 let privView = null;
 let reportWin = null;
-const PRIV_W = 330, PRIV_H = 424;
+const PRIV_W = 330;
+let privH = 424;
 function layoutPriv() {
   if (!privView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  privView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - PRIV_W - 12), y: chromeHeight() - 6, width: PRIV_W, height: PRIV_H });
+  privView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - PRIV_W - 12), y: chromeHeight() - 6, width: PRIV_W, height: privH });
 }
 function closePriv(refocus = true) {
   if (!privView || !win || win.isDestroyed()) return;
@@ -1673,6 +1674,12 @@ function wirePrivIpc() {
   });
   ipcMain.on('priv:report', (e) => { if (ok(e)) { closePriv(false); openReport(); } });
   ipcMain.on('priv:settings', (e) => { if (ok(e)) { closePriv(false); openSettings(); } });
+  ipcMain.on('priv:size', (e, h) => {
+    if (!ok(e) || !Number.isFinite(h)) return;
+    const [, ch] = win.getContentSize();
+    privH = Math.max(160, Math.min(h, ch - chromeHeight() - 12));
+    layoutPriv();
+  });
   ipcMain.on('priv:close', (e) => { if (ok(e)) closePriv(); });
   ipcMain.handle('report:get', (e) => (reportWin && e.sender === reportWin.webContents ? pstats.week() : null));
   ipcMain.on('report:copy', (e, text) => { if (reportWin && e.sender === reportWin.webContents) clipboard.writeText(String(text).slice(0, 1000)); });
