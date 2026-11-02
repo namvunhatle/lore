@@ -12,7 +12,7 @@ app.whenReady().then(async () => {
   try {
     for (const [lang, h1, card] of [['en', 'What are you looking for?', 'What is Da Nang?'], ['vi', 'Bạn muốn tìm gì hôm nay?', 'Đà Nẵng là gì?']]) {
       await win.loadFile(home, { query: { lang } });
-      const r = await win.webContents.executeJavaScript(`({ h1: document.querySelector('h1').textContent, title: document.title, href: document.querySelector('#c-ask').href, text: document.querySelector('#c-ask b').textContent, lang: document.documentElement.lang })`);
+      const r = await win.webContents.executeJavaScript(`({ h1: document.getElementById('h1').textContent, title: document.title, href: document.querySelector('#c-ask').href, text: document.querySelector('#c-ask b').textContent, lang: document.documentElement.lang })`);
       assert.strictEqual(r.h1, h1);
       assert.strictEqual(r.text, card);
       assert.strictEqual(r.lang, lang);
