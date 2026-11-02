@@ -14,15 +14,19 @@ const DEFAULTS = () => ({
     doh: 'automatic', // off | automatic | cloudflare | quad9
     trackingOff: [], aiOff: [] // sites where link cleaning / AI reading are switched off
   },
+  aiSaving: 'balanced', // save | balanced | detail: how much of a page is sent to a model
+  sidebar: 'full', // full | rail: the tab list at the left of the window
   minFont: 0, // smallest text size a page may use, in px; 0 leaves pages alone
   search: 'duckduckgo', searchCustom: '', // duckduckgo | google | bing | brave | coccoc | custom
   alias: { provider: 'off', key: '' }, // off | addy | simplelogin
-  provider: 'local', // local | openai | anthropic | off
+  provider: 'local', // local | openai | anthropic | gemini | mistral | off
   local: { url: process.env.LORE_LLM_URL || 'http://127.0.0.1:11434', model: process.env.LORE_LLM_MODEL || 'qwen2.5:3b', embedModel: 'bge-m3' },
   openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', key: '' },
-  anthropic: { model: 'claude-haiku-5-5', key: '' }
+  anthropic: { model: 'claude-haiku-5-5', key: '' },
+  gemini: { model: 'gemini-2.5-flash', key: '' },
+  mistral: { model: 'mistral-small-latest', key: '' }
 });
-const PROVIDERS = ['local', 'openai', 'anthropic', 'off'];
+const PROVIDERS = ['local', 'openai', 'anthropic', 'gemini', 'mistral', 'off'];
 const LANGUAGES = ['auto', 'en', 'vi'];
 const STARTUPS = ['restore', 'new'];
 const APPEARANCES = ['system', 'light', 'dark'];
@@ -59,6 +63,8 @@ class Settings {
     for (const k of ['blockThirdPartyCookies', 'scamProtection', 'cookieBanners', 'reduceFingerprint', 'httpsFirst', 'stripTracking', 'memory', 'lock']) if (typeof pv[k] === 'boolean') out.privacy[k] = pv[k];
     if (DOH.includes(pv.doh)) out.privacy.doh = pv.doh;
     for (const k of ['trackingOff', 'aiOff']) { const l = hostList(pv[k]); if (l) out.privacy[k] = l; }
+    if (['save', 'balanced', 'detail'].includes(patch.aiSaving)) out.aiSaving = patch.aiSaving;
+    if (['full', 'rail'].includes(patch.sidebar)) out.sidebar = patch.sidebar;
     if ([0, 12, 14, 16, 18].includes(patch.minFont)) out.minFont = patch.minFont;
     if (['duckduckgo', 'google', 'bing', 'brave', 'coccoc', 'custom'].includes(patch.search)) out.search = patch.search;
     if (typeof patch.searchCustom === 'string') out.searchCustom = patch.searchCustom.trim().slice(0, 300);
@@ -66,7 +72,7 @@ class Settings {
     if (ALIAS.includes(al.provider)) out.alias.provider = al.provider;
     if (typeof al.key === 'string' && al.key.trim()) out.alias.key = al.key.trim();
     if (pv.permissions !== undefined) out.privacy.permissions = pv.permissions;
-    for (const k of ['local', 'openai', 'anthropic']) {
+    for (const k of ['local', 'openai', 'anthropic', 'gemini', 'mistral']) {
       for (const f of Object.keys(out[k])) {
         const v = patch[k] && patch[k][f];
         if (typeof v !== 'string') continue;
@@ -89,6 +95,14 @@ class Settings {
       if (!cfg.openai.model) throw new Error('set.v.model');
       if (!cfg.openai.key && !isLocalHost(cfg.openai.baseUrl)) throw new Error('set.v.key');
     }
+    if (cfg.provider === 'mistral') {
+      if (!cfg.mistral.model) throw new Error('set.v.model');
+      if (!cfg.mistral.key) throw new Error('set.v.key');
+    }
+    if (cfg.provider === 'gemini') {
+      if (!cfg.gemini.model) throw new Error('set.v.model');
+      if (!cfg.gemini.key) throw new Error('set.v.key');
+    }
     if (cfg.provider === 'anthropic') {
       if (!cfg.anthropic.model) throw new Error('set.v.model');
       if (!cfg.anthropic.key) throw new Error('set.v.key');
@@ -110,10 +124,12 @@ class Settings {
   view() {
     const c = this.cfg;
     return {
-      provider: c.provider, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
+      provider: c.provider, aiSaving: c.aiSaving, sidebar: c.sidebar, minFont: c.minFont, search: c.search, searchCustom: c.searchCustom, language: c.language, startup: c.startup, appearance: c.appearance, tabsLayout: c.tabsLayout, autoUpdate: c.autoUpdate, privacy: { ...c.privacy }, persistent: this.persistent,
       local: { ...c.local },
       openai: { baseUrl: c.openai.baseUrl, model: c.openai.model, hasKey: !!c.openai.key },
       anthropic: { model: c.anthropic.model, hasKey: !!c.anthropic.key },
+      gemini: { model: c.gemini.model, hasKey: !!c.gemini.key },
+      mistral: { model: c.mistral.model, hasKey: !!c.mistral.key },
       alias: { provider: c.alias.provider, hasKey: !!c.alias.key }
     };
   }

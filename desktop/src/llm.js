@@ -2,6 +2,8 @@
 //   local      Ollama on this machine (nothing leaves the device)
 //   openai     any OpenAI-compatible endpoint (OpenAI, OpenRouter, Groq, LM Studio, ...)
 //   anthropic  Anthropic Messages API
+//   gemini     Google Gemini API (OpenAI-compatible endpoint)
+//   mistral    Mistral AI (OpenAI-compatible endpoint, servers in the EU)
 // Remote providers send the user's question to that host, and answerQuery says so in the UI.
 
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ''; } };
@@ -48,6 +50,7 @@ function ollama({ url, model }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = j.done_reason === 'length';
+      this.usage = { in: j.prompt_eval_count | 0, out: j.eval_count | 0 };
       return String((j.message && j.message.content) || '').trim();
     }
   };
@@ -69,6 +72,7 @@ function openai({ baseUrl, model, key }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = !!(j.choices && j.choices[0] && j.choices[0].finish_reason === 'length');
+      this.usage = { in: (j.usage && j.usage.prompt_tokens) | 0, out: (j.usage && j.usage.completion_tokens) | 0 };
       return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
     }
   };
@@ -89,15 +93,22 @@ function anthropic({ model, key }, f) {
       if (!r.ok) throw await httpError(r);
       const j = await r.json();
       this.truncated = j.stop_reason === 'max_tokens';
+      this.usage = { in: (j.usage && j.usage.input_tokens) | 0, out: (j.usage && j.usage.output_tokens) | 0 };
       return String((j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('')).trim();
     }
   };
 }
 
+const MISTRAL_URL = 'https://api.mistral.ai/v1';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+
 function createLlm(cfg, { fetchImpl = fetch } = {}) {
   if (cfg.provider === 'local') return ollama(cfg.local, fetchImpl);
   if (cfg.provider === 'openai') return openai(cfg.openai, fetchImpl);
   if (cfg.provider === 'anthropic') return anthropic(cfg.anthropic, fetchImpl);
+  // Google's Gemini API speaks the OpenAI chat format at this address, so the same client serves it.
+  if (cfg.provider === 'mistral') return openai({ baseUrl: MISTRAL_URL, model: cfg.mistral.model, key: cfg.mistral.key }, fetchImpl);
+  if (cfg.provider === 'gemini') return openai({ baseUrl: GEMINI_URL, model: cfg.gemini.model, key: cfg.gemini.key }, fetchImpl);
   return null;
 }
 

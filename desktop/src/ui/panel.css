@@ -1,6 +1,6 @@
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f);border-left:1px solid var(--line)}
+body{margin:0;display:flex;flex-direction:column;background:var(--win);color:var(--ink);font:14px/1.5 var(--f);}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -145,3 +145,142 @@ blockquote.fold{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vert
 #herotitle{font-size:22px;margin:0 0 6px}
 .lead-act{min-height:48px}
 .act{min-height:46px}
+
+/* A tool panel, not a web page: a card beside the page, small type, quiet rows. */
+html,body{background:var(--win)}
+body{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ph{padding:9px 8px 9px 12px;gap:9px}
+.logo{width:26px;height:26px;border-radius:8px}
+.logo svg{width:16px;height:16px}
+h3{font-size:13px;font-weight:600}
+#sub{font-size:11.5px}
+.x{width:28px;height:28px;font-size:18px}
+#feed{padding:12px}
+h4{font-size:15px;font-weight:600;margin:0 0 10px;letter-spacing:0}
+.lead-act{min-height:40px;padding:0 12px;border-radius:9px;gap:10px}
+.lead-act b{font-size:13px}
+.lead-act small{display:none}
+.grid{grid-template-columns:1fr;gap:0;margin:6px 0 16px}
+.act{min-height:38px;padding:0 8px;border:0;border-radius:8px;gap:10px;font-size:13px;font-weight:500}
+.act:hover{background:var(--hover);border-color:transparent;transform:none}
+.act svg{width:24px;height:24px;padding:5px;border-radius:7px}
+.act.wide{justify-content:flex-start;color:var(--muted);min-height:34px}
+.card{border-radius:10px;padding:10px 12px}
+.chip{border-radius:8px;padding:5px 10px;font-size:12.5px}
+.me{border-radius:12px 12px 3px 12px;font-size:13px}
+#composer{padding:8px 10px 10px}
+.askform{border-radius:10px}
+.askform input{font-size:13px}
+.send{border-radius:8px}
+#herotitle,.hero h4{font-size:15px;font-weight:600;margin:0 0 8px}
+
+/* Panel, second pass: the page it is about as a context row, actions as a list, answers as soft blocks, a quiet composer. */
+#herotitle{display:none}
+.hero{margin:0 0 10px}
+.pagechip{margin:0 0 10px;padding:8px 10px;border-radius:9px;background:var(--hover)}
+.trust{font-size:12px;margin:0 2px}
+.lead-act{min-height:38px;padding:0 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);margin:0 0 2px}
+.lead-act b{font-weight:600}
+.lead-act>svg{width:24px;height:24px;padding:5px;border-radius:7px;background:var(--win);stroke:var(--accent)}
+.lead-act:hover{opacity:1;background:color-mix(in srgb,var(--accent) 16%,var(--win))}
+.grid{margin:0 0 12px}
+.card{border:0;background:var(--hover);border-radius:10px}
+.ch{margin-bottom:6px}
+.cp{border:0;background:var(--win);border-radius:6px}
+blockquote{border-left-width:2px}
+#composer{border-top:0;padding:6px 10px 10px}
+.askform{padding:3px 3px 3px 12px;border:0;border-radius:10px;background:var(--hover)}
+.askform:focus-within{background:var(--win);box-shadow:inset 0 0 0 1px var(--accent)}
+.askform input{height:32px}
+.send{width:30px;height:30px;border-radius:8px}
+.send svg{width:16px;height:16px}
+.ph{border-bottom:0;padding-bottom:4px}
+
+/* Prompt first: the box at the bottom is the main control; the home state is a short invitation and a few suggestions. */
+.logo{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 88%,#fff),var(--accent) 55%,color-mix(in srgb,var(--accent) 70%,#000));box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.logo svg{width:15px;height:15px;fill:#fff;stroke:none}
+#herotitle{display:block;font-size:17px;font-weight:600;line-height:1.3;margin:6px 2px 12px;letter-spacing:-.005em}
+.pagechip{display:none}
+.hero{margin:6px 0 4px}
+.trust{display:inline-flex;align-items:center;gap:6px;margin:0 0 16px;padding:3px 10px 3px 8px;border-radius:12px;background:var(--hover);color:var(--muted);font-size:11.5px;font-weight:500}
+.trust::before{margin:0;width:6px;height:6px}
+.trust.remote{background:var(--warn-soft);color:var(--warn)}
+.trust.remote::before{background:var(--warn)}
+.sugs2{display:flex;flex-wrap:wrap;gap:6px}
+.sug{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px 0 9px;border-radius:9px;background:var(--hover);font-size:13px;font-weight:500;transition:background .15s}
+.sug:hover{background:var(--accent-soft);color:var(--accent)}
+.sug svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--accent)}
+.sug.more{background:transparent;color:var(--muted);padding:0 8px}
+.sug.more:hover{background:var(--hover);color:var(--ink)}
+.askform{padding:4px 4px 4px 14px}
+/* Small print under an answer: quiet, one line, no sentences. */
+.fine{display:inline-block;margin:8px 6px 0 0;padding:1px 8px;border-radius:9px;background:var(--win);font-size:11px;line-height:1.6}
+
+/* Header mark: just the glyph. */
+.logo{width:22px;height:22px;background:none;box-shadow:none;border-radius:0}
+.logo svg{width:20px;height:20px;fill:var(--accent)}
+/* Suggestions: two columns, "All tasks" as a quiet row of its own. */
+.sugs2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sug{justify-content:flex-start}
+.sug.more{grid-column:1/-1;justify-content:flex-start;padding:0 9px;height:30px}
+.trust{display:none}
+/* Model chip under the prompt box. */
+#composer{padding-bottom:6px}
+.mrow{display:flex;padding:6px 2px 0}
+.mbtn{display:inline-flex;align-items:center;gap:7px;max-width:100%;height:26px;padding:0 8px 0 7px;border-radius:7px;color:var(--muted);font:500 12px var(--f)}
+.mbtn:hover{background:var(--hover);color:var(--ink)}
+.mbtn .md{flex:none;width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.mbtn[data-kind="local"] .md{background:#2fa36b}
+.mbtn[data-kind="remote"] .md{background:var(--warn)}
+.mbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbtn::after{content:"";flex:none;width:5px;height:5px;margin:-3px 0 0 1px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+
+.metas{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.metas .fine{margin:0}
+
+/* Header buttons, history list */
+.hb{font-size:0;display:grid;place-items:center}
+.hb svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hb[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+#hist h4{margin:4px 2px 10px}
+#histlist{list-style:none;margin:0;padding:0}
+.hrow{display:flex;align-items:flex-start;gap:4px;border-radius:9px}
+.hrow:hover{background:var(--hover)}
+.hopen{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 8px;text-align:left}
+.hopen b{max-width:100%;font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hopen small{color:var(--muted);font-size:11.5px}
+.hopen .pv{max-width:100%;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdel{flex:none;width:26px;height:26px;margin:6px 4px 0 0;border-radius:6px;color:var(--muted);font-size:16px;opacity:0}
+.hrow:hover .hdel{opacity:1}
+.hdel:hover{background:var(--line);color:var(--ink)}
+.chip.fu{border-style:dashed}
+
+/* Sources of the conversation */
+.srcrow{flex:none;display:flex;gap:6px;overflow-x:auto;padding:2px 12px 8px;scrollbar-width:none}
+.srcrow::-webkit-scrollbar{display:none}
+.src{flex:none;display:inline-flex;align-items:center;max-width:170px;height:26px;border-radius:8px;background:var(--hover);font-size:12px;font-weight:500}
+.src .sb{display:inline-flex;align-items:center;gap:6px;min-width:0;height:100%;padding:0 4px 0 6px}
+.src .sl{flex:none;width:16px;height:16px;border-radius:5px;background:var(--win);color:var(--muted);font:600 9.5px/16px var(--f);text-align:center;font-style:normal}
+.src .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src .sx{flex:none;width:18px;height:18px;margin-right:4px;border-radius:5px;color:var(--muted);font-size:13px;line-height:1;opacity:.6}
+.src .sx:hover{opacity:1;background:var(--line)}
+.src.cur{background:var(--accent-soft);color:var(--accent)}
+.src.cur .sl{color:var(--accent)}
+.src.ghost{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.src.ghost .sb{padding-right:8px}
+.src.shut{opacity:.55}
+.cited{margin:0;line-height:1.55}
+.cite{display:inline-grid;place-items:center;min-width:17px;height:17px;margin:0 1px;padding:0 4px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font:600 10.5px/1 var(--f);vertical-align:1px}
+.cite:hover{background:var(--accent);color:var(--accent-ink)}
+.fine.ln{display:block;background:none;padding:0;margin:12px 0 4px}
+ol.srcs{list-style:none;margin:0;padding:0}
+ol.srcs li{border-top:1px solid var(--line)}
+ol.srcs li.used .sl2 b::before{content:"● ";color:var(--accent);font-size:8px;vertical-align:2px}
+.sl2{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:6px 2px;text-align:left}
+.sl2 b{max-width:100%;font-weight:500;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl2 small{color:var(--muted);font-size:11.5px}
+.pass{margin:0 0 6px 2px;color:var(--muted);font-size:12px}
+
+.cutnote{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-size:12.5px}
+.cutnote span{flex:1}
+.cutnote .small{color:inherit;border-color:currentColor;flex:none}

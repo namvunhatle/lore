@@ -10,10 +10,14 @@
 </head>
 <body>
   <header class="ph">
-    <span class="logo" aria-hidden="true"><svg viewBox="-10 -10 20 20" stroke-linejoin="round"><g transform="translate(0 7.5)"><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-66) scale(.76)" fill-opacity=".55"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(66) scale(.76)" fill-opacity=".55"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(-33) scale(.9)" fill-opacity=".8"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z" transform="rotate(33) scale(.9)" fill-opacity=".8"/><path d="M0 0C-3.6-3.6-3.2-9.2 0-12.4 3.2-9.2 3.6-3.6 0 0Z"/></g></svg></span>
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.2l1.9 5.3 5.3 1.9-5.3 1.9L12 17.6l-1.9-5.3-5.3-1.9 5.3-1.9z"/><path d="M18.6 15.4l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" opacity=".75"/></svg></span>
     <div class="ttl"><h3 id="title" data-i18n="pg.title"></h3><p id="sub"></p></div>
+    <button class="x hb" id="newchat" type="button" data-i18n-aria="chat.new" data-i18n-title="chat.new"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="x hb" id="histbtn" type="button" data-i18n-aria="chat.history" data-i18n-title="chat.history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></button>
     <button class="x" id="close" data-i18n-aria="panel.close" type="button">×</button>
   </header>
+
+  <div class="srcrow" id="srcrow" hidden></div>
 
   <main id="feed">
     <section id="home" hidden>
@@ -22,9 +26,11 @@
         <h4 id="herotitle"></h4>
         <p class="trust" id="trust"></p>
       </div>
-      <button class="lead-act" id="leadact" type="button"></button>
-      <div class="grid" id="grid"></div>
+      <button class="lead-act" id="leadact" type="button" hidden></button>
+      <div class="grid" id="grid" hidden></div>
+      <div class="sugs2" id="sugs"></div>
     </section>
+    <section id="hist" hidden><h4 data-i18n="chat.history"></h4><p class="k" id="hist-empty" hidden data-i18n="chat.none"></p><ul id="histlist"></ul></section>
     <div id="thread" aria-live="polite"></div>
     <ol class="steps" id="steps"></ol>
     <div id="box"></div>
@@ -38,6 +44,7 @@
       <input id="askq" type="text" data-i18n-ph="pg.askph" autocomplete="off" spellcheck="false">
       <button class="send" type="submit" data-i18n-aria="pg.ask"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6"/></svg></button>
     </form>
+    <div class="mrow"><button class="mbtn" id="modelbtn" type="button" aria-haspopup="menu"><i class="md" aria-hidden="true"></i><span id="mname"></span></button></div>
   </footer>
   <script src="i18n.js"></script>
   <script src="panel.js"></script>

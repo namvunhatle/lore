@@ -1,8 +1,34 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences, screen } = require('electron');
+// In the CI smoke test an error at start-up must end the run with its stack, not leave an error dialog nobody can see.
+// A known bug in the HTTP client that ships with Node (an assertion from inside undici when a server closes a connection) must
+// never take the browser down. Other start-up errors in the CI smoke test end the run with their stack; elsewhere they are shown.
+const isUndici = (e) => !!e && /undici/.test(String(e.stack)) && /paused/.test(String(e.message));
+process.on('uncaughtException', (e) => {
+  if (global.__smokeDone || harmless(e)) { if (global.__smokeDone) process.exit(0); return; }
+  if (isUndici(e)) { console.error('[net] ignored an undici assertion'); return; }
+  if (process.env.LORE_SMOKE) { console.error('LORE_SMOKE_FAIL uncaught: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); }
+  console.error(e);
+  try { require('electron').dialog.showErrorBox('Lore', String(e && e.message || e)); } catch { /* not ready */ }
+});
+if (process.env.LORE_SMOKE) {
+  process.on('unhandledRejection', (e) => { if (isUndici(e)) return; console.error('LORE_SMOKE_FAIL rejected: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); });
+  global.__smokeStage = 'loaded';
+  setTimeout(() => { console.error('LORE_SMOKE_FAIL no window after 45 s | stage=' + global.__smokeStage); process.exit(1); }, 45000).unref();
+}
+// While the window is closing, the page can still send a message (a tooltip hiding, a click) to a handler that looks at the
+// window. That "Object has been destroyed" is harmless, so it must not be reported as an error.
+const harmless = (e) => /Object has been destroyed/.test(String(e && e.message));
+{
+  const on = ipcMain.on.bind(ipcMain);
+  ipcMain.on = (ch, fn) => on(ch, (...a) => { try { return fn(...a); } catch (e) { if (harmless(e)) return undefined; throw e; } });
+  const handle = ipcMain.handle.bind(ipcMain);
+  ipcMain.handle = (ch, fn) => handle(ch, async (...a) => { try { return await fn(...a); } catch (e) { if (harmless(e)) return undefined; throw e; } });
+}
+const stage = (n) => { global.__smokeStage = n; };
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { classify, setSearchEngine, searchUrl } = require('./router');
+const { classify, norm, setSearchEngine, searchUrl } = require('./router');
 const { createBlocker } = require('./adblock');
 const { isAllowedNavigation, isGoogleSignIn, isGoogleSignInRejected } = require('./privacy');
 const { hardenSession: harden } = require('./harden');
@@ -16,7 +42,7 @@ const shield = require('./shield');
 const { Memory, fileStore, RANGES, isSensitiveHost } = require('./memory');
 const { Favicons, toDataUrl } = require('./favicons');
 const { createEmbedder } = require('./embedder');
-const { answerQuery } = require('./answer');
+const { answerQuery, answer: wikiAnswer } = require('./answer');
 const { createLlm, listLocalModels, pullLocalModel, isLocalHost } = require('./llm');
 const { Settings } = require('./settings');
 const writing = require('./writing');
@@ -40,10 +66,18 @@ const aliasLib = require('./alias');
 const { SitePerms } = require('./perms');
 const pwLib = require('./passwords');
 const pagenote = require('./pagenote');
+const chats = require('./chats');
+const startLib = require('./start');
+const { budgetFor } = require('./condense');
+const nodeCrypto = require('crypto');
 const breachLib = require('./breach');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
+// Node's own fetch (undici) can throw an assertion from deep inside when a TLS server closes the connection in a certain way, and
+// that kills the process (seen on Windows). Anything that goes to an https address uses Chromium's network stack instead.
+const smartFetch = (u, o) => (String(u).startsWith('https:') ? net.fetch(u, o) : fetch(u, o));
+const makeLlm = (cfg) => createLlm(cfg, { fetchImpl: smartFetch });
 let settings;
 let llm = null;
 let settingsWin = null;
@@ -58,20 +92,38 @@ const loadUi = (wc, file, query = {}) => {
   const tab = tabs.find((x) => x.view.webContents === wc);
   return wc.loadFile(file, { query: { lang: L(), blocked: String(S.blocked), ...(tab && tab.private ? { private: '1' } : {}), ...query } });
 };
-const loadHome = (wc, query = {}) => loadUi(wc, HOME, query);
-// MEM-06: the New tab page offers the last few pages from the local memory, newest first, one per site.
-function resumeQuery() {
-  if (!memory || !memory.size) return {};
+// The New tab page is built from what is on this computer each time, so it is useful and not the same every time.
+function startData(priv) {
+  const now = Date.now();
+  if (priv) return { private: true };
+  const web = (u) => /^https?:/.test(u);
   const seen = new Set();
-  const out = [];
-  for (const i of memory.list({ from: Date.now() - 3 * 86400000 })) {
-    const h = hostOfUrl(i.url);
-    if (!h || seen.has(h) || !/^https?:/.test(i.url)) continue;
-    seen.add(h); out.push({ url: i.url, title: i.title || h, host: h.replace(/^www\./, '') });
-    if (out.length === 3) break;
+  const recent = [];
+  for (const i of memory && memory.size ? memory.list({ from: now - 3 * 86400000 }) : []) {
+    const h = hostOfUrl(i.url).replace(/^www\./, '');
+    if (!h || seen.has(h) || !web(i.url)) continue;
+    seen.add(h); recent.push({ url: i.url, title: i.title || h, host: h, ts: i.ts });
+    if (recent.length === 4) break;
   }
-  return out.length ? { resume: JSON.stringify(out) } : {};
+  const icon = (host) => { const f = favicons ? favicons.get(host) : ''; return f && f.length < 3500 ? f : ''; };
+  const sites = (memory && memory.size ? startLib.topSites(memory.list({ from: now - 30 * 86400000 })) : []).map((x) => ({ host: x.host, url: x.url, icon: icon(x.host) }));
+  const folder = T('rl.folder');
+  const reading = bookmarks ? bookmarks.items.filter((b) => b.folder === folder).sort((a, b) => b.ts - a.ts) : [];
+  const dlDone = downloads ? downloads.items.find((r) => r.state === 'done' && !r.private && now - r.started < 86400000) : null;
+  return {
+    recent, sites, chats: chatStore ? chatStore.list().slice(0, 3) : [], closed: closedTabs.items.filter((x) => !x.private).slice(-3).reverse(),
+    reading: reading.slice(0, 2), readingCount: reading.length, download: dlDone ? dlDone.name : '', tabs: tabs.filter((t) => !t.isHome && !t.private).length,
+    modelReady: !!lastModel.ready || !!(llm && settings.get().provider !== 'off'), week: pstats ? pstats.week().total : null
+  };
 }
+const loadHome = (wc, query = {}) => {
+  const q = { ...query };
+  if (!q.kind) {
+    const tab = tabs.find((x) => x.view.webContents === wc);
+    try { q.start = JSON.stringify(startLib.build(startData(!!(tab && tab.private)))); } catch { /* the page falls back to its plain form */ }
+  }
+  return loadUi(wc, HOME, q);
+};
 const isOurHome = (url) => url.startsWith('file:') && decodeURI(url).includes('/ui/home.html');
 const { AgentRun, WORKFLOWS, match: matchWorkflow } = require('./agent');
 const { PageDriver } = require('./driver');
@@ -79,7 +131,10 @@ const realWorkflows = require('./workflows').real;
 const { classifyResponse, isDeniedSite } = require('./media');
 const downloader = require('./downloader');
 
-const CHROME_BASE = 88;
+// The window is a frame (tab list at the left, address bar on top) with the page and the AI panel as cards inside it.
+const CHROME_BASE = 52;
+const SIDE_FULL = 252, SIDE_RAIL = 72, INSET = 8, RADIUS = 10;
+const sideWidth = () => 0; // the tab sidebar slides over the page and takes no room (ui/side.html)
 const BAR_H = 34; // the bookmarks bar, when it is shown
 const TABS_H = 40; // the tab strip, when tabs are along the top
 const SIDE_W = 240; // the tab sidebar, when tabs are down the left
@@ -88,7 +143,7 @@ const PEEK_STRIP = 6, PEEK_W = SIDE_W + 32; // the hidden sidebar: an edge strip
 let sideView = null; // the hidden sidebar, a transparent view above the pages (ui/side.html)
 let peekOut = false;
 let sideReady = false;
-const chromeHeight = () => CHROME_BASE - (sideOn() ? TABS_H : 0) + (bookmarks && bookmarks.bar ? BAR_H : 0);
+const chromeHeight = () => CHROME_BASE + (sideOn() ? 0 : TABS_H) + (bookmarks && bookmarks.bar ? BAR_H : 0);
 const HOME = path.join(__dirname, 'ui', 'home.html');
 const TAB_PRELOAD = path.join(__dirname, 'tab-preload.js');
 
@@ -141,6 +196,7 @@ function applyDoh() {
 function loadStats() { pstats = new PrivacyStats({ file: statsFile }); S.blocked = pstats.today().blocked; }
 function saveStats() { if (pstats) pstats.save(); }
 let statsFile = null;
+let chatStore;
 let vault;
 let perms;
 let memory;
@@ -159,28 +215,94 @@ let panel;          // trusted side panel (own preload); web pages never get thi
 let run = null;
 const PANEL_W = 380;
 let dl = null;      // current download session: { tab, state, options, pct, path, error, ctl }
-let paSeq = 0;
+let paSeq = Math.floor(Date.now() / 1000); // unique across runs, so saved messages never collide with new ones
 let pa = null;      // page assistant session: { tab, view }
 const agentOpen = () => !!run || !!dl || !!pa;
 
 const active = () => tabs.find((t) => t.id === activeId);
+
+// Where the page card sits: right of the tab list, under the address bar, with the AI panel (when open) beside it.
+function pageRect(w, h) {
+  const pw = agentOpen() ? PANEL_W + SPLIT_GAP : 0;
+  const x = sideWidth() || INSET, y = chromeHeight();
+  return { x, y, width: Math.max(200, w - INSET - pw - x), height: Math.max(200, h - y - INSET) };
+}
+
+// ---- Sheets: Settings, Memory, History and the other tools open inside this window, over the page, not in a window of their own ----
+// A Sheet looks like a BrowserWindow to the code that opens it (webContents, loadFile, focus, close, 'closed') but is a view drawn
+// over the page area. One at a time; choosing a tab, pressing Esc or the × closes it.
+const CLOSE_MARK = '[[lore-close]]';
+let sheet = null;
+const SHEET_CSS = 'body{background:var(--win)!important}main,.shell main{border:0!important;border-radius:0!important;margin:0!important}';
+class Sheet {
+  constructor({ webPreferences, title = '', name = '' }) {
+    this.title = title; this.name = name; this.dead = false; this.closedFns = [];
+    if (sheet) sheet.close();
+    this.view = new WebContentsView({ webPreferences });
+    this.webContents = this.view.webContents;
+    this.view.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF');
+    const wc = this.webContents;
+    wc.on('before-input-event', (e, input) => { if (input.type === 'keyDown' && input.key === 'Escape') { e.preventDefault(); this.close(); } });
+    wc.on('page-title-updated', (e, t) => { if (t === CLOSE_MARK) { e.preventDefault(); this.close(); } });
+    wc.on('did-finish-load', () => {
+      wc.insertCSS(SHEET_CSS).catch(() => {});
+      wc.executeJavaScript(`(() => { window.close = () => { document.title = ${JSON.stringify(CLOSE_MARK)}; }; })()`).catch(() => {});
+    });
+    sheet = this;
+    win.contentView.addChildView(this.view);
+    layout();
+    pushState();
+  }
+  loadFile(f, opts) { return this.webContents.loadFile(f, opts); }
+  setTitle() {}
+  setMenuBarVisibility() {}
+  on(ev, fn) { if (ev === 'closed') this.closedFns.push(fn); }
+  isDestroyed() { return this.dead || this.webContents.isDestroyed(); }
+  focus() {
+    if (this.dead) return;
+    if (sheet && sheet !== this) sheet.close();
+    sheet = this;
+    win.contentView.addChildView(this.view);
+    layout();
+    this.webContents.focus();
+  }
+  show() { this.focus(); }
+  close() {
+    if (this.dead) return;
+    this.dead = true;
+    if (sheet === this) sheet = null;
+    try { if (win && !win.isDestroyed()) pushState(); } catch { /* closing */ }
+    try { win.contentView.removeChildView(this.view); } catch { /* not attached */ }
+    try { this.webContents.close(); } catch { /* gone */ }
+    for (const fn of this.closedFns) { try { fn(); } catch { /* ignore */ } }
+    const t = active();
+    if (t && win && !win.isDestroyed()) t.view.webContents.focus();
+  }
+}
+const closeSheet = () => { if (sheet) sheet.close(); };
+
+function toggleSidebar() {
+  settings.update({ sidebar: settings.get().sidebar === 'rail' ? 'full' : 'rail' });
+  layout();
+  pushState();
+}
 
 function layout() {
   const t = active();
   if (!win || win.isDestroyed() || !t) return;
   const [w, h] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  // The sidebar never takes room: it slides over the page when the pointer reaches the left edge.
-  const x = 0;
-  const y = chromeHeight(), height = h - chromeHeight(), width = w - pw - x;
+  for (const x of tabs) x.view.setBorderRadius(t.fs ? 0 : RADIUS);
   if (t.fs) { t.view.setBounds({ x: 0, y: 0, width: w, height: h }); return; }
+  const r = pageRect(w, h);
   if (splitOn()) {
-    const left = Math.round((width - SPLIT_GAP) * split.ratio);
-    tabById(split.a).view.setBounds({ x, y, width: left, height });
-    tabById(split.b).view.setBounds({ x: x + left + SPLIT_GAP, y, width: width - SPLIT_GAP - left, height });
-    if (splitHandle) splitHandle.setBounds({ x: x + left, y, width: SPLIT_GAP, height });
-  } else t.view.setBounds({ x, y, width, height });
-  if (panel && pw) panel.setBounds({ x: w - pw, y: chromeHeight(), width: pw, height: h - chromeHeight() });
+    const left = Math.round((r.width - SPLIT_GAP) * split.ratio);
+    tabById(split.a).view.setBounds({ x: r.x, y: r.y, width: left, height: r.height });
+    tabById(split.b).view.setBounds({ x: r.x + left + SPLIT_GAP, y: r.y, width: r.width - SPLIT_GAP - left, height: r.height });
+    if (splitHandle) splitHandle.setBounds({ x: r.x + left, y: r.y, width: SPLIT_GAP, height: r.height });
+  } else t.view.setBounds(r);
+  if (sheet && !sheet.dead) { const q = pageRect(w, h); sheet.view.setBorderRadius(RADIUS); sheet.view.setBounds(q); }
+  if (panel && pw) { panel.setBorderRadius(RADIUS); panel.setBounds({ x: w - INSET - pw, y: r.y, width: pw, height: r.height }); }
   layoutFind();
   layoutPriv();
   layoutPeek();
@@ -279,7 +401,41 @@ function isLoading(tab) {
 function paintTitleBar(priv) {
   if (process.platform === 'darwin' || !win.setTitleBarOverlay) return;
   const dark = priv || nativeTheme.shouldUseDarkColors;
-  win.setTitleBarOverlay({ color: priv ? '#1A1330' : dark ? '#10151E' : '#FFFFFF', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: sideOn() ? 48 : 40 });
+  win.setTitleBarOverlay({ color: priv ? '#0E0A1C' : dark ? '#090D14' : '#E9ECF0', symbolColor: priv ? '#F1ECFF' : dark ? '#E9EDF3' : '#12161C', height: 40 });
+}
+
+// Whatever is typed in the panel: a verb Lore knows runs that action, a writing request opens the writing task, anything else is a question about the page.
+// The model chip's menu: local models, the cloud providers that have a key, or off.
+async function modelMenu(x, y) {
+  const c = settings.get();
+  let names = [];
+  try { names = await listLocalModels(c.local.url); } catch { /* Ollama not running */ }
+  const pick = (patch) => () => {
+    try { settings.update(patch); } catch { return openSettings('ai'); }
+    llm = makeLlm(settings.get());
+    refreshEmbedder();
+    pushState();
+    modelInfo().then((m) => { if (panel && !panel.webContents.isDestroyed()) panel.webContents.send('model:info', m); });
+  };
+  const items = names.map((n) => ({ label: n, type: 'radio', checked: c.provider === 'local' && c.local.model === n, click: pick({ provider: 'local', local: { model: n } }) }));
+  if (!names.length) items.push({ label: T('mm.noLocal'), enabled: false });
+  const cloud = [];
+  if (c.openai.key) cloud.push({ label: 'OpenAI · ' + c.openai.model, type: 'radio', checked: c.provider === 'openai', click: pick({ provider: 'openai' }) });
+  if (c.mistral.key) cloud.push({ label: 'Mistral · ' + c.mistral.model, type: 'radio', checked: c.provider === 'mistral', click: pick({ provider: 'mistral' }) });
+  if (c.gemini.key) cloud.push({ label: 'Gemini · ' + c.gemini.model, type: 'radio', checked: c.provider === 'gemini', click: pick({ provider: 'gemini' }) });
+  if (c.anthropic.key) cloud.push({ label: 'Anthropic · ' + c.anthropic.model, type: 'radio', checked: c.provider === 'anthropic', click: pick({ provider: 'anthropic' }) });
+  if (cloud.length) items.push({ type: 'separator' }, ...cloud);
+  items.push({ type: 'separator' }, { label: T('mm.off'), type: 'radio', checked: c.provider === 'off', click: pick({ provider: 'off' }) }, { type: 'separator' }, { label: T('mm.more'), click: () => openSettings('ai') });
+  const b = panel.getBounds();
+  Menu.buildFromTemplate(items).popup({ window: win, x: b.x + x, y: b.y + y });
+}
+
+function panelPrompt(q) {
+  const n = norm(q);
+  if (/^(tom tat|summari[sz]e|tl;?dr)\b/.test(n)) return pageAssistant('summarize');
+  if (/^(dich|translate)\b/.test(n)) return pageAssistant('translate');
+  if (classify(q).kind === 'write') return submit(q);
+  return pageAssistant('ask', q);
 }
 
 const hostOfUrl = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
@@ -349,8 +505,12 @@ function pushState() {
   const wc = t && t.view.webContents;
   const state = {
     lang: L(),
+    side: settings.get().sidebar,
+    sheet: sheet && !sheet.dead ? sheet.name : '',
+    panel: agentOpen(),
     tabs: tabs.map((x) => ({
-      id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon, home: x.isHome,
+      // A page without an icon of its own (or one still loading) uses the one this site had before.
+      id: x.id, title: x.title || T(x.private ? 'tab.newPrivate' : 'tab.new'), active: x.id === activeId, favicon: x.favicon || (!x.private && favicons && !x.isHome ? favicons.get(hostOfUrl(x.lazyUrl || x.url)) : ''), home: x.isHome,
       loading: isLoading(x) || !!x.pending, private: x.private, pinned: !!x.pinned, group: x.group || 0, parent: x.parent || 0, depth: tabstate.depth(tabs, x.id), toc: x.items ? x.items.length : 0, outline: x.id === activeId ? outlineView(x) : null, split: split && x.id === split.a ? 'a' : split && x.id === split.b ? 'b' : ''
     })),
     profile: profiles ? { id: profiles.active, name: profiles.current.name, color: profiles.current.color } : null,
@@ -420,6 +580,7 @@ function runSmoke() {
       const page = t ? t.view.webContents.getURL() : '';
       if (!t || strip < 1 || !/home\.html/.test(page) || t.view.webContents.isLoading()) return setTimeout(check, 500);
       if (!blocker || !blocker.ready) return fail('the ad-block engine did not load');
+      global.__smokeDone = true;
       console.log('LORE_SMOKE_OK tabs=' + strip + ' packaged=' + app.isPackaged);
       app.exit(0);
     } catch (e) { setTimeout(check, 500); }
@@ -436,10 +597,11 @@ function openStores(id) {
   const bm = f('bookmarks.bin');
   const pm = f('perms.bin');
   const pv = f('passwords.bin');
-  return { vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
+  const ch = f('chats.bin');
+  return { chats: new chats.ChatStore({ load: () => ch.load(), save: (d) => ch.save(d) }), vault: new pwLib.Vault({ load: () => pv.load(), save: (d) => pv.save(d) }), perms: new SitePerms({ load: () => pm.load(), save: (d) => pm.save(d) }), memory: new Memory(f('memory.bin')), favicons: new Favicons(f('favicons.bin')), bookmarks: new Bookmarks({ load: () => bm.load(), save: (d) => bm.save(d) }), sessionStore: f('session.bin') };
 }
 function useStores(st) {
-  vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
+  chatStore = st.chats; mainConv = newConv(); vault = st.vault; perms = st.perms; memory = st.memory; favicons = st.favicons; bookmarks = st.bookmarks; sessionStore = st.sessionStore;
   refreshEmbedder();
 }
 // Closes every tab without remembering it or opening a new one: the next profile's tabs take their place.
@@ -604,8 +766,9 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     }
     if (url.startsWith('lore-do:')) {
       e.preventDefault();
-      const a = new URL(url).searchParams.get('a');
-      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openPrivate(), memory: openMemoryLocked, settings: openSettings, tasks: () => openTasks() }[a] || (() => {}))();
+      const sp = new URL(url).searchParams;
+      const a = sp.get('a');
+      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openPrivate(), memory: openMemoryLocked, settings: openSettings, tasks: () => openTasks(), ai: () => openSettings('ai'), organize: () => openOrganize('tabs'), bookmarks: openBookmarks, downloads: openDownloads, chat: () => openChat(sp.get('k') || '') }[a] || (() => {}))();
       return;
     }
     if (!url.startsWith('lore-run:')) return guard(e, url);
@@ -622,7 +785,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   wc.on('leave-html-full-screen', () => { tab.fs = false; if (tab.fsWindow) win.setFullScreen(false); tab.fsWindow = false; layout(); });
   // A page that crashed shows a page that says so, instead of a white tab.
   wc.on('render-process-gone', (_e, d) => { if (!tabs.includes(tab) || !win || win.isDestroyed() || wc.isDestroyed() || d.reason === 'clean-exit' || d.reason === 'killed' && tab.closing) return; tab.fs = false; tab.crashedUrl = tab.url; tab.isHome = true; wc.loadFile(NETERR, { query: { lang: L(), url: tab.crashedUrl, code: 'crash', search: searchUrl('%q').replace('%25q', '%s') } }); layout(); });
-  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; resetOutline(tab); tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); pushState(); });
+  wc.on('did-navigate', (_e, url) => { if (!/\/ui\/neterror\.html/.test(decodeURI(url))) tab.errorUrl = ''; tab.pending = ''; googleRejected(url); tab.media = []; tab.favicon = ''; tab.url = url; resetOutline(tab); tab.isHome = url.startsWith('file:'); if (!tab.isHome && !priv && settings.get().privacy.memory) memory.add({ url, title: tab.title }); if (tab.id === activeId) followTab(tab); pushState(); });
   // Cookie banners and element hiding, once the page has a DOM.
   wc.on('dom-ready', async () => {
     const url = wc.getURL();
@@ -676,7 +839,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   selectTab(tab.id);
   if (target && target.url) wc.loadURL(target.url);
   else {
-    loadHome(wc, target || (priv ? {} : resumeQuery()));
+    loadHome(wc, target || {});
     // The page loads after the box is shown, and loading takes the focus: take it back once it is ready.
     wc.once('did-finish-load', () => { if (tab.id === activeId && tab.isHome) focusIntent(); });
   }
@@ -749,12 +912,14 @@ function openSplit(withId) {
 }
 
 function selectTab(id) {
+  closeSheet();
   activeId = id;
   const t = active();
   syncViews();
   closeFind();
   if (t.isHome && !t.lazyUrl) focusIntent();
   if (t.group && groups.has(t.group)) groups.get(t.group).collapsed = false;
+  followTab(t);
   layout();
   pushState();
 }
@@ -895,7 +1060,7 @@ function showTabMenu(id) {
 
 function startAgent(id) {
   if (run) run.cancel();
-  pa = null; dl = null;
+  pa = null; dl = null; assistOn = false;
   run = new AgentRun(id, {
     log: agentLog,
     driver: new PageDriver(active().view.webContents, T),
@@ -911,7 +1076,7 @@ function startAgent(id) {
 function closePanel() {
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  pa = null;
+  pa = null; assistOn = false;
   win.contentView.removeChildView(panel);
   layout();
 }
@@ -929,7 +1094,7 @@ async function openDownload() {
   const tab = active();
   if (!tab || !tab.media.length || isDeniedSite(tab.url)) return;
   if (run) { run.cancel(); run = null; }
-  pa = null;
+  pa = null; assistOn = false;
   if (dl && dl.ctl) dl.ctl.abort();
   const title = tab.title || 'video';
   dl = { tab, title, state: 'loading', options: [], pct: 0 };
@@ -981,16 +1146,116 @@ async function runPageAction(r) {
 
 // ---- Page assistant (AI-03 summary and questions, AI-04 translation) -------------------------------------------------
 const pageMeta = (tab) => { let host = ''; try { host = new URL(tab.url).hostname.replace(/^www\./, ''); } catch { /* none */ } return { title: tab.title, host }; };
-// Opens (or keeps) the assistant for this tab. A new tab or a new address starts a fresh conversation.
+// ---- Conversations ---------------------------------------------------------------------------------------------------
+// One conversation follows the person from tab to tab. Every page asked about becomes a source of it; a later question reads all
+// the sources that are still open (the newest four), so "compare it with the other one" works. Normal tabs share one conversation
+// that is saved (encrypted, on this computer); private tabs have a conversation of their own that never leaves memory.
+const MAX_SOURCES_OPEN = 4;
+const newConv = () => ({ id: 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), url: '', title: '', states: [], sources: [] });
+let mainConv = newConv();
+let privConv = newConv();
+let assistOn = false;      // the person opened the assistant and has not closed it
+let chatSaveTimer = null;
+const convFor = (tab) => (tab && tab.private ? privConv : mainConv);
+const normUrl = (u) => { try { const x = new URL(u); x.hash = ''; return x.toString(); } catch { return String(u || ''); } };
+// Restores a saved conversation and goes to the page it read last (an open tab, or the page again in a new one).
+function rebind(conv) { for (const src of conv.sources) { const t = tabOfSource(conv, src); src.tabId = t ? t.id : 0; } }
+function openChat(key) {
+  if (!chatStore) return;
+  const t = chatStore.get(String(key));
+  if (!t || !isAllowedNavigation(t.url)) return;
+  mainConv = { id: t.key, url: t.url, title: t.title, states: t.states.map((x) => ({ ...x })), sources: t.sources.map((x) => ({ key: normUrl(x.url), url: x.url, title: x.title, tabId: 0 })) };
+  rebind(mainConv);
+  assistOn = true;
+  const last = mainConv.sources[mainConv.sources.length - 1];
+  let tab = last && tabOfSource(mainConv, last);
+  if (tab) selectTab(tab.id); else if (last && isAllowedNavigation(last.url)) { tab = openTab({ url: last.url }); tab.url = last.url; last.tabId = tab.id; }
+  // Show it at once, without waiting for the page to load.
+  if (tab) { pa = null; claimPanel(tab); }
+}
+// A page joins the conversation when something is asked about it.
+function addSource(conv, tab) {
+  if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
+  const key = normUrl(tab.url);
+  let src = conv.sources.find((x) => x.tabId === tab.id) || conv.sources.find((x) => x.key === key);
+  if (!src) { src = { key }; conv.sources.push(src); if (conv.sources.length > 8) conv.sources.shift(); }
+  Object.assign(src, { key, url: tab.url, title: tab.title || hostOfUrl(tab.url), tabId: tab.id });
+  if (!conv.url) conv.url = tab.url;
+}
+// The tab a source belongs to, if it is still open: by tab, then by address.
+function tabOfSource(conv, src) {
+  const t = tabs.find((x) => x.id === src.tabId && !x.isHome) || tabs.find((x) => !x.isHome && normUrl(x.lazyUrl || x.url) === src.key);
+  return t && !!t.private === (conv === privConv) ? t : null;
+}
+// Tabs the next question will read: the one in front first, then the newest sources, each allowed and still open.
+function readableTabs(conv, tab) {
+  const out = [];
+  const add = (t) => { if (t && !out.includes(t) && !t.lazyUrl && /^https?:/.test(t.url) && !aiOffFor(t.url) && !isSensitiveHost(hostOfUrl(t.url))) out.push(t); };
+  if (tab && tab.private === (conv === privConv)) add(tab);
+  for (const src of [...conv.sources].reverse()) add(tabOfSource(conv, src));
+  return out.slice(0, MAX_SOURCES_OPEN);
+}
+function sourceChips(conv, tab) {
+  const here = tab && !tab.isHome && /^https?:/.test(tab.url) && !!tab.private === (conv === privConv) ? tab : null;
+  const chips = conv.sources.map((src) => { const t = tabOfSource(conv, src); return { key: src.key, title: src.title, host: hostOfUrl(src.url).replace(/^www\./, ''), tabId: t ? t.id : 0, open: !!t, current: !!(here && t === here) }; });
+  if (here && !chips.some((c) => c.current)) chips.push({ key: normUrl(here.url), title: here.title || hostOfUrl(here.url), host: hostOfUrl(here.url).replace(/^www\./, ''), tabId: here.id, open: true, current: true, ghost: true });
+  return chips;
+}
+function saveConv(conv) {
+  if (conv === privConv || !chatStore) return;
+  clearTimeout(chatSaveTimer);
+  chatSaveTimer = setTimeout(() => {
+    const first = conv.states.find((x) => x.question);
+    chatStore.put(conv.id, { url: conv.url, title: (first && first.question) || (conv.sources[0] && conv.sources[0].title) || '', states: conv.states, sources: conv.sources });
+  }, 800);
+}
+function recordState(tab, s) {
+  if (!Number.isFinite(s.seq) || s.state === 'idle') return;
+  const conv = convFor(tab);
+  const { reset, lang, ...rest } = s;
+  conv.states = conv.states.filter((x) => x.seq !== s.seq);
+  if (s.state === 'done' || s.state === 'error') conv.states.push(rest);
+  conv.states = conv.states.slice(-chats.MAX_STATES);
+  saveConv(conv);
+}
+// Draws the conversation in the panel: what was said before, or the opening state when nothing was.
+function sendThread(tab) {
+  const conv = convFor(tab);
+  panel.webContents.send('page:thread', {
+    lang: L(), page: pageMeta(tab), states: conv.states.filter((x) => x.state === 'done'), sources: sourceChips(conv, tab),
+    modelReady: lastModel.ready, remote: lastModel.remote, model: lastModel.model
+  });
+}
+// Only the sources row and the page name change when the tab in front changes.
+function sendContext(tab) {
+  panel.webContents.send('page:ctx', { page: pageMeta(tab), sources: sourceChips(convFor(tab), tab) });
+}
+// Opens (or keeps) the assistant for this tab. Moving between normal tabs keeps the conversation; a private tab has its own.
 function claimPanel(tab) {
-  const fresh = !pa || pa.tab !== tab || pa.url !== tab.url;
+  const swap = !pa || !!pa.tab.private !== !!tab.private;
   pa = { tab, view: 'both', url: tab.url };
   win.contentView.addChildView(panel);
   layout();
-  return fresh;
+  if (swap) sendThread(tab); else sendContext(tab);
+  return false;
 }
-const sendPage = (s) => { if (pa) panel.webContents.send('page:state', { ...s, lang: L() }); };
-const modelInfo = async () => ({ ready: !!llm && (await llm.available()), remote: !!llm && llm.remote ? llm.host : '', model: llm ? llm.model : '' });
+// The tab in front changed (or its address did): follow it with the panel.
+function followTab(tab) {
+  if (!assistOn || run || dl || !tab) return;
+  const web = !tab.isHome && /^https?:/.test(tab.url);
+  if (web) { if (!pa || pa.tab !== tab || pa.url !== tab.url) claimPanel(tab); return; }
+  // On a new tab page the conversation stays open: it can still be asked about the pages it already read.
+  if (!pa || !!pa.tab.private !== !!tab.private) { pa = null; claimPanel(tab); return; }
+  pa = { tab, view: 'both', url: tab.url };
+  sendContext(tab);
+}
+const sendPageFor = (tab, s) => {
+  recordState(tab, s);
+  if (pa && convFor(pa.tab) === convFor(tab)) panel.webContents.send('page:state', { ...s, lang: L() });
+};
+const sendPage = (s) => { if (pa) sendPageFor(pa.tab, s); };
+let lastModel = { ready: false, remote: '', model: '' };
+const modelInfo = async () => (lastModel = { ready: !!llm && (await llm.available()), remote: !!llm && llm.remote ? llm.host : '', model: llm ? llm.model : '' });
 
 // Everything a model reads from a page comes through here (AI-10): visible text only, invisible characters stripped,
 // and a report of anything that looked like an order to the assistant.
@@ -1024,35 +1289,72 @@ async function pageRead(tab) {
   return shield.prepare(raw, hidden);
 }
 
+// Answers already written for the same page text, model and question are shown again without asking the model (token saver).
+const answerCache = new Map();
+const cacheKey = (parts) => nodeCrypto.createHash('sha1').update(parts.join('\u0001')).digest('hex');
+const cacheGet = (k) => { const v = answerCache.get(k); if (v) { answerCache.delete(k); answerCache.set(k, v); } return v; };
+const cachePut = (k, v) => { answerCache.set(k, v); if (answerCache.size > 80) answerCache.delete(answerCache.keys().next().value); };
+// What a call cost, from the provider's own count; only calls that leave this computer are counted.
+function usedTokens(l) {
+  const u = l && l.remote && l.usage ? { in: l.usage.in, out: l.usage.out } : null;
+  if (u && pstats) { pstats.record('tin', '', u.in); pstats.record('tout', '', u.out); }
+  return u;
+}
+
 async function pageAssistant(action, question = '') {
   const tab = active();
   if (!tab) return;
-  if (aiOffFor(tab.url)) { claimPanel(tab); return sendPage({ mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), reset: true, state: 'error', error: 'pg.aiOff' }); }
-  if (tab.isHome || !/^https?:/.test(tab.url)) return loadHome(tab.view.webContents, { kind: 'nopage' });
+  const web = !tab.isHome && /^https?:/.test(tab.url);
+  const conv = convFor(tab);
+  if (web && aiOffFor(tab.url)) { assistOn = true; claimPanel(tab); return sendPageFor(tab, { mode: action, question, remote: '', model: '', seq: ++paSeq, page: pageMeta(tab), state: 'error', error: 'pg.aiOff' }); }
+  // A question can also be about the pages the conversation already read, even from a tab that has no page.
+  const others = readableTabs(conv, web ? tab : null);
+  if (!web && !(action === 'ask' && others.length)) return loadHome(tab.view.webContents, { kind: 'nopage' });
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  const fresh = claimPanel(tab);
+  assistOn = true;
+  claimPanel(tab);
+  if (web) { addSource(conv, tab); sendContext(tab); }
   const mine = pa;
+  const sp = (x) => sendPageFor(tab, x);
   const live = () => pa === mine && active() === tab;
   const m = await modelInfo();
   const meta = { mode: action, question, remote: m.remote, model: m.model, seq: ++paSeq, page: pageMeta(tab) };
-  sendPage({ ...meta, reset: fresh, state: 'working' });
+  sp({ ...meta, state: 'working' });
   try {
     if (action === 'translate') return await translatePage(tab, mine, meta, m, live);
+    const l = m.ready ? llm : null;
+    const bud = budgetFor(settings.get().aiSaving);
+    if (l) l.usage = null;
+    // Several pages: read each one the same safe way, then answer with numbered sources.
+    if (action === 'ask' && others.length > 1 || (action === 'ask' && others.length === 1 && others[0] !== tab)) {
+      const items = [];
+      for (const t of others) { const r = await pageRead(t); items.push({ url: t.url, title: t.title || hostOfUrl(t.url), text: r.text, tabId: t.id, report: r.report }); }
+      const res = await recall.askSources({ items, question, llm: l, lang: L(), history: chats.context(conv.states) });
+      const flagged = items.map((i) => i.report).find((r) => shield.worthWarning(r) || r.invisible || r.hiddenChars) || null;
+      return sp({ ...meta, state: 'done', found: res.found, answer: res.answer, cites: res.cites, ai: !!res.answer, cut: !!res.cut, safety: flagged,
+        tokens: usedTokens(l),
+        srcs: res.sources.map((x) => ({ n: x.n, title: x.title, host: x.host, url: items[x.n - 1].url, tabId: items[x.n - 1].tabId, passage: x.passages[0] || '' })) });
+    }
     const { text, report } = await pageRead(tab);
     const safety = shield.worthWarning(report) || report.invisible || report.hiddenChars ? report : null;
-    if (!live()) return;
-    if (text.length < 120) return sendPage({ ...meta, state: 'error', error: 'pg.noText' });
-    const l = m.ready ? llm : null;
+    if (text.length < 120) return sp({ ...meta, state: 'error', error: 'pg.noText' });
     if (action === 'summarize') {
-      const s = await pageassist.summarize({ text, llm: l, lang: L() });
+      const ck = cacheKey(['sum', m.model, L(), settings.get().aiSaving, text]);
+      let s = cacheGet(ck);
+      const cached = !!s;
+      if (!s) { s = await pageassist.summarize({ text, llm: l, lang: L(), budget: bud.summary }); if (s.ai && !s.cut) cachePut(ck, s); }
       mine.text = text;
-      return live() && sendPage({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, safety });
+      return sp({ ...meta, state: 'done', bullets: s.bullets, ai: s.ai, cut: s.cut, safety, tokens: cached ? { in: 0, out: 0, cached: true } : usedTokens(l) });
     }
-    const a = await pageassist.ask({ text, question, llm: l, lang: L() });
+    const hist = chats.context(conv.states, 2);
+    const ck = hist.length ? '' : cacheKey(['ask', m.model, L(), settings.get().aiSaving, question, text]);
+    let a = ck ? cacheGet(ck) : null;
+    const cached = !!a;
+    if (!a) { a = await pageassist.ask({ text, question, llm: l, lang: L(), history: hist, passages: bud.passages }); if (ck && a.ai && !a.cut) cachePut(ck, a); }
     mine.text = text;
-    if (live()) sendPage({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, safety });
-  } catch { if (live()) sendPage({ ...meta, state: 'error', error: 'pg.error' }); }
+    sp({ ...meta, state: 'done', found: a.found, answer: a.answer, passages: a.passages, ai: a.ai, cut: a.cut, safety, tokens: cached ? { in: 0, out: 0, cached: true } : usedTokens(l) });
+  } catch { sp({ ...meta, state: 'error', error: 'pg.error' }); }
 }
 
 // Opens the page tools without running anything, so the options are visible before the user asks for one.
@@ -1061,9 +1363,10 @@ async function openAssist() {
   if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
   if (run) { run.cancel(); run = null; }
   if (dl) { if (dl.ctl) dl.ctl.abort(); dl = null; }
-  const fresh = claimPanel(tab);
-  const m = await modelInfo();
-  sendPage({ mode: 'idle', question: '', state: 'idle', reset: fresh, page: pageMeta(tab), modelReady: m.ready, remote: m.remote, model: m.model });
+  assistOn = true;
+  pa = null; // always draw the conversation again
+  await modelInfo();
+  claimPanel(tab);
 }
 
 async function translatePage(tab, mine, meta, m, live) {
@@ -1108,7 +1411,7 @@ async function submit(text) {
     tab.pending = r.text;
     pushState();
     let a;
-    try { a = await answerQuery(r.text, { llm, lang: L() }); } finally { tab.busy = false; tab.pending = ''; }
+    try { a = await answerQuery(r.text, { llm, lang: L(), wiki: (q) => wikiAnswer(q, smartFetch) }); } finally { tab.busy = false; tab.pending = ''; }
     if (!tabs.includes(tab)) return;
     if (a) loadHome(wc, { kind: 'answer', q: r.text, web: r.url, answer: JSON.stringify(a) });
     else { tab.pending = r.text; pushState(); wc.loadURL(r.url); }
@@ -1150,11 +1453,11 @@ function createWindow() {
       : {
           titleBarStyle: 'hidden', autoHideMenuBar: true,
           titleBarOverlay: {
-            color: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
-            symbolColor: nativeTheme.shouldUseDarkColors ? '#E9EDF3' : '#12161C', height: sideOn() ? 48 : 40
+            color: nativeTheme.shouldUseDarkColors ? '#090D14' : '#E9ECF0',
+            symbolColor: nativeTheme.shouldUseDarkColors ? '#E9EDF3' : '#12161C', height: 40
           }
         }),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#090D14' : '#E9ECF0',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true }
   });
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
@@ -1174,8 +1477,8 @@ function refreshEmbedder() {
 }
 
 function openMemory() {
-  if (memoryWin && !memoryWin.isDestroyed()) return memoryWin.focus();
-  memoryWin = new BrowserWindow({
+  if (memoryWin && !memoryWin.isDestroyed()) return memoryWin.close();
+  memoryWin = new Sheet({ name: 'memory',
     width: 860, height: 780, minWidth: 560, minHeight: 480, title: T('mem.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'memory-preload.js'), contextIsolation: true, sandbox: true }
@@ -1220,7 +1523,7 @@ function wireMemoryIpc() {
     if (h && !memory.list({ host: h }).length) favicons.remove(h);
     return r;
   });
-  const confirm = async (message) => (await dialog.showMessageBox(memoryWin, { type: 'warning', buttons: [T('mem.delete'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message })).response === 0;
+  const confirm = async (message) => (await dialog.showMessageBox(win, { type: 'warning', buttons: [T('mem.delete'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message })).response === 0;
   ipcMain.handle('memory:removeHost', async (e, host) => {
     if (!trusted(e)) return reject();
     const n = memory.list({ host: String(host) }).length;
@@ -1238,7 +1541,7 @@ function wireMemoryIpc() {
   });
   ipcMain.handle('memory:export', async (e) => {
     if (!trusted(e)) return reject();
-    const r = await dialog.showSaveDialog(memoryWin, { defaultPath: 'lore-memory.json', filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'CSV', extensions: ['csv'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: 'lore-memory.json', filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'CSV', extensions: ['csv'] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     const rows = memory.export();
     const csv = ['url,title,visited', ...rows.map((x) => [x.url, x.title, x.visited].map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(','))].join('\n');
@@ -1317,7 +1620,7 @@ function openTasks(req) {
     if (req) tasksWin.webContents.send('tasks:open', req);
     return;
   }
-  tasksWin = new BrowserWindow({
+  tasksWin = new Sheet({ name: 'tasks',
     width: 760, height: 700, minWidth: 520, minHeight: 480, title: T('task.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'tasks-preload.js'), contextIsolation: true, sandbox: true }
@@ -1617,8 +1920,8 @@ async function fillPassword() {
   Menu.buildFromTemplate(found.map((x) => ({ label: x.user || T('pw.noUser'), click: () => put(x) }))).popup({ window: win });
 }
 function openPasswords() {
-  if (pwWin && !pwWin.isDestroyed()) { pwWin.focus(); return; }
-  pwWin = new BrowserWindow({
+  if (pwWin && !pwWin.isDestroyed()) { pwWin.close(); return; }
+  pwWin = new Sheet({ name: 'pw',
     width: 760, height: 620, minWidth: 520, minHeight: 420, title: T('pw.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'passwords-preload.js'), contextIsolation: true, sandbox: true }
@@ -1695,8 +1998,8 @@ async function createAlias() {
 
 let breachWin = null;
 function openBreach() {
-  if (breachWin && !breachWin.isDestroyed()) { breachWin.focus(); return; }
-  breachWin = new BrowserWindow({
+  if (breachWin && !breachWin.isDestroyed()) { breachWin.close(); return; }
+  breachWin = new Sheet({ name: 'breach',
     width: 480, height: 330, resizable: false, minimizable: false, title: T('br.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'breach-preload.js'), contextIsolation: true, sandbox: true }
@@ -1711,15 +2014,43 @@ function openBreach() {
   });
 }
 
+// ---- Tooltips -------------------------------------------------------------------------------------------------------------
+// The browser window's own page sits under the page card, so a tip drawn there can be hidden. This small view is drawn on top.
+let tipView = null;
+let tipWant = null;
+function hideTip() { tipWant = null; if (tipView && win && !win.isDestroyed()) { try { win.contentView.removeChildView(tipView); } catch { /* not shown */ } } }
+function wireTipIpc() {
+  ipcMain.on('tip:show', (e, d) => {
+    if (e.sender !== win.webContents || !d || typeof d.text !== 'string' || ![d.x, d.y, d.w, d.h].every(Number.isFinite)) return;
+    tipWant = { x: d.x, y: d.y, w: d.w, h: d.h, place: d.place === 'right' ? 'right' : 'below' };
+    if (!tipView) {
+      tipView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'tip-preload.js'), contextIsolation: true, sandbox: true } });
+      tipView.setBackgroundColor('#00000000');
+      tipView.webContents.loadFile(path.join(__dirname, 'ui', 'tip.html')).then(() => tipView && tipView.webContents.send('tip:text', { text: d.text.slice(0, 200), cap: String(d.cap || '').slice(0, 12) }));
+    } else tipView.webContents.send('tip:text', { text: d.text.slice(0, 200), cap: String(d.cap || '').slice(0, 12) });
+  });
+  ipcMain.on('tip:size', (e, w, h) => {
+    if (!tipView || e.sender !== tipView.webContents || !tipWant || !Number.isFinite(w) || !Number.isFinite(h)) return;
+    const [cw, ch] = win.getContentSize();
+    const a = tipWant;
+    const x = a.place === 'right' ? a.x + a.w + 2 : a.x + a.w / 2 - w / 2;
+    const y = a.place === 'right' ? a.y + a.h / 2 - h / 2 : a.y + a.h - 2;
+    tipView.setBounds({ x: Math.round(Math.max(2, Math.min(cw - w - 2, x))), y: Math.round(Math.max(2, Math.min(ch - h - 2, y))), width: w, height: h });
+    win.contentView.addChildView(tipView);
+  });
+  ipcMain.on('tip:hide', (e) => { if (e.sender === win.webContents) hideTip(); });
+}
+
 // ---- Privacy at a glance (PRV-15) and the weekly report (PRV-04) -----------------------------------------------------------
 let privView = null;
 let reportWin = null;
-const PRIV_W = 330, PRIV_H = 424;
+const PRIV_W = 330;
+let privH = 424;
 function layoutPriv() {
   if (!privView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  privView.setBounds({ x: Math.max(0, w - pw - PRIV_W - 12), y: chromeHeight() + 4, width: PRIV_W, height: PRIV_H });
+  privView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - PRIV_W - 12), y: chromeHeight() - 6, width: PRIV_W, height: privH });
 }
 function closePriv(refocus = true) {
   if (!privView || !win || win.isDestroyed()) return;
@@ -1743,8 +2074,8 @@ function openPriv() {
   privView.webContents.focus();
 }
 function openReport() {
-  if (reportWin && !reportWin.isDestroyed()) { reportWin.focus(); return; }
-  reportWin = new BrowserWindow({
+  if (reportWin && !reportWin.isDestroyed()) { reportWin.close(); return; }
+  reportWin = new Sheet({ name: 'report',
     width: 600, height: 640, minWidth: 440, minHeight: 420, title: T('rep.h'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'report-preload.js'), contextIsolation: true, sandbox: true }
@@ -1780,6 +2111,12 @@ function wirePrivIpc() {
   });
   ipcMain.on('priv:report', (e) => { if (ok(e)) { closePriv(false); openReport(); } });
   ipcMain.on('priv:settings', (e) => { if (ok(e)) { closePriv(false); openSettings(); } });
+  ipcMain.on('priv:size', (e, h) => {
+    if (!ok(e) || !Number.isFinite(h)) return;
+    const [, ch] = win.getContentSize();
+    privH = Math.max(160, Math.min(h, ch - chromeHeight() - 12));
+    layoutPriv();
+  });
   ipcMain.on('priv:close', (e) => { if (ok(e)) closePriv(); });
   ipcMain.handle('report:get', (e) => (reportWin && e.sender === reportWin.webContents ? pstats.week() : null));
   ipcMain.on('report:copy', (e, text) => { if (reportWin && e.sender === reportWin.webContents) clipboard.writeText(String(text).slice(0, 1000)); });
@@ -1791,7 +2128,7 @@ function layoutFind() {
   if (!findView || !win) return;
   const [w] = win.getContentSize();
   const pw = agentOpen() ? PANEL_W : 0;
-  findView.setBounds({ x: Math.max(0, w - pw - FIND_W - 12), y: chromeHeight() + 8, width: FIND_W, height: 46 });
+  findView.setBounds({ x: Math.max(0, w - INSET - (pw ? pw + SPLIT_GAP : 0) - FIND_W - 12), y: chromeHeight() + 8, width: FIND_W, height: 46 });
 }
 function openFind() {
   const t = active();
@@ -1841,7 +2178,7 @@ function wireFindIpc() {
 // ---- AI organize: tabs and bookmarks (AI-13) --------------------------------------------------------------------------
 function openOrganize(source) {
   if (organizeWin && !organizeWin.isDestroyed()) { organizeWin.close(); organizeWin = null; }
-  organizeWin = new BrowserWindow({
+  organizeWin = new Sheet({ name: 'organize',
     width: 620, height: 680, minWidth: 460, minHeight: 420, title: T('org.title'), parent: win, modal: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'organize-preload.js'), contextIsolation: true, sandbox: true }
@@ -1924,7 +2261,7 @@ function wireOrganizeIpc() {
 function openCompare(ids) {
   compareDefault = Array.isArray(ids) ? ids : [];
   if (compareWin && !compareWin.isDestroyed()) { compareWin.close(); }
-  compareWin = new BrowserWindow({
+  compareWin = new Sheet({ name: 'compare',
     width: 760, height: 640, minWidth: 520, minHeight: 420, title: T('cmp.h'), parent: win,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'compare-preload.js'), contextIsolation: true, sandbox: true }
@@ -1951,7 +2288,7 @@ function wireCompareIpc() {
     const items = [];
     for (const [i, t] of picked.entries()) { const r = await pageRead(t); items.push({ n: i + 1, title: t.title || t.url, host: hostOfUrl(t.url).replace(/^www\./, ''), text: r.text }); }
     try {
-      const rows = await comparer.compare({ items, llm, lang: L() });
+      const rows = await comparer.compare({ items, llm, lang: L(), perPage: budgetFor(settings.get().aiSaving).compare });
       return { rows, pages: items.map((i) => ({ title: i.title, host: i.host })), remote: m.remote };
     } catch { return { error: 'failed' }; }
   });
@@ -1994,8 +2331,8 @@ function openFromBar(url, newTab) {
   t.view.webContents.loadURL(url);
 }
 function openBookmarks() {
-  if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.focus();
-  bookmarksWin = new BrowserWindow({
+  if (bookmarksWin && !bookmarksWin.isDestroyed()) return bookmarksWin.close();
+  bookmarksWin = new Sheet({ name: 'bookmarks',
     width: 780, height: 700, minWidth: 520, minHeight: 420, title: T('bm.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'bookmarks-preload.js'), contextIsolation: true, sandbox: true }
@@ -2005,8 +2342,8 @@ function openBookmarks() {
   bookmarksWin.on('closed', () => { bookmarksWin = null; });
 }
 function openHistory() {
-  if (historyWin && !historyWin.isDestroyed()) return historyWin.focus();
-  historyWin = new BrowserWindow({
+  if (historyWin && !historyWin.isDestroyed()) return historyWin.close();
+  historyWin = new Sheet({ name: 'history',
     width: 780, height: 720, minWidth: 520, minHeight: 420, title: T('hist.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'history-preload.js'), contextIsolation: true, sandbox: true }
@@ -2069,7 +2406,7 @@ function wireBrowserDataIpc() {
   ipcMain.on('bookmarks:go', (e, id) => { if (!bmTrusted(e)) return; const b = bookmarks.items.find((x) => x.id === Number(id)); if (b) openTab({ url: b.url }); });
   ipcMain.handle('bookmarks:export', async (e) => {
     if (!bmTrusted(e)) return false;
-    const r = await dialog.showSaveDialog(bookmarksWin, { defaultPath: path.join(app.getPath('downloads'), 'lore-bookmarks.html'), filters: [{ name: 'HTML', extensions: ['html'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), 'lore-bookmarks.html'), filters: [{ name: 'HTML', extensions: ['html'] }] });
     if (r.canceled || !r.filePath) return false;
     fs.writeFileSync(r.filePath, bookmarks.exportHtml());
     return true;
@@ -2098,7 +2435,7 @@ function wireBrowserDataIpc() {
   ipcMain.handle('history:remove', (e, url) => (hiTrusted(e) ? memory.remove(String(url)) : false));
   ipcMain.handle('history:clear', async (e, range) => {
     if (!hiTrusted(e) || !(range === 'all' || RANGES[range])) return false;
-    const ok = (await dialog.showMessageBox(historyWin, { type: 'warning', buttons: [T('hist.clearGo'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('hist.clearAsk.' + range), detail: T('hist.clearDetail') })).response === 0;
+    const ok = (await dialog.showMessageBox(win, { type: 'warning', buttons: [T('hist.clearGo'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('hist.clearAsk.' + range), detail: T('hist.clearDetail') })).response === 0;
     if (!ok) return false;
     memory.removeSince(range);
     return true;
@@ -2108,8 +2445,8 @@ function wireBrowserDataIpc() {
 
 // ---- Downloads window (BRW-04) ---------------------------------------------------------------------------------------
 function openDownloads() {
-  if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.focus();
-  downloadsWin = new BrowserWindow({
+  if (downloadsWin && !downloadsWin.isDestroyed()) return downloadsWin.close();
+  downloadsWin = new Sheet({ name: 'downloads',
     width: 640, height: 560, minWidth: 460, minHeight: 360, title: T('dl2.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'downloads-preload.js'), contextIsolation: true, sandbox: true }
@@ -2132,7 +2469,7 @@ function wireDownloadsIpc() {
     else if (action === 'reveal' && r.path) shell.showItemInFolder(r.path);
     else if (action === 'open' && r.state === 'done' && r.path && fs.existsSync(r.path)) {
       if (r.risky) {
-        const ask = await dialog.showMessageBox(downloadsWin, { type: 'warning', buttons: [T('dl2.openAnyway'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('dl2.riskyAsk', { name: r.name }), detail: T('dl2.riskyDetail', { host: r.host || '?' }) });
+        const ask = await dialog.showMessageBox(win, { type: 'warning', buttons: [T('dl2.openAnyway'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('dl2.riskyAsk', { name: r.name }), detail: T('dl2.riskyDetail', { host: r.host || '?' }) });
         if (ask.response !== 0) return false;
       }
       shell.openPath(r.path);
@@ -2282,8 +2619,8 @@ function openLink(u) {
 
 function openSettings(pane) {
   const where = typeof pane === 'string' ? pane : '';
-  if (settingsWin && !settingsWin.isDestroyed()) { if (where) settingsWin.webContents.send('settings:pane', where); return settingsWin.focus(); }
-  settingsWin = new BrowserWindow({
+  if (settingsWin && !settingsWin.isDestroyed()) { if (where) { settingsWin.webContents.send('settings:pane', where); return settingsWin.focus(); } return settingsWin.close(); }
+  settingsWin = new Sheet({ name: 'settings',
     width: 820, height: 680, minWidth: 620, minHeight: 520, title: T('set.title'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151E' : '#FFFFFF',
     webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, sandbox: true }
@@ -2298,14 +2635,14 @@ function wireSettingsIpc() {
   const trusted = (e) => settingsWin && e.sender === settingsWin.webContents;
   const reject = () => { throw new Error('untrusted sender'); };
   const msg = (e) => (e && e.name === 'TimeoutError' ? T('set.err.timeout') : e && /^(llm|set)\./.test(e.message) ? T(e.message, { status: e.status, detail: e.detail ? ': ' + e.detail : '' }) : e && e.message ? e.message : T('set.err.connect'));
-  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L(), lockOk: lockAvailable() } : reject()));
+  ipcMain.handle('settings:get', (e) => (trusted(e) ? { view: settings.view(), lang: L(), lockOk: lockAvailable(), usage: { in: pstats.today().tin || 0, out: pstats.today().tout || 0 } } : reject()));
   ipcMain.handle('settings:save', (e, patch) => {
     if (!trusted(e)) return reject();
     const before = L();
     const layoutBefore = settings.get().tabsLayout;
     try {
       const view = settings.update(patch);
-      llm = createLlm(settings.get());
+      llm = makeLlm(settings.get());
       refreshEmbedder();
       if (L() !== before) applyLanguage();
       applyAppearance();
@@ -2325,7 +2662,7 @@ function wireSettingsIpc() {
   ipcMain.handle('settings:test', async (e, patch) => {
     if (!trusted(e)) return reject();
     try {
-      const m = createLlm(settings.preview(patch));
+      const m = makeLlm(settings.preview(patch));
       if (!m) return { ok: false, message: T('set.err.off') };
       if (!(await m.available())) return { ok: false, message: m.remote ? T('set.err.needKey') : T('set.err.notInstalled') };
       const reply = await m.chat([{ role: 'user', content: 'Reply with the single word: ok' }], { timeoutMs: 20000 });
@@ -2336,7 +2673,7 @@ function wireSettingsIpc() {
     if (!trusted(e)) return reject();
     const o = { history: !!opts.history, site: !!opts.site, cache: !!opts.cache, range: ['hour', 'day', 'week', 'month', 'all'].includes(opts.range) ? opts.range : 'all' };
     if (!o.history && !o.site && !o.cache) return { ok: false };
-    const r = await dialog.showMessageBox(settingsWin, {
+    const r = await dialog.showMessageBox(win, {
       type: 'warning', buttons: [T('set.priv.clearBtn'), T('set.priv.cancel')], defaultId: 1, cancelId: 1, message: T('set.priv.confirm')
     });
     if (r.response !== 0) return { ok: false };
@@ -2372,11 +2709,11 @@ function wireSettingsIpc() {
       const todo = [plan.chat, plan.embed].filter((m) => !modelplan.installed(names, m));
       for (const [i, m] of todo.entries()) { step(1 + i, 0); await pullLocalModel(url, m, (p) => step(1 + i, p)); }
       step(0, 1);
-      const probe = createLlm({ ...settings.get(), provider: 'local', local: { ...settings.get().local, model: plan.chat } });
+      const probe = makeLlm({ ...settings.get(), provider: 'local', local: { ...settings.get().local, model: plan.chat } });
       const reply = await probe.chat([{ role: 'user', content: 'Reply with the single word: ok' }], { timeoutMs: 90000 });
       if (!reply) return { ok: false, message: T('set.err.empty') };
       const view = settings.update({ provider: 'local', local: { url, model: plan.chat, embedModel: plan.embed } });
-      llm = createLlm(settings.get());
+      llm = makeLlm(settings.get());
       refreshEmbedder();
       return { ok: true, model: plan.chat, view };
     } catch (err) { return { ok: false, message: msg(err) }; } finally { settingUp = false; }
@@ -2386,7 +2723,11 @@ function wireSettingsIpc() {
 
 function wireIpc() {
   ipcMain.handle('intent:classify', (e, text) => (e.sender === win.webContents && typeof text === 'string' ? classify(text.slice(0, 300)).kind : ''));
+  // For taking the website's screenshots: put the window at a fixed place and in front.
+  if (process.env.LORE_SHOTS) ipcMain.on('debug:shots', (e, o) => { if (e.sender !== win.webContents) return; if (o && o.bounds) win.setBounds(o.bounds); win.show(); app.focus({ steal: true }); win.moveTop(); });
   ipcMain.on('tab:new', () => openTab());
+  ipcMain.on('model:menu', (e, x, y) => { if (panel && e.sender === panel.webContents && Number.isFinite(x) && Number.isFinite(y)) modelMenu(x, y); });
+  ipcMain.on('side:toggle', (e) => { if (e.sender === win.webContents) toggleSidebar(); });
   ipcMain.on('tab:select', (_e, id) => selectTab(id));
   // Outline: the page reports its headings and the one at the reading line; the sidebar asks to go to one or open it.
   ipcMain.on('outline:set', (e, raw) => {
@@ -2426,9 +2767,9 @@ function wireIpc() {
   ipcMain.on('split:toggle', (e) => { if (e.sender === win.webContents) openSplit(); });
   ipcMain.on('split:drag', (e, screenX) => {
     if (!splitHandle || e.sender !== splitHandle.webContents || !splitOn() || !Number.isFinite(screenX)) return;
-    const [w] = win.getContentSize();
-    const width = w - (agentOpen() ? PANEL_W : 0) - SPLIT_GAP;
-    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - SPLIT_GAP / 2) / width));
+    const [w, h] = win.getContentSize();
+    const r = pageRect(w, h);
+    split.ratio = Math.min(0.75, Math.max(0.25, (screenX - win.getContentBounds().x - r.x - SPLIT_GAP / 2) / (r.width - SPLIT_GAP)));
     layout();
   });
   ipcMain.on('split:reset', (e) => { if (splitHandle && e.sender === splitHandle.webContents && split) { split.ratio = 0.5; layout(); } });
@@ -2469,9 +2810,45 @@ function wireIpc() {
     if (e.sender !== panel.webContents || !['summarize', 'translate', 'ask', 'tasks', 'task'].includes(action)) return;
     if (action === 'tasks') return openTasks();
     if (action === 'task') return taskLib.BUILTIN.some((t) => t.id === arg && t.group === 'page') ? openTasks({ select: String(arg), auto: true }) : undefined;
+    if (action === 'ask') return panelPrompt(String(arg || ''));
     pageAssistant(action, String(arg || ''));
   });
   ipcMain.on('panel:copy', (e, text) => { if (e.sender === panel.webContents && typeof text === 'string') clipboard.writeText(text.slice(0, 20000)); });
+  // Past conversations, newest first; opening one restores its messages and goes to the page it read last.
+  const fromPanel = (e) => panel && e.sender === panel.webContents;
+  ipcMain.handle('chats:list', (e) => (fromPanel(e) && chatStore ? chatStore.list() : []));
+  ipcMain.on('chats:open', (e, key) => { if (fromPanel(e)) openChat(key); });
+  // A source chip: go to its tab, or open the page again when the tab was closed.
+  ipcMain.on('chats:goto', (e, key) => {
+    if (!fromPanel(e) || !pa) return;
+    const conv = convFor(pa.tab);
+    const src = conv.sources.find((x) => x.key === normUrl(key));
+    if (!src) return;
+    const t = tabOfSource(conv, src);
+    if (t) return selectTab(t.id);
+    if (!isAllowedNavigation(src.url)) return;
+    const nt = openTab({ url: src.url }, { private: conv === privConv });
+    nt.url = src.url; src.tabId = nt.id;
+    sendContext(nt);
+  });
+  ipcMain.on('chats:addhere', (e) => { if (fromPanel(e) && pa) { const t = active(); if (t) { addSource(convFor(t), t); sendContext(t); saveConv(convFor(t)); } } });
+  ipcMain.on('chats:drop', (e, key) => {
+    if (!fromPanel(e) || !pa) return;
+    const conv = convFor(pa.tab);
+    conv.sources = conv.sources.filter((x) => x.key !== normUrl(key));
+    saveConv(conv);
+    sendContext(pa.tab);
+  });
+  ipcMain.on('chats:delete', (e, key) => {
+    if (!fromPanel(e) || !chatStore) return;
+    chatStore.remove(String(key));
+    if (mainConv.id === String(key)) { mainConv = newConv(); if (pa) sendThread(pa.tab); }
+  });
+  ipcMain.on('chat:new', (e) => {
+    if (!fromPanel(e) || !pa) return;
+    if (pa.tab.private) privConv = newConv(); else mainConv = newConv();
+    sendThread(pa.tab);
+  });
   ipcMain.on('page:view', (e, view) => {
     if (e.sender !== panel.webContents || !pa || !['both', 'translation', 'original'].includes(view)) return;
     pa.tab.view.webContents.executeJavaScriptInIsolatedWorld(1004, [{ code: pageassist.viewScript(view) }]).catch(() => {});
@@ -2488,22 +2865,41 @@ function wireIpc() {
       { label: T('menu.newTab'), accelerator: 'CmdOrCtrl+T', click: () => openTab() },
       { label: T('more.private'), accelerator: 'CmdOrCtrl+Shift+N', click: () => openPrivate() },
       { type: 'separator' },
-      { label: T('more.assist'), enabled: web, accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
-      { label: T('pg.summarize'), enabled: web, accelerator: 'CmdOrCtrl+Alt+S', click: () => pageAssistant('summarize') },
-      { label: T('pg.translate'), enabled: web, accelerator: 'CmdOrCtrl+Alt+T', click: () => pageAssistant('translate') },
+      { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
+      { label: T('pdf.print'), enabled: web, accelerator: 'CmdOrCtrl+P', click: printPage },
+      { label: T('pdf.save'), enabled: web, click: savePdf },
+      { label: T('rl.add'), enabled: web, accelerator: 'CmdOrCtrl+Shift+L', click: readLater },
+      { label: T('src.menu'), enabled: web, accelerator: 'CmdOrCtrl+U', click: viewSource },
       { label: T('menu.openExternal'), enabled: web, accelerator: 'CmdOrCtrl+Shift+O', click: () => { const t = active(); if (t) shell.openExternal(t.url); } },
       { type: 'separator' },
-      { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() },
-      { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
+      { label: T('more.ai'), submenu: [
+        { label: T('more.assist'), enabled: web, accelerator: 'CmdOrCtrl+Alt+A', click: openAssist },
+        { label: T('pg.summarize'), enabled: web, accelerator: 'CmdOrCtrl+Alt+S', click: () => pageAssistant('summarize') },
+        { label: T('pg.translate'), enabled: web, accelerator: 'CmdOrCtrl+Alt+T', click: () => pageAssistant('translate') },
+        { type: 'separator' },
+        { label: T('cmp.menu'), click: () => openCompare() },
+        { label: T('org.menu'), accelerator: 'CmdOrCtrl+Alt+O', click: () => openOrganize('tabs') },
+        { label: T('menu.tasks'), accelerator: 'CmdOrCtrl+Shift+K', click: () => openTasks() }
+      ] },
+      { label: T('more.library'), submenu: [
+        { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
+        { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
+        { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
+        { label: T('menu.memory'), accelerator: 'CmdOrCtrl+Shift+Y', click: openMemoryLocked },
+        { label: T('pw.menu'), accelerator: 'CmdOrCtrl+Alt+P', click: async () => { if (await unlock()) openPasswords(); } }
+      ] },
+      { label: T('more.privacy'), submenu: [
+        { label: T('rep.menu'), click: openReport },
+        { label: T('eph.menu'), submenu: [5, 15, 60].map((n) => ({ label: T('eph.min', { n }), click: () => openEphemeral(n) })) },
+        { type: 'separator' },
+        { label: T('pw.fill'), enabled: web, accelerator: 'CmdOrCtrl+Alt+L', click: fillPassword },
+        { label: T('alias.menu'), click: createAlias },
+        { label: T('br.menu'), click: openBreach }
+      ] },
+      { type: 'separator' },
       { label: T('menu.import'), click: () => openWelcome('import') },
       { label: T('menu.update'), click: () => checkForUpdates(true) },
-      { label: T('bm.manage'), accelerator: 'CmdOrCtrl+Alt+B', click: openBookmarks },
-      { label: T('menu.history'), accelerator: 'CmdOrCtrl+Y', click: openHistory },
-      { label: T('menu.downloads'), accelerator: 'CmdOrCtrl+J', click: openDownloads },
-      { label: T('menu.find'), enabled: web, accelerator: 'CmdOrCtrl+F', click: openFind },
-      { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings },
-      { type: 'separator' },
-      { label: T('more.shortcuts', { k: process.platform === 'darwin' ? '⌘' : 'Ctrl+' }), enabled: false }
+      { label: T('menu.settings'), accelerator: 'CmdOrCtrl+,', click: openSettings }
     ]).popup({ window: win, x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
   });
   ipcMain.on('memory:open', (e) => { if (e.sender === win.webContents) openMemoryLocked(); });
@@ -2641,6 +3037,7 @@ function buildMenu() {
       { label: T('pdf.save'), click: savePdf },
       { label: T('src.menu'), accelerator: 'CmdOrCtrl+U', click: viewSource },
       { type: 'separator' },
+      { label: T('side.toggle'), accelerator: 'CmdOrCtrl+Shift+E', click: toggleSidebar },
       { role: 'togglefullscreen' },
       { label: T('menu.devtools'), accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => { const t = active(); if (t) t.view.webContents.toggleDevTools(); } }
     ] },
@@ -2657,11 +3054,12 @@ for (const a of process.argv.slice(1)) if (/^https?:\/\//i.test(a)) pendingUrls.
 app.whenReady().then(() => {
   // A packaged app already carries its icon; this is only for `npm start`. A missing icon must never stop the window opening.
   if (process.platform === 'darwin' && app.dock && !app.isPackaged) { try { app.dock.setIcon(path.join(__dirname, '..', 'build', 'icon.png')); } catch { /* keep the default icon */ } }
+  stage('ready');
   settings = new Settings({
     ...fileStore(path.join(app.getPath('userData'), 'settings.bin'), safeStorage),
     persistent: safeStorage.isEncryptionAvailable()
   });
-  llm = createLlm(settings.get());
+  llm = makeLlm(settings.get());
   applyAppearance();
   applyDoh();
   applySearch();
@@ -2682,6 +3080,7 @@ app.whenReady().then(() => {
   const logStore = fileStore(path.join(app.getPath('userData'), 'agent-log.bin'), safeStorage);
   const entries = logStore.load();
   agentLog = { append: (e) => { entries.push(e); logStore.save(entries); } };
+  stage('stores');
   wireIpc();
   wireSettingsIpc();
   wireMemoryIpc();
@@ -2692,21 +3091,27 @@ app.whenReady().then(() => {
   wireOrganizeIpc();
   wireCompareIpc();
   wirePrivIpc();
+  wireTipIpc();
   wirePasswordsIpc();
   wireWelcomeIpc();
+  stage('ipc');
   statsFile = path.join(app.getPath('userData'), 'stats.json');
   zoomFile = path.join(app.getPath('userData'), 'zoom.json');
   loadZooms();
   loadStats();
-  blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
+  blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin'), fetchImpl: smartFetch });
   blocker.load();
-  scamList = createScamList({ cachePath: path.join(app.getPath('userData'), 'phishing.txt') });
+  stage('blocker');
+  scamList = createScamList({ cachePath: path.join(app.getPath('userData'), 'phishing.txt'), fetchImpl: smartFetch });
   scamList.load();
   scamList.refresh().catch(() => {});
   blocker.refresh().catch(() => {}); // weekly list update in the background
   hardenSession(session.defaultSession);
+  stage('menu');
   buildMenu();
+  stage('window');
   createWindow();
+  stage('tabs');
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 // A certificate Chromium cannot trust is refused, unless the person chose to continue to that host (see the warning page).

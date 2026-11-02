@@ -103,3 +103,7 @@ section:not([hidden]){animation:rise .2s ease both}
 .plist li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .plist .none{color:var(--muted)}
 .plist .link{color:var(--accent);font-weight:500;flex:none}
+
+.setup{margin:0 0 18px;align-items:center}
+.setup .hint{margin:0}
+#setup-bar{margin:-8px 0 18px}

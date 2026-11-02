@@ -1,0 +1,4 @@
+html,body{margin:0;background:transparent;overflow:hidden}
+#t{position:absolute;left:6px;top:6px;display:inline-flex;align-items:center;gap:8px;max-width:320px;padding:5px 10px;border-radius:8px;background:var(--ink);color:var(--win);font:500 12px/1.4 var(--f);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.22)}
+#t span{overflow:hidden;text-overflow:ellipsis}
+kbd{font:500 11px var(--f);border:1px solid currentColor;border-radius:5px;padding:0 6px;line-height:16px;opacity:.75}

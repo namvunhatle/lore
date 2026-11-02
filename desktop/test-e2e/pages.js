@@ -12,7 +12,7 @@ app.whenReady().then(async () => {
   try {
     for (const [lang, h1, card] of [['en', 'What are you looking for?', 'What is Da Nang?'], ['vi', 'Bạn muốn tìm gì hôm nay?', 'Đà Nẵng là gì?']]) {
       await win.loadFile(home, { query: { lang } });
-      const r = await win.webContents.executeJavaScript(`({ h1: document.querySelector('h1').textContent, title: document.title, href: document.querySelector('#c-ask').href, text: document.querySelector('#c-ask b').textContent, lang: document.documentElement.lang })`);
+      const r = await win.webContents.executeJavaScript(`({ h1: document.getElementById('h1').textContent, title: document.title, href: document.querySelector('#c-ask').href, text: document.querySelector('#c-ask b').textContent, lang: document.documentElement.lang })`);
       assert.strictEqual(r.h1, h1);
       assert.strictEqual(r.text, card);
       assert.strictEqual(r.lang, lang);
@@ -44,7 +44,7 @@ app.whenReady().then(async () => {
     assert.strictEqual(new URL(sg.open).protocol, 'lore-external:');
     assert.strictEqual(new URL(sg.open).searchParams.get('u'), 'https://accounts.google.com/signin?x=1');
     assert.strictEqual(sg.back, 'Back to safety');
-    for (const [st, checks] of [['summarize', /Lãi suất giữ nguyên.*Những câu chính lấy nguyên văn/s], ['ask', /Giữ nguyên.*From the page.*Ngân hàng Nhà nước.*Show in page.*Written by m1.*sent to api\.example\.com/s], ['translate', /Translated 12 paragraphs into Vietnamese.*Both.*Translation.*Original/s]]) {
+    for (const [st, checks] of [['summarize', /Lãi suất giữ nguyên.*Những câu chính lấy nguyên văn/s], ['ask', /Giữ nguyên.*From the page.*Ngân hàng Nhà nước.*Show in page.*m1.*Sent to api\.example\.com/s], ['translate', /Translated 12 paragraphs into Vietnamese.*Both.*Translation.*Original/s]]) {
       const pw = new BrowserWindow({ show: false, webPreferences: { preload: path.join(__dirname, 'stub-panel-preload.js') } });
       await pw.loadFile(path.join(__dirname, '..', 'src', 'ui', 'panel.html'), { query: { s: st } });
       await new Promise((r) => setTimeout(r, 300));

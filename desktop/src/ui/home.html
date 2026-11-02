@@ -3,13 +3,26 @@
 <head>
 <meta charset="utf-8">
 <title>New tab</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:">
 <script src="early.js"></script>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="home.css">
 </head>
 <body>
 <div class="col">
+  <section id="start" hidden>
+    <p class="when" id="when"></p>
+    <h1 id="hi"></h1>
+    <form class="ask-box" id="askbox" autocomplete="off">
+      <input id="askin" type="text" spellcheck="false" aria-label="Ask or search">
+      <button type="submit" class="go" id="askgo" aria-label="Go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <div id="cont" hidden><p class="k" id="cont-k"></p><div class="conts" id="conts"></div></div>
+    <div id="sites" hidden><p class="k" id="sites-k"></p><div class="tiles" id="tiles"></div></div>
+    <div id="tips" hidden><p class="k" id="tips-k"></p><div class="tipl" id="tipl"></div></div>
+    <p class="privnote" id="privnote" hidden></p>
+  </section>
+
   <h1 id="h1" data-i18n="home.h1"></h1>
   <p class="sub" id="sub" data-i18n="home.sub"></p>
 

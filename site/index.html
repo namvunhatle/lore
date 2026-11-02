@@ -54,7 +54,7 @@
     <img class="mark" src="assets/lore-icon.svg" width="72" height="72" alt="Lore">
     <p class="eyebrow" data-i18n="hero.eyebrow">Free · Open source · MIT</p>
     <h1 data-i18n="hero.h1"><span>The browser that remembers you.</span> <span>Only you.</span></h1>
-    <p class="lead" data-i18n="hero.lead">A private browser with AI built in from the start. Ask in one bar, let it tidy your tabs, and find anything you have read. The memory stays on your computer.</p>
+    <p class="lead" data-i18n="hero.lead">A private browser with AI built in from the start. Ask in one bar, keep one conversation going across your tabs, let it tidy them, and find anything you have read. The memory stays on your computer.</p>
     <div class="cta">
       <a class="btn primary" id="cta-main" href="#download"><span id="cta-label" data-i18n="cta.download">Download Lore</span></a>
       <a class="btn" data-repo="" href="https://github.com/tevo-web/lore"><span data-i18n="cta.github">View on GitHub</span></a>
@@ -69,8 +69,7 @@
           <div class="demo-url"><span id="demo-q"></span><i class="caret"></i><span class="chip" id="demo-chip" hidden></span></div>
           <span class="demo-tools" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 5.4C12 4 10.9 3 9.6 3 8.2 3 7.1 4 7.1 5.3 5.4 5.6 4 7 4 8.7c0 .8.3 1.5.8 2.1-.5.6-.8 1.3-.8 2.1 0 1.3.8 2.4 2 2.8.1 1.8 1.6 3.3 3.5 3.3 1 0 1.9-.5 2.5-1.3V5.4zM12 5.4C12 4 13.1 3 14.4 3c1.4 0 2.5 1 2.5 2.3 1.7.3 3.1 1.7 3.1 3.4 0 .8-.3 1.5-.8 2.1.5.6.8 1.3.8 2.1 0 1.3-.8 2.4-2 2.8-.1 1.8-1.6 3.3-3.5 3.3-1 0-1.9-.5-2.5-1.3V5.4z"/></svg>
-            <span class="ai"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>AI</span>
+                        <span class="ai"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span>
           </span>
         </div>
         <div class="demo-body" id="demo-body" aria-live="off"></div>
@@ -99,31 +98,41 @@
       <div class="copy">
         <p class="eyebrow time" data-i18n="f1.eyebrow">7:40 AM</p>
         <h3 data-i18n="f1.h">You wonder something. You just ask.</h3>
-        <p data-i18n="f1.p">On the train you type a question into the one bar, not an address. Lore answers in a line or two and shows where it came from. It never guesses a price or a flight.</p>
+        <p data-i18n="f1.p">Every new tab starts with where you left off: your last chat, the pages you read, the sites you use. Or just ask: type a question, not an address. Lore answers in a line or two and shows where it came from. It never guesses a price or a flight.</p>
       </div>
-      <figure class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><img src="assets/bar-home.png" width="1280" height="88" alt=""></div><img class="win-body" src="assets/home.png" width="1280" height="732" alt="Lore new tab page" loading="lazy"></figure>
+      <figure class="win shot"><img class="win-body" src="assets/shot-home.jpg" width="1600" height="1025" alt="Lore new tab page: a greeting, one box to ask, where you left off, your sites" loading="lazy"></figure>
     </article>
 
     <article class="row chapter flip reveal">
       <div class="copy">
         <p class="eyebrow time" data-i18n="f2.eyebrow">9:15 AM</p>
         <h3 data-i18n="f2.h">A long article, a short morning.</h3>
-        <p data-i18n="f2.p">Lore sits beside the page. It sums it up, pulls out the dates, or answers "does it mention a price?" by quoting the exact line.</p>
+        <p data-i18n="f2.p">Lore sits beside the page, in one box: ask, or tell it what to do. It sums the page up, or answers "does it mention a price?" by quoting the exact line. Each page keeps its own chat, on your computer.</p>
         <p class="fine" data-i18n="f2.note">Sample summary from a stand-in model.</p>
       </div>
-      <figure class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><img src="assets/bar-page.png" width="1280" height="88" alt=""></div><div class="win-body split"><img src="assets/page-panel.jpg" width="900" height="732" alt="Wikipedia article in Lore" loading="lazy"><img src="assets/panel.png" width="380" height="732" alt="Lore AI panel quoting the answer from the page" loading="lazy"></div></figure>
+      <figure class="win shot"><img class="win-body" src="assets/shot-page-ai.jpg" width="1600" height="1025" alt="A Wikipedia article in Lore with the AI panel beside it, answering a question about the page" loading="lazy"></figure>
+    </article>
+
+    <article class="row chapter reveal">
+      <div class="copy">
+        <p class="eyebrow time" data-i18n="f9.eyebrow">9:40 AM</p>
+        <h3 data-i18n="f9.h">Open a second page. Keep talking.</h3>
+        <p data-i18n="f9.p">Ask about one page, switch tabs and ask again: Lore adds the new page to the same conversation and keeps the first as a source. Its answer says which page each claim came from, and a click takes you there.</p>
+        <p class="fine" data-i18n="f9.note">Answer written by a stand-in model.</p>
+      </div>
+      <figure class="win shot"><img class="win-body" src="assets/shot-chat.jpg" width="1600" height="1025" alt="The AI panel answering a question about two pages, with a numbered source for each" loading="lazy"></figure>
     </article>
 
     <article class="row chapter showcase reveal">
       <div class="copy">
         <p class="eyebrow time" data-i18n="f7.eyebrow">10:20 AM</p>
         <h3 data-i18n="f7.h">Twelve tabs, one tidy-up.</h3>
-        <p data-i18n="f7.p">Too many tabs open? Lore reads their titles and groups them by what they are about: a trip, a project, a topic. You see the plan first, change what you like, press Apply, and undo if you change your mind. Duplicates are found too.</p>
+        <p data-i18n="f7.p">Too many tabs open? They live in a list on the left, and Lore reads their titles and groups them by what they are about: a trip, a project, a topic. You see the plan first, change what you like, press Apply, and undo if you change your mind. Duplicates are found too.</p>
         <p class="fine" data-i18n="f7.note">Groups made by a stand-in model.</p>
       </div>
       <div class="stack">
-        <figure class="win back"><div class="zoom"><img src="assets/bar-groups.png" width="1280" height="88" alt="Tabs gathered into three named groups" loading="lazy"></div><img class="win-body peek" src="assets/page-panel.jpg" width="900" height="732" alt="" loading="lazy"></figure>
-        <figure class="win front"><div class="win-title"><span class="dots"><i></i><i></i><i></i></span><b data-i18n="f7.win">Organize</b></div><img class="win-body" src="assets/organize.png" width="620" height="650" alt="The Organize window proposing three groups, with Apply and Cancel" loading="lazy"></figure>
+        <figure class="win shot back"><img class="win-body" src="assets/shot-groups.jpg" width="1600" height="1025" alt="Tabs gathered into three named, coloured groups in the side list" loading="lazy"></figure>
+        <figure class="win shot front"><img class="win-body" src="assets/shot-tidy.jpg" width="1600" height="1025" alt="The Organize sheet proposing groups, with Apply and Cancel" loading="lazy"></figure>
       </div>
     </article>
 
@@ -134,7 +143,7 @@
         <p data-i18n="f3.p">Tell Lore what you need. It writes the draft and opens it in your own Gmail or Outlook. You read it, you press Send. That last part stays yours.</p>
         <p class="fine" data-i18n="f3.note">Sample draft from a stand-in model.</p>
       </div>
-      <figure class="win"><div class="win-title"><span class="dots"><i></i><i></i><i></i></span><b>Tasks</b></div><img class="win-body" src="assets/tasks-email.png" width="760" height="668" alt="Tasks window with an email draft" loading="lazy"></figure>
+      <figure class="win shot"><img class="win-body" src="assets/shot-tasks.jpg" width="1600" height="1025" alt="Tasks open over the page with an email draft ready" loading="lazy"></figure>
     </article>
 
     <article class="row chapter reveal">
@@ -143,16 +152,16 @@
         <h3 data-i18n="f8.h">Read on one side, write on the other.</h3>
         <p data-i18n="f8.p">Open two pages side by side and drag the divider where you like. Click into either one and Lore follows, so the tools and the address always belong to the page you are on.</p>
       </div>
-      <figure class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><img src="assets/bar-split.png" width="1280" height="88" alt="Two tabs joined by one line in the tab strip" loading="lazy"></div><div class="win-body panes"><img src="assets/split-left.jpg" width="636" height="732" alt="Da Nang on Wikipedia, left pane" loading="lazy"><i class="divider" aria-hidden="true"></i><img src="assets/split-right.jpg" width="636" height="732" alt="Huế on Wikipedia, right pane" loading="lazy"></div></figure>
+      <figure class="win shot"><img class="win-body" src="assets/shot-split.jpg" width="1600" height="1025" alt="Two Wikipedia pages side by side with a divider between them" loading="lazy"></figure>
     </article>
 
     <article class="row chapter flip reveal">
       <div class="copy">
         <p class="eyebrow time" data-i18n="f4.eyebrow">2:00 PM</p>
         <h3 data-i18n="f4.h">Wait, where was that page?</h3>
-        <p data-i18n="f4.p">You remember the idea, not the address. Ask by meaning and Lore finds it, from a memory that is encrypted and lives only on your computer.</p>
+        <p data-i18n="f4.p">You remember the idea, not the address. Ask by meaning and Lore finds it, from a memory that is encrypted and lives only on your computer. It can also write a short note on what you read today.</p>
       </div>
-      <figure class="win crop"><div class="win-title"><span class="dots"><i></i><i></i><i></i></span><b>Memory</b></div><img class="win-body" src="assets/memory.png" width="860" height="748" alt="Memory window listing visited pages" loading="lazy"></figure>
+      <figure class="win shot"><img class="win-body" src="assets/shot-memory.jpg" width="1600" height="1025" alt="Memory open over the page, listing visited pages" loading="lazy"></figure>
     </article>
   </div>
 </section>
@@ -165,19 +174,19 @@
     <ul class="bento">
       <li class="reveal wide">
         <div class="bt"><b data-i18n="x.1.b">Profiles</b><span data-i18n="x.1.t">Work and personal apart: their own logins, tabs, memory and bookmarks.</span></div>
-        <img src="assets/profiles.png" width="820" height="648" alt="Settings page listing two profiles, Personal and Work" loading="lazy">
+        <img src="assets/shot-profiles.jpg" width="1600" height="1025" alt="Settings listing two profiles, Personal and Work" loading="lazy">
       </li>
       <li class="reveal">
         <div class="bt"><b data-i18n="x.3.b">Light, dark, or yours</b><span data-i18n="x.3.t">Follows your system, or stays the way you pick.</span></div>
-        <div class="duo"><img class="lt" src="assets/home.png" width="1280" height="732" alt="Light theme" loading="lazy"><img class="dk" src="assets/home-dark.png" width="1280" height="732" alt="Dark theme" loading="lazy"></div>
+        <div class="duo"><img class="lt" src="assets/shot-home.jpg" width="1600" height="1025" alt="Light theme" loading="lazy"><img class="dk" src="assets/shot-home-dark.jpg" width="1600" height="1025" alt="Dark theme" loading="lazy"></div>
       </li>
       <li class="reveal">
         <div class="bt"><b data-i18n="x.4.b">Offline? Play.</b><span data-i18n="x.4.t">A small lotus game while you wait. The page reloads when the connection is back.</span></div>
         <img src="assets/offline.png" width="1280" height="732" alt="The offline page with a small lotus jumping game" loading="lazy">
       </li>
       <li class="reveal wide flipx">
-        <img src="assets/history.png" width="780" height="720" alt="History grouped by day" loading="lazy">
-        <div class="bt"><b data-i18n="x.5.b">Bookmarks, history, downloads</b><span data-i18n="x.5.t">A bookmarks bar, a history page by day, a downloads list, find in page, and your tabs back after a restart.</span></div>
+        <img src="assets/shot-history.jpg" width="1600" height="1025" alt="History grouped by day" loading="lazy">
+        <div class="bt"><b data-i18n="x.5.b">Bookmarks, history, downloads</b><span data-i18n="x.5.t">A bookmarks bar, a history page by day, a downloads list, find in page, and your tabs back after a restart. They open over the page, not in windows of their own.</span></div>
       </li>
       <li class="reveal text">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14"/></svg>
@@ -188,12 +197,16 @@
         <b data-i18n="x.7.b">One bar for everything</b><span data-i18n="x.7.t">As you type, a small label says what Enter will do: open a site, ask Lore, write, or search your memory.</span>
       </li>
       <li class="reveal text">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg>
+        <b data-i18n="x.12.b">Tabs on the side</b><span data-i18n="x.12.t">A list on the left with names you can read, groups as coloured blocks, and a slim icon-only mode on one key.</span>
+      </li>
+      <li class="reveal text">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg>
         <b data-i18n="x.8.b">Compare tabs and ask a PDF</b><span data-i18n="x.8.t">Pick two to four pages and get one table; figures not found on the page are flagged. PDFs open in the tab and answer with the page number.</span>
       </li>
-      <li class="reveal text">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4"/></svg>
-        <b data-i18n="x.9.b">Privacy at a glance</b><span data-i18n="x.9.t">Click the shield: ads, tracking links, https-first and Memory, with per-site switches. A weekly report, encrypted DNS, and tabs that destroy themselves.</span>
+      <li class="reveal wide">
+        <div class="bt"><b data-i18n="x.9.b">Privacy at a glance</b><span data-i18n="x.9.t">Click the shield: ads, tracking links, https-first and Memory, with per-site switches. A weekly report, encrypted DNS, and tabs that destroy themselves.</span></div>
+        <img src="assets/shot-privacy.jpg" width="1600" height="1025" alt="The shield panel with switches for blocking, link cleaning, https first, Memory and AI" loading="lazy">
       </li>
       <li class="reveal text">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg>
@@ -232,6 +245,9 @@
       <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4 10 6-.7 1-1.8 2.3-3.2 3.4M6.5 7.6C4.6 8.9 3.2 10.6 2 12c1.5 2 5 6 10 6 1.4 0 2.7-.3 3.9-.8M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><b data-i18n="p.4.b">Private tabs</b><span data-i18n="p.4.t">Nothing saved. Tinted violet.</span></li>
       <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11v3c0 2-.5 4-1.5 6M8 9a4 4 0 0 1 8 0v2c0 3-.6 5.5-2 8M5 11V9a7 7 0 0 1 14 0v1M5 15c.3-1.3.5-2.7.5-4"/></svg><b data-i18n="p.5.b">Less fingerprinting</b><span data-i18n="p.5.t">You look like everyone else.</span></li>
       <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"/></svg><b data-i18n="p.6.b">Permissions ask once</b><span data-i18n="p.6.t">Never granted silently.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><b data-i18n="p.7.b">Tracking links cleaned</b><span data-i18n="p.7.t">utm_ and fbclid tags are removed.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg><b data-i18n="p.8.b">Secure connections first</b><span data-i18n="p.8.t">https is tried before plain http.</span></li>
+      <li class="reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.500 18.400 12 21c-2.500-2.600-3.800-5.600-3.800-9S9.500 5.600 12 3z"/></svg><b data-i18n="p.9.b">Encrypted DNS</b><span data-i18n="p.9.t">Your provider does not see site names.</span></li>
     </ul>
     <details class="leaves reveal">
       <summary data-i18n="l.h">What leaves your computer</summary>
@@ -243,6 +259,7 @@
           <tr><td data-i18n="l.r5.a">Every few hours</td><td>github.com</td><td data-i18n="l.r5.c">Only your IP address and the version number (update check)</td></tr>
           <tr><td data-i18n="l.r3.a">About once a week</td><td>easylist.to, abpvn.com, GitHub</td><td data-i18n="l.r3.c">Nothing (filter lists)</td></tr>
           <tr><td data-i18n="l.r6.a">You check a password for breaches</td><td>pwnedpasswords.com</td><td data-i18n="l.r6.c">The first 5 characters of its hash, never the password</td></tr>
+          <tr><td data-i18n="l.r7.a">You create an email alias</td><td data-i18n="l.r7.b">The alias service you chose</td><td data-i18n="l.r7.c">A note with the site name</td></tr>
           <tr><td data-i18n="l.r4.a">You use a cloud AI key</td><td data-i18n="l.r4.b">The provider you chose</td><td data-i18n="l.r4.c">The text you asked about</td></tr>
         </tbody>
       </table>
@@ -257,18 +274,15 @@
     <div class="copy reveal">
       <p class="eyebrow time" data-i18n="f6.eyebrow">9:30 PM</p>
       <h2 data-i18n="f6.h">Your AI. Your rules.</h2>
-      <p data-i18n="f6.p">Lore can use a model running on your own computer, your own key, or no AI at all. You choose, and everything else keeps working.</p>
+      <p data-i18n="f6.p">Lore can use a model running on your own computer, your own key, or no AI at all. You choose, and everything else keeps working. Choose how much of a page may be sent, and see the tokens a cloud model used.</p>
       <div class="choices" role="tablist" aria-label="AI">
         <button type="button" role="tab" aria-selected="true" data-choice="0" data-i18n="c.0">On your computer</button>
         <button type="button" role="tab" aria-selected="false" data-choice="1" data-i18n="c.1">Your own key</button>
         <button type="button" role="tab" aria-selected="false" data-choice="2" data-i18n="c.2">No AI</button>
       </div>
-      <p class="choice-text" id="choice-text" aria-live="polite" data-i18n="c.t0">A model through Ollama, so nothing you ask ever leaves your machine.</p>
+      <p class="choice-text" id="choice-text" aria-live="polite" data-i18n="c.t0">A model through Ollama, so nothing you ask ever leaves your machine. One button sets it up.</p>
     </div>
-    <figure class="win reveal">
-      <div class="win-title"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><b data-i18n="f6.win">Settings</b></div>
-      <img class="win-body" src="assets/settings.png" width="820" height="648" alt="Settings: choose where the AI runs" loading="lazy">
-    </figure>
+    <figure class="win shot reveal"><img class="win-body" src="assets/shot-settings.jpg" width="1600" height="1025" alt="Settings: choose where the AI runs: this computer, off, OpenAI-compatible, Anthropic, Mistral or Gemini" loading="lazy"></figure>
   </div>
 </section>
 
@@ -281,6 +295,7 @@
         <li data-i18n="h.1">No phone version yet, and the Linux builds are new</li>
         <li data-i18n="h.2">It cannot pay a real bill or book a real ticket yet</li>
         <li data-i18n="h.3">No VPN, sync or extensions</li>
+        <li data-i18n="h.5">The password manager has no import or passkeys, and addresses are not auto-filled</li>
         <li data-i18n="h.4" data-unsigned="any">The installer is not signed, so your computer will frown at it</li>
       </ul>
     </div>
@@ -341,6 +356,7 @@ npm start</code></pre>
     <details><summary data-i18n="q.1s">Is it free?</summary><p data-i18n="q.1p">Yes: open source, no account, no ads. A cloud AI key you add may cost money. A model on your computer does not.</p></details>
     <details><summary data-i18n="q.2s">Is it really private?</summary><p data-i18n="q.2p">No analytics, no telemetry. Your history and memory stay on your computer, encrypted. "Private" is not "anonymous": sites still see your connection, and a cloud AI sees what you send it. Every result says where text went.</p></details>
     <details><summary data-i18n="q.3s">Do I need an AI model?</summary><p data-i18n="q.3p">No. Answers, memory, ad blocking and scam warnings work without one. A model adds writing, summaries and translation.</p></details>
+    <details><summary data-i18n="q.10s">How do I keep cloud AI costs down?</summary><p data-i18n="q.10p">Settings > AI model > "Data sent to the model": Save sends only the key sentences of a page. Answers you already asked for are shown again for free, and every answer from a cloud model shows how many tokens it used.</p></details>
     <details><summary data-i18n="q.8s">Can I bring my bookmarks and history?</summary><p data-i18n="q.8p">Yes, from Chrome, Edge, Brave, Vivaldi, Cốc Cốc and Firefox on this computer, or from a bookmarks file. Passwords are not imported.</p></details>
     <details><summary data-i18n="q.9s">Does Lore update itself?</summary><p data-i18n="q.9p">It checks for new versions, and on Windows and Linux installs them for you. On macOS it tells you and opens the download page until the app is signed.</p></details>
     <details><summary data-i18n="q.5s">Can I sign in to Google?</summary><p data-i18n="q.5p">Sometimes. Google blocks some embedded browsers. If it says no, Lore offers to open the page in your system browser.</p></details>

@@ -113,3 +113,15 @@ test('Ollama is asked for a context window big enough for a whole page', async (
   await createLlm({ provider: 'local', local: { url: 'http://127.0.0.1:1', model: 'm' } }, { fetchImpl: f }).chat([{ role: 'user', content: 'hi' }]);
   assert.ok(body.options.num_ctx >= 8192);
 });
+
+test('Gemini is reached through Google\'s OpenAI-compatible address with the key as a bearer token', async () => {
+  let seen;
+  const f = async (url, opt) => { seen = { url, opt }; return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 3 } }) }; };
+  const m = createLlm({ provider: 'gemini', gemini: { model: 'gemini-2.5-flash', key: 'K' } }, { fetchImpl: f });
+  assert.strictEqual(m.host, 'generativelanguage.googleapis.com');
+  assert.ok(m.remote);
+  assert.strictEqual(await m.chat([{ role: 'user', content: 'hi' }]), 'ok');
+  assert.strictEqual(seen.url, 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+  assert.strictEqual(seen.opt.headers.authorization, 'Bearer K');
+  assert.deepStrictEqual(m.usage, { in: 12, out: 3 });
+});

@@ -1,6 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const val = (id) => $(id).value.trim();
 let lockOk = false;
+let usage = { in: 0, out: 0 };
 let view;
 let lang = 'en';
 const T = (k, v) => LORE_I18N.t(lang, k, v);
@@ -25,6 +26,11 @@ function setLang(l) {
   mf.replaceChildren();
   for (const v of [0, 12, 14, 16, 18]) { const o = document.createElement('option'); o.value = String(v); o.textContent = v ? v + ' px' : T('set.a11y.off'); mf.append(o); }
   mf.value = view ? String(view.minFont) : keepMf || '0';
+  const sv = $('#saving');
+  const keepSv = sv.value;
+  sv.replaceChildren();
+  for (const v of ['save', 'balanced', 'detail']) { const o = document.createElement('option'); o.value = v; o.textContent = T('set.data.' + v); sv.append(o); }
+  sv.value = view ? view.aiSaving : keepSv || 'balanced';
   const se = $('#search');
   const keepSe = se.value;
   se.replaceChildren();
@@ -71,6 +77,8 @@ function fill(v) {
   $('#fp').checked = v.privacy.reduceFingerprint;
   $('#perm').value = v.privacy.permissions;
   $('#minfont').value = String(v.minFont);
+  $('#saving').value = v.aiSaving;
+  $('#usage').textContent = usage.in || usage.out ? T('set.usage', { i: usage.in.toLocaleString(), o: usage.out.toLocaleString() }) : T('set.usage0');
   $('#search').value = v.search;
   $('#search-custom').value = v.searchCustom;
   $('#search-custom-row').hidden = v.search !== 'custom';
@@ -91,7 +99,9 @@ function fill(v) {
   $('#openai-url').value = v.openai.baseUrl;
   $('#openai-model').value = v.openai.model;
   $('#anthropic-model').value = v.anthropic.model;
-  for (const k of ['openai', 'anthropic']) {
+  $('#gemini-model').value = v.gemini.model;
+  $('#mistral-model').value = v.mistral.model;
+  for (const k of ['openai', 'anthropic', 'gemini', 'mistral']) {
     $('#' + k + '-key').value = '';
     $('#' + k + '-key').placeholder = v[k].hasKey ? T('set.keySaved') : T('set.keyPh');
     $('#' + k + '-clear').hidden = !v[k].hasKey;
@@ -102,9 +112,9 @@ function fill(v) {
 function show() {
   const p = provider();
   $('#test').hidden = p === 'off';
-  for (const k of ['local', 'openai', 'anthropic']) $('#p-' + k).hidden = p !== k;
+  for (const k of ['local', 'openai', 'anthropic', 'gemini', 'mistral']) $('#p-' + k).hidden = p !== k;
   const w = $('#remote-warn');
-  const remoteHost = p === 'anthropic' ? 'api.anthropic.com' : p === 'openai' ? safeHost($('#openai-url').value) : '';
+  const remoteHost = p === 'anthropic' ? 'api.anthropic.com' : p === 'gemini' ? 'generativelanguage.googleapis.com' : p === 'mistral' ? 'api.mistral.ai' : p === 'openai' ? safeHost($('#openai-url').value) : '';
   w.hidden = !(remoteHost && !isLocal(remoteHost));
   if (!w.hidden) w.textContent = T('set.warnRemote', { host: remoteHost });
   const h = $('#store-hint');
@@ -128,10 +138,13 @@ function patch() {
     privacy: { blockThirdPartyCookies: $('#cookies').checked, scamProtection: $('#scam').checked, cookieBanners: $('#banners').checked, reduceFingerprint: $('#fp').checked, permissions: $('#perm').value, httpsFirst: $('#https').checked, stripTracking: $('#strip').checked, memory: $('#mem').checked, doh: $('#doh').value, lock: $('#lock').checked },
     alias: { provider: $('#alias').value, key: $('#alias-key').value },
     minFont: Number($('#minfont').value),
+    aiSaving: $('#saving').value,
     search: $('#search').value, searchCustom: $('#search-custom').value,
     local: { url: val('#local-url'), model: val('#local-model'), embedModel: val('#local-embed') },
     openai: { baseUrl: val('#openai-url'), model: val('#openai-model'), key: $('#openai-key').value },
-    anthropic: { model: val('#anthropic-model'), key: $('#anthropic-key').value }
+    anthropic: { model: val('#anthropic-model'), key: $('#anthropic-key').value },
+    gemini: { model: val('#gemini-model'), key: $('#gemini-key').value },
+    mistral: { model: val('#mistral-model'), key: $('#mistral-key').value }
   };
 }
 
@@ -180,7 +193,7 @@ $('#test').addEventListener('click', async () => {
   say(r.ok ? T('set.testOk') : r.message, !r.ok);
 });
 
-for (const k of ['openai', 'anthropic']) {
+for (const k of ['openai', 'anthropic', 'gemini', 'mistral']) {
   $('#' + k + '-clear').addEventListener('click', async () => {
     const r = await settings.save({ clearKey: [k], provider: 'off' });
     if (r.error) return say(r.error, true);
@@ -281,7 +294,7 @@ $('#padd').addEventListener('submit', async (e) => {
 settings.profiles.list().then(paintProfiles);
 settings.onPane((id) => go(id));
 
-settings.get().then((r) => { view = r.view; lockOk = r.lockOk; setLang(r.lang); fill(r.view); });
+settings.get().then((r) => { view = r.view; lockOk = r.lockOk; usage = r.usage; setLang(r.lang); fill(r.view); });
 
 // Left-hand navigation: one pane at a time, arrow keys move between them.
 const navs = [...document.querySelectorAll('.nav')];

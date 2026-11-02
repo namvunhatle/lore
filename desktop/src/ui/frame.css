@@ -1,0 +1,31 @@
+/* Shared by the Settings, Memory, History, Bookmarks and Downloads windows: the same frame as the browser window (a tinted
+   background with the content as a card), smaller type and 8-10 px corners instead of pills. */
+body{background:var(--bg)}
+h1{font-size:17px;font-weight:600;letter-spacing:0}
+h2{font-size:17px;font-weight:600;letter-spacing:0}
+.lead{font-size:13px;margin-bottom:14px}
+.top{background:transparent;border-bottom:0;padding:20px 24px 10px}
+main{background:var(--win);border:1px solid var(--line);border-radius:12px}
+body>main{margin:0 12px 12px}
+.search{height:38px;border-radius:10px;background:var(--win);border:1px solid var(--line)}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search input{font-size:14px}
+.chip{height:28px;border-radius:8px;padding:0 11px;font-size:12.5px}
+select{height:30px;border-radius:8px}
+li{border-radius:8px}
+.foot,footer{background:transparent;border-top:0}
+.btn{height:32px;border-radius:8px;padding:0 14px;font-size:13px}
+.f input,.f select{height:34px;border-radius:8px}
+.group,.danger,.warn{border-radius:10px}
+.set{padding:11px 14px}
+.set:first-child{border-radius:10px 10px 0 0}.set:last-child{border-radius:0 0 10px 10px}
+.pcard{border-radius:10px;padding:14px}
+.shell .side{background:transparent;border-right:0;padding:22px 8px 12px 12px}
+.shell .side h1{margin:0 10px 14px}
+.nav{height:34px;border-radius:8px;font-size:13.5px}
+.nav.on{background:var(--win);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.shell main{margin:10px 10px 10px 0;background:var(--win);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.savebar{background:transparent}
+.panes{padding:26px 32px 20px}
+.dd-btn{height:34px;border-radius:8px;font-size:13.5px}
+.dd-list{border-radius:10px}

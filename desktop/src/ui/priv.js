@@ -30,6 +30,7 @@ async function paint() {
   const t = h('div', 't'); t.append(h('b', '', T('priv.share')), h('small', '', T('priv.shareNote')));
   never.append(t, h('span', 'never', T('priv.never')));
   rows.append(never);
+  setTimeout(() => priv.size(document.getElementById("box").offsetHeight + 4), 30);
 }
 $('#rep').addEventListener('click', () => priv.report());
 $('#set').addEventListener('click', () => priv.settings());

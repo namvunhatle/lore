@@ -1,6 +1,7 @@
 // AI-03 / AI-04: summarize, ask about, and translate the current page.
 // Page text is untrusted data: prompts say so, models only ever see short passages, and answers always come with the
 // page's own wording as evidence so the user can check them.
+const { condense } = require('./condense');
 const { extractiveSummary, bestPassages } = require('./pageai');
 
 const NAME = { en: 'English', vi: 'Vietnamese' };
@@ -24,32 +25,36 @@ const cutAtSentence = (text, truncated) => {
 
 const stripBullet = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
 
-async function summarize({ text, llm, lang = 'en' }) {
+async function summarize({ text, llm, lang = 'en', budget = 9000 }) {
   const key = extractiveSummary(text, 4);
   if (!llm || !(await llm.available())) return { bullets: key, ai: false };
   try {
     const reply = await llm.chat([
       { role: 'system', content: `Summarize the page in 3 to 5 short bullet points, one per line, in ${NAME[lang]}. Use only what the page says. No preamble. ${UNTRUSTED}` },
-      { role: 'user', content: 'PAGE:\n<<<\n' + samplePage(text) + '\n>>>' }
-    ], { timeoutMs: 60000, maxTokens: 900 });
-    const bullets = complete(reply.split(/\n+/).map(stripBullet).filter((l) => l.length > 10).slice(0, 5), llm.truncated);
-    return bullets.length ? { bullets, ai: true } : { bullets: key, ai: false };
+      { role: 'user', content: 'PAGE:\n<<<\n' + (text.length > budget ? condense(text, budget) : samplePage(text, budget)) + '\n>>>' }
+    ], { timeoutMs: 60000, maxTokens: 1600 });
+    const all = reply.split(/\n+/).map(stripBullet).filter((l) => l.length > 10).slice(0, 5);
+    const bullets = complete(all, llm.truncated);
+    return bullets.length ? { bullets, ai: true, cut: !!llm.truncated } : { bullets: key, ai: false };
   } catch { return { bullets: key, ai: false }; }
 }
 
 // Always returns the page's own passages as evidence. A model, if present, only phrases the answer from them.
-async function ask({ text, question, llm, lang = 'en' }) {
-  const passages = bestPassages(text, question, 3);
+async function ask({ text, question, llm, lang = 'en', history = [], passages: count = 3 }) {
+  // A follow-up ("shorter", "and the price?") borrows the words of the question before it to find its passages.
+  const prev = history.length ? history[history.length - 1].q : '';
+  const passages = bestPassages(text, prev ? question + ' ' + prev : question, count);
   if (!passages.length) return { found: false, passages: [], answer: '', ai: false };
   if (!llm || !(await llm.available())) return { found: true, passages, answer: '', ai: false };
   try {
     const ctx = passages.map((p, i) => `[${i + 1}] ${p}`).join('\n');
+    const earlier = history.slice(-2).map((h) => `Q: ${String(h.q).slice(0, 200)}\nA: ${String(h.a).slice(0, 300)}`).join('\n');
     const reply = await llm.chat([
-      { role: 'system', content: `Answer the question in at most 3 sentences in ${NAME[lang]}, using ONLY the numbered passages. If they do not answer it, reply exactly NO_ANSWER. ${UNTRUSTED}` },
-      { role: 'user', content: `QUESTION: ${question}\n\nPASSAGES:\n<<<\n${ctx}\n>>>` }
-    ], { timeoutMs: 45000, maxTokens: 700 });
+      { role: 'system', content: `Answer the question in at most 3 sentences in ${NAME[lang]}, using ONLY the numbered passages. If the question refers to the earlier conversation (shorter, simpler, more detail, translate that), rework the earlier answer using the passages. If they do not answer it, reply exactly NO_ANSWER. ${UNTRUSTED}` },
+      { role: 'user', content: (earlier ? `EARLIER IN THIS CONVERSATION:\n${earlier}\n\n` : '') + `QUESTION: ${question}\n\nPASSAGES:\n<<<\n${ctx}\n>>>` }
+    ], { timeoutMs: 45000, maxTokens: 1200 });
     if (!reply || /NO_ANSWER/.test(reply)) return { found: true, passages, answer: '', ai: false };
-    return { found: true, passages, answer: cutAtSentence(reply.replace(/\[\d+\]/g, '').trim(), llm.truncated), ai: true };
+    return { found: true, passages, answer: cutAtSentence(reply.replace(/\[\d+\]/g, '').trim(), llm.truncated), ai: true, cut: !!llm.truncated };
   } catch { return { found: true, passages, answer: '', ai: false }; }
 }
 

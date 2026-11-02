@@ -119,22 +119,32 @@ function fillActions() {
   const go = el('span', 'go'); go.innerHTML = P('<path d="M5 12h14M13 6l6 6-6 6"/>');
   lead.append(lt, go);
   lead.onclick = first.run;
-  let n = 0;
-  for (const a of [...ACTIONS.slice(1, 5), MORE]) {
-    const b = el('button', a === MORE ? 'act wide' : 'act');
+  // Prompt first: a few suggestions as small chips, not a menu of tools. Typing in the box below does the same and more.
+  const sugs = $('#sugs');
+  sugs.replaceChildren();
+  for (const a of ACTIONS.slice(0, 4)) {
+    const b = el('button', 'sug');
     b.type = 'button';
-    b.style.setProperty('--i', String(n++));
     b.innerHTML = P(ICONS[a.id]); // fixed strings above
-    const t = el('span', 'at'); t.append(el('b', '', a.label()));
-    b.append(t);
+    b.append(el('span', '', a.label()));
     b.addEventListener('click', a.run);
-    grid.append(b);
+    sugs.append(b);
   }
+  const more = el('button', 'sug more', MORE.label());
+  more.type = 'button';
+  more.addEventListener('click', MORE.run);
+  sugs.append(more);
   for (const a of ACTIONS) {
     const c = el('button', 'chip', a.label());
     c.type = 'button';
     c.addEventListener('click', a.run);
     rail.append(c);
+  }
+  for (const k of ['shorter', 'simpler', 'detail']) {
+    const f = el('button', 'chip fu', T('chat.fu.' + k));
+    f.type = 'button';
+    f.addEventListener('click', () => agent.pageDo('ask', T('chat.fu.' + k + '.q')));
+    rail.append(f);
   }
   const c = el('button', 'chip', MORE.label());
   c.type = 'button';
@@ -143,6 +153,17 @@ function fillActions() {
 }
 
 // The opening state: which page this is, and what stays private.
+// The model chip under the prompt box, as in other AI apps: what answers, where it runs, and a menu to change it.
+function setModel(m) {
+  const b = $('#modelbtn');
+  b.dataset.kind = !m.ready ? 'none' : m.remote ? 'remote' : 'local';
+  $('#mname').textContent = !m.ready ? T('pg.hero.none') : (m.model || T('pg.hero.local')) + (m.remote ? ' · ' + m.remote : '');
+  b.dataset.tip = !m.ready ? T('pg.hero.none') : m.remote ? T('pg.hero.remote', { host: m.remote }) : T('pg.hero.local', { model: m.model });
+  b.title = b.dataset.tip;
+}
+$('#modelbtn').addEventListener('click', () => { const r = $('#modelbtn').getBoundingClientRect(); agent.modelMenu(r.left, r.top); });
+agent.onModel(setModel);
+
 function fillHero(s) {
   const p = s.page || {};
   const host = p.host || '';
@@ -151,6 +172,8 @@ function fillHero(s) {
   $('#ph').textContent = host;
   $('#pagechip').hidden = true;
   $('#herotitle').textContent = T('pg.hero.h');
+  setTimeout(() => { const q = $('#askq'); if (q && !$('#composer').hidden) q.focus(); }, 60);
+  setModel({ ready: !!s.modelReady, model: s.model, remote: s.remote });
   const trust = $('#trust');
   trust.className = 'trust ' + (!s.modelReady ? 'none' : s.remote ? 'remote' : 'local');
   trust.textContent = !s.modelReady ? T('pg.hero.none') : s.remote ? T('pg.hero.remote', { host: s.remote }) : T('pg.hero.local', { model: s.model });
@@ -240,6 +263,34 @@ function body(s) {
     b.append(ul);
     copy = s.bullets.map((x) => '- ' + x).join('\n');
     extra.push(s.ai ? T('pg.byModel', { m: s.model }) : T('pg.extractive'));
+  } else if (s.mode === 'ask' && s.srcs) {
+    // Answer drawn from several pages: numbers in the text lead to the page each claim came from.
+    if (!s.found) b.append(el('p', '', T('pg.nofind')));
+    else {
+      if (s.answer) {
+        const p = el('p', 'cited');
+        for (const part of s.answer.split(/(\[\d{1,2}\])/)) {
+          const m = /^\[(\d{1,2})\]$/.exec(part);
+          const src = m && s.srcs[Number(m[1]) - 1];
+          if (src) { const a = el('button', 'cite', m[1]); a.type = 'button'; a.title = src.title; a.addEventListener('click', () => agent.chats.goto(src.url)); p.append(a); } else p.append(document.createTextNode(part));
+        }
+        b.append(p);
+        copy = s.answer.replace(/\[\d{1,2}\]/g, '');
+      }
+      const list = el('ol', 'srcs');
+      for (const x of s.srcs) {
+        const li = el('li', (s.cites || []).includes(x.n) ? 'used' : '');
+        const a = el('button', 'sl2');
+        a.type = 'button';
+        a.append(el('b', '', x.title), el('small', '', x.host));
+        a.addEventListener('click', () => agent.chats.goto(x.url));
+        li.append(a);
+        if (!s.answer && x.passage) li.append(el('p', 'pass', x.passage.slice(0, 200)));
+        list.append(li);
+      }
+      b.append(el('p', 'fine ln', T('pg.sources')), list);
+      if (s.ai) extra.push(T('pg.byModel', { m: s.model }));
+    }
   } else if (s.mode === 'ask') {
     if (!s.found) b.append(el('p', '', T('pg.nofind')));
     else {
@@ -247,9 +298,9 @@ function body(s) {
       const q = el('blockquote', s.passages[0].length > 280 ? 'fold' : '', s.passages[0]);
       b.append(el('p', 'fine', T('pg.fromPage')), q);
       if (q.classList.contains('fold')) {
-        const more = el('button', 'more', T('pg.more'));
+        const more = el('button', 'more', T('pg.foldMore'));
         more.type = 'button';
-        more.addEventListener('click', () => { const f = q.classList.toggle('fold'); more.textContent = T(f ? 'pg.more' : 'pg.less'); });
+        more.addEventListener('click', () => { const f = q.classList.toggle('fold'); more.textContent = T(f ? 'pg.foldMore' : 'pg.less'); });
         b.append(more);
       }
       const show = el('button', 'small', T('pg.showInPage'));
@@ -271,13 +322,24 @@ function body(s) {
     b.append(seg);
   }
   if (s.remote && (s.ai || s.mode === 'translate')) extra.push(T('pg.sentTo', { host: s.remote }));
+  if (s.tokens) extra.push(s.tokens.cached ? T('pg.cached') : T('pg.tokens', { i: s.tokens.in.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US'), o: s.tokens.out.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') }));
   if (s.safety) {
     const w = safetyNote(s.safety);
     if (w) b.prepend(w);
     const n = s.safety.invisible || 0;
     if (n) extra.push(T('safe.cleaned', { n }));
   }
-  for (const t of extra) b.append(el('p', 'fine', t));
+  // The model ran out of room: say so and offer to carry on, instead of leaving a cut answer looking finished.
+  if (s.cut) {
+    const n = el('div', 'cutnote');
+    n.append(el('span', '', T('pg.cut')));
+    const go = el('button', 'small', T('pg.cutGo'));
+    go.type = 'button';
+    go.addEventListener('click', () => agent.pageDo('ask', T('pg.cutGo.q')));
+    n.append(go);
+    b.append(n);
+  }
+  if (extra.length) { const m = el('div', 'metas'); for (const t of extra) m.append(el('span', 'fine', t)); b.append(m); }
   return { b, copy };
 }
 
@@ -296,6 +358,41 @@ function renderPage(s) {
   if (!$('#composer').hidden && s.state === 'idle') $('#askq').focus();
 }
 
+// A page's whole conversation arrives at once: when the tab or page in front changes, or the panel is opened.
+// The pages this conversation reads: one chip each. The tab in front is offered as a dashed chip until something is asked about it.
+function paintSources(list) {
+  const row = $('#srcrow');
+  row.replaceChildren();
+  row.hidden = !list || list.length === 0 || (list.length === 1 && list[0].ghost);
+  for (const c of list || []) {
+    const chip = el('span', 'src' + (c.current ? ' cur' : '') + (c.ghost ? ' ghost' : '') + (c.open ? '' : ' shut'));
+    const b = el('button', 'sb');
+    b.type = 'button';
+    b.append(el('i', 'sl', (c.host || '?').charAt(0).toUpperCase()), el('span', 'st', c.title || c.host));
+    b.title = c.ghost ? T('src.add', { host: c.host }) : c.open ? c.title : T('src.reopen', { host: c.host });
+    b.addEventListener('click', () => (c.ghost ? agent.chats.addHere() : agent.chats.goto(c.key)));
+    chip.append(b);
+    if (!c.ghost) { const x = el('button', 'sx', '×'); x.type = 'button'; x.setAttribute('aria-label', T('src.drop')); x.addEventListener('click', () => agent.chats.drop(c.key)); chip.append(x); }
+    row.append(chip);
+  }
+  row.hidden = row.children.length === 0 || (list.length === 1 && list[0].ghost);
+}
+agent.onCtx((c) => { setTitle(T('pg.title'), c.page ? c.page.host : ''); paintSources(c.sources); });
+
+agent.onThread((t) => {
+  lang = t.lang || lang; LORE_I18N.apply(lang);
+  paintSources(t.sources);
+  showHistory(false);
+  reset();
+  const base = { page: t.page, model: t.model, remote: t.remote };
+  last = { fn: renderPage, s: { state: 'idle', ...base, modelReady: t.modelReady } };
+  if (!t.states.length) return renderPage({ state: 'idle', seq: 0, ...base, modelReady: t.modelReady });
+  setModel({ ready: t.modelReady, model: t.model, remote: t.remote });
+  for (const s of t.states) renderPage({ ...s, reset: false });
+  setTitle(T('pg.title'), t.page ? t.page.host : '');
+  setMode(true);
+  $('#feed').scrollTop = $('#feed').scrollHeight;
+});
 agent.onPage((s) => { lang = s.lang || lang; LORE_I18N.apply(lang); last = { fn: renderPage, s }; renderPage(s); });
 $('#askform').addEventListener('submit', (e) => { e.preventDefault(); const q = $('#askq').value.trim(); if (!q) return; $('#askq').value = ''; agent.pageDo('ask', q); });
 
@@ -305,3 +402,32 @@ agent.onLang((l) => { lang = l; LORE_I18N.apply(lang); fillActions(); });
 $('#close').addEventListener('click', () => agent.close());
 LORE_I18N.apply(lang);
 fillActions();
+
+// History: every saved conversation, newest first. Opening one goes to its page.
+function showHistory(on) {
+  $('#hist').hidden = !on;
+  $('#histbtn').setAttribute('aria-pressed', String(on));
+  if (on) { $('#home').hidden = true; $('#thread').hidden = true; } else { $('#thread').hidden = false; $('#home').hidden = msgs.size > 0; }
+}
+async function paintHistory() {
+  const list = await agent.chats.list();
+  const ul = $('#histlist');
+  ul.replaceChildren();
+  $('#hist-empty').hidden = list.length > 0;
+  for (const c of list) {
+    const li = el('li', 'hrow');
+    const open = el('button', 'hopen');
+    open.type = 'button';
+    open.append(el('b', '', c.title), el('small', '', [c.host, new Date(c.ts).toLocaleDateString(lang === 'vi' ? 'vi-VN' : undefined, { day: 'numeric', month: 'short' }), T('chat.count', { n: c.count })].join(' · ')));
+    if (c.preview) open.append(el('span', 'pv', c.preview));
+    open.addEventListener('click', () => { agent.chats.open(c.key); showHistory(false); });
+    const del = el('button', 'hdel', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', T('chat.delete'));
+    del.addEventListener('click', () => { agent.chats.remove(c.key); li.remove(); $('#hist-empty').hidden = ul.children.length > 0; });
+    li.append(open, del);
+    ul.append(li);
+  }
+}
+$('#histbtn').addEventListener('click', () => { const on = $('#hist').hidden; showHistory(on); if (on) paintHistory(); });
+$('#newchat').addEventListener('click', () => agent.chats.fresh());

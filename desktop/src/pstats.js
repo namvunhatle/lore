@@ -13,12 +13,12 @@ class PrivacyStats {
     try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); if (j && j.days && typeof j.days === 'object') this.days = j.days; } catch { /* first run */ }
     this.prune();
   }
-  _day(now) { return (this.days[dayKey(now)] ||= { blocked: 0, params: 0, https: 0, top: {} }); }
+  _day(now) { return (this.days[dayKey(now)] ||= { blocked: 0, params: 0, https: 0, tin: 0, tout: 0, top: {} }); }
   // kind: 'blocked' (host = the tracker), 'params' (n removed), 'https' (one upgrade)
   record(kind, host = '', n = 1, now = Date.now()) {
-    if (!['blocked', 'params', 'https'].includes(kind)) return;
+    if (!['blocked', 'params', 'https', 'tin', 'tout'].includes(kind)) return;
     const d = this._day(now);
-    d[kind] += n;
+    d[kind] = (d[kind] || 0) + n;
     if (kind === 'blocked' && host) {
       d.top[host] = (d.top[host] || 0) + n;
       const names = Object.keys(d.top);

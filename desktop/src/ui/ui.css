@@ -1,10 +1,6 @@
 *{box-sizing:border-box}
-html,body{margin:0;height:88px;overflow:hidden;background:var(--win);color:var(--ink);font:14px/1.5 var(--f);-webkit-user-select:none;user-select:none}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tabs{-webkit-app-region:drag;display:flex;align-items:center;gap:4px;height:40px;padding:0 12px 0 84px}
-.tab{-webkit-app-region:no-drag;display:flex;align-items:center;gap:6px;max-width:220px;min-width:60px;height:28px;padding:0 6px 0 12px;border-radius:8px;font-size:12.5px;font-weight:500;color:var(--muted)}
-.tab[aria-selected="true"]{background:var(--hover);color:var(--ink)}
 .fav{width:16px;height:16px;flex:none;border-radius:4px;display:grid;place-items:center;overflow:hidden}
 .fav img{width:16px;height:16px;object-fit:contain}
 .fav.ph{background:var(--hover);color:var(--muted);font-size:10px;font-weight:600;line-height:1}
@@ -12,15 +8,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .fav.priv{color:var(--accent)}
 .fav.spin{border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.tab span:not(.fav){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.tab .x{width:18px;height:18px;border-radius:5px;line-height:1;color:var(--muted)}
-.tab .x:hover,.plus:hover,.ib:hover:not(:disabled){background:var(--hover)}
-.plus{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:8px;color:var(--muted);font-size:18px;line-height:1}
-.bar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,720px) minmax(0,1fr);align-items:center;column-gap:14px;height:48px;padding:0 12px;border-bottom:1px solid var(--line)}
-.ib{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--muted);flex:none;position:relative}
+.ib{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--muted);flex:none;position:relative}
 .ib:disabled{opacity:.35;cursor:default}
-.omni{min-width:0;width:100%;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px 0 16px;border-radius:19px;background:var(--hover);border:1px solid transparent;transition:background .15s,border-color .15s,box-shadow .15s}
-.omni:focus-within{background:var(--win);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 #intent{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--ink);font:400 14px var(--f);outline:0;-webkit-user-select:text;user-select:text}
 #intent::placeholder{color:var(--muted)}
 kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 6px;line-height:18px}
@@ -31,7 +20,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 @keyframes load{0%{left:-35%}100%{left:100%}}
 @media (prefers-reduced-motion:reduce){.fav.spin{animation:none}#bar.loading::after{animation:none;width:100%;opacity:.6}}
 /* Windows draws its own window buttons on the right, so leave them room and drop the macOS traffic-light gap. */
-.win32 .tabs,.linux .tabs{padding-left:12px;padding-right:150px}
 #media[hidden]{display:none}
 #media{color:var(--accent)}
 #assist:not(:disabled){color:var(--accent)}
@@ -39,7 +27,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .omni{position:relative}
 .omni-ph{position:absolute;left:15px;right:58px;top:0;bottom:0;display:flex;align-items:center;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #intent:not(:placeholder-shown)~.omni-ph{display:none}
-.omni.typing{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 /* Tooltips */
 #tip{position:fixed;z-index:20;top:10px;display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:var(--ink);color:var(--win);font:500 12px/1.4 var(--f);white-space:nowrap;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.22);animation:tip 125ms cubic-bezier(.23,1,.32,1) both}
 #tip kbd{color:inherit;border-color:currentColor;opacity:.75;line-height:16px}
@@ -60,14 +47,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 @media (prefers-reduced-motion:reduce){.omni-load{animation:none}}
 
 /* Pinned tabs show only their icon; dragging shows where the tab will land. */
-.tab.pinned{min-width:0;width:36px;max-width:36px;padding:0;justify-content:center}
-.tab.pinned span:not(.fav),.tab.pinned .x{display:none}
-.tab[draggable="true"]{cursor:default}
-.tab.dragging{opacity:.5}
-.tab{position:relative}
-.tab.over-l::before,.tab.over-r::after{content:"";position:absolute;top:3px;bottom:3px;width:2px;border-radius:1px;background:var(--accent)}
-.tab.over-l::before{left:-3px}
-.tab.over-r::after{right:-3px}
 #downloads[hidden]{display:none}
 #downloads .badge[hidden]{display:none}
 #downloads.busy{color:var(--accent)}
@@ -83,8 +62,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .star[aria-pressed="true"]{color:var(--accent)}
 .star[aria-pressed="true"] svg{fill:currentColor}
 /* Bookmarks bar: one more row under the toolbar. */
-.with-bar,.with-bar body{height:122px}
-.bmbar{display:flex;align-items:center;gap:2px;height:34px;padding:0 12px;border-bottom:1px solid var(--line);overflow:hidden}
 .bmbar[hidden]{display:none}
 .bm{display:inline-flex;align-items:center;gap:6px;max-width:180px;height:26px;padding:0 8px;border-radius:7px;font-size:12.5px;color:var(--ink);flex:none}
 .bm:hover{background:var(--hover)}
@@ -94,21 +71,7 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 
 /* Tab groups */
 .g-blue{--g:#4C8DF6}.g-green{--g:#2FA36B}.g-amber{--g:#E0A030}.g-red{--g:#E5594F}.g-purple{--g:#8E6BE8}.g-grey{--g:#8A93A3}
-.grp{-webkit-app-region:no-drag;display:inline-flex;align-items:center;gap:6px;flex:none;height:24px;padding:0 10px 0 8px;border-radius:12px;background:color-mix(in srgb,var(--g) 20%,transparent);color:var(--ink);font:600 12px var(--f);max-width:150px}
-.grp i{width:8px;height:8px;border-radius:50%;background:var(--g);flex:none}
-.grp span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.grp.collapsed{background:var(--g);color:#fff}
-.grp.collapsed i{background:#fff}
-.grp-edit{-webkit-app-region:no-drag;flex:none;width:110px;height:24px;border-radius:12px;border:1px solid var(--accent);background:var(--win);color:var(--ink);padding:0 10px;font:600 12px var(--f);outline:0;-webkit-user-select:text;user-select:text}
-.tab.grouped{box-shadow:inset 0 -2px 0 var(--g)}
-.plus.org{color:var(--accent)}
-.plus.org[hidden]{display:none}
 
-.grp em{font-style:normal;font-size:10px;opacity:.7;margin-left:1px}
-.grp:hover{filter:brightness(1.12)}
-.grp.over,.tab.over-mid{outline:2px solid var(--accent);outline-offset:-2px}
-.gplus{-webkit-app-region:no-drag;flex:none;width:20px;height:20px;border-radius:50%;color:var(--g);font-size:15px;line-height:1;opacity:.7}
-.gplus:hover{opacity:1;background:color-mix(in srgb,var(--g) 20%,transparent)}
 .grp-edit{border-color:var(--g)}
 
 /* Toolbar layout: navigation on the left, the address box in the middle (centred on the window), tools on the right. */
@@ -131,7 +94,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 @keyframes chip{from{opacity:0;transform:translateX(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.ichip{animation:none}}
 .omni.has-text .star,.omni.has-text kbd{display:none}
-@media (max-width:980px){.aibtn span{display:none}.aibtn{padding:0 10px;margin:0 2px}.bar{column-gap:8px}}
 
 /* Blocking off: the shield is crossed out and loses its accent colour. */
 #shield .slash{display:none}
@@ -139,8 +101,6 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 #shield[aria-pressed="false"]{color:var(--muted)}
 
 /* Profile avatar at the start of the tab strip (only when there is more than one profile). */
-.avatar{-webkit-app-region:no-drag;flex:none;width:26px;height:26px;margin-right:4px;border-radius:50%;background:var(--g);color:#fff;font:600 12px var(--f);display:grid;place-items:center}
-.avatar:hover{filter:brightness(1.1)}
 
 /* The two tabs of a split view are joined by one accent line. */
 .tab.in-split{box-shadow:inset 0 -2px 0 var(--accent)}
@@ -309,3 +269,78 @@ html.peek:not(.open) .fav.spin{animation-play-state:paused}
 #tip[data-x]{animation-name:tipx}
 @keyframes tipx{from{opacity:0;transform:translateX(var(--tx,0))}to{opacity:1;transform:none}}
 #tip[data-instant]{animation:none}
+
+/* ---- The window frame: a tab list at the left, the address bar on top, the page as a card inside ------------------------ */
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.5 var(--f);-webkit-user-select:none;user-select:none}
+:root{--sw:0px;--hv:color-mix(in srgb,var(--ink) 7%,transparent);--card:var(--win)}
+:root[data-side="rail"]{--sw:72px}
+.ib:hover:not(:disabled){background:var(--hv)}
+.side-foot{flex:none;display:flex;align-items:center;gap:2px;padding-top:8px;border-top:1px solid var(--line);margin:0 -2px}
+/* Groups: a header row, its tabs indented under it. */
+.g-blue{--g:#4C8DF6}.g-green{--g:#2FA36B}.g-amber{--g:#E0A030}.g-red{--g:#E5594F}.g-purple{--g:#8E6BE8}.g-grey{--g:#8A93A3}
+/* The top bar */
+.bar{position:relative;display:grid;grid-template-columns:auto minmax(260px,720px) auto;justify-content:space-between;align-items:center;column-gap:12px;height:52px;margin-left:var(--sw);padding:0 12px 0 4px;-webkit-app-region:drag}
+.bar button,.bar input,.bar form{-webkit-app-region:no-drag}
+.win32 .bar,.linux .bar{padding-right:150px}
+.omni{min-width:0;width:100%;display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);transition:border-color .15s,box-shadow .15s}
+.omni:focus-within,.omni.typing{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.bmbar{display:flex;align-items:center;gap:2px;height:34px;margin-left:var(--sw);padding:0 8px 0 4px;overflow:hidden}
+.bmbar[hidden]{display:none}
+.bm{display:inline-flex;align-items:center;gap:6px;max-width:180px;height:26px;padding:0 8px;border-radius:7px;font-size:12.5px;color:var(--ink);flex:none}
+.bm:hover{background:var(--hv)}
+.bm span:not(.fav){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bm.dir{color:var(--muted)}
+.bmbar .hint{color:var(--muted);font-size:12px;padding:0 6px}
+#bar.loading::after{left:0;bottom:2px}
+@media (max-width:980px){.aibtn span{display:none}.aibtn{padding:0 10px;margin:0 2px}.bar{column-gap:8px}}
+#org[hidden]{display:none}
+/* Narrow rail: icons only. */
+
+/* Shield and AI: quieter. The shield is an icon with a small count; the AI button is a soft accent chip, not a filled pill. */
+#shield{width:auto;min-width:34px;padding:0 9px;gap:5px;display:flex;align-items:center;justify-content:center}
+#shield .badge{position:static;min-width:0;height:auto;padding:0;background:none;color:inherit;font:600 12px/1 var(--f);text-align:left}
+#shield[aria-pressed="true"] .badge{color:var(--accent)}
+#shield[aria-pressed="true"]{background:var(--accent-soft)}
+.aibtn{height:34px;padding:0 12px 0 10px;margin:0 2px 0 4px;border-radius:9px;background:transparent;color:var(--accent);font:600 13px var(--f);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.aibtn svg{fill:none;stroke:currentColor;stroke-width:1.8}
+.aibtn:hover:not(:disabled){background:var(--accent-soft);opacity:1}
+.aibtn:disabled{background:transparent;border-color:var(--line);color:var(--muted)}
+#assist:not(:disabled){color:var(--accent)}
+
+/* Shield and AI as two quiet icon buttons: the shield carries a small count, the AI button is a soft tile that fills when its panel is open. */
+#shield{width:34px;min-width:34px;padding:0;gap:0;display:grid;place-items:center;background:transparent}
+#shield[aria-pressed="true"]{background:transparent}
+#shield .badge{position:absolute;top:2px;right:0;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font:600 9.5px/15px var(--f);text-align:center}
+#shield[aria-pressed="false"] .badge,#shield .badge:empty{display:none}
+.aibtn{width:34px;height:34px;padding:0;margin:0 2px 0 4px;border-radius:9px;border:0;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.aibtn span{display:none}
+.aibtn svg{width:18px;height:18px}
+.aibtn:hover:not(:disabled){background:var(--accent);color:var(--accent-ink)}
+.aibtn:disabled{background:transparent;color:var(--muted);opacity:.5}
+.aibtn.open{background:var(--accent);color:var(--accent-ink)}
+#assist:not(:disabled){color:var(--accent)}
+#assist.open:not(:disabled),#assist:hover:not(:disabled){color:var(--accent-ink)}
+
+.aibtn{color:var(--muted);background:transparent}
+#assist:not(:disabled){color:var(--muted)}
+.aibtn:hover:not(:disabled){background:var(--hv);color:var(--ink)}
+#assist:hover:not(:disabled){color:var(--ink)}
+.aibtn.open,#assist.open:not(:disabled){background:var(--accent-soft);color:var(--accent)}
+
+/* Tab list, second pass: icon tiles, a little more air, a clear selected row, and the tools along the bottom. */
+.grow{flex:1}
+.side-foot{padding:10px 2px 0;gap:4px}
+.side-foot .ib{width:36px;height:36px;border-radius:10px;color:var(--muted)}
+.side-foot .ib:hover{color:var(--ink)}
+:root[data-side="rail"] .grow{display:none}
+
+/* Tab list, third pass: plain icons, darker text, a slim accent mark on the open tab, a labelled list. */
+
+/* Groups, third pass: one tinted block per group, a header with its colour, the tabs inside. */
+
+/* Group header: dot, name, a small count, then the + (on hover) and the fold arrow at the right edge. */
+/* Renaming a group: a quiet field in the group's own colour, no browser outline. */
+
+/* Loading: a small round spinner in place of the icon, whatever the tab style. */
+.ib.on{background:var(--accent-soft);color:var(--accent)}
+@media (prefers-reduced-motion:reduce){.tab .fav.spin{animation:none;border-top-color:var(--accent);border-right-color:var(--accent)}}
