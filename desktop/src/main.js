@@ -4,6 +4,7 @@ const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, native
 // never take the browser down. Other start-up errors in the CI smoke test end the run with their stack; elsewhere they are shown.
 const isUndici = (e) => !!e && /undici/.test(String(e.stack)) && /paused/.test(String(e.message));
 process.on('uncaughtException', (e) => {
+  if (global.__smokeDone || harmless(e)) { if (global.__smokeDone) process.exit(0); return; }
   if (isUndici(e)) { console.error('[net] ignored an undici assertion'); return; }
   if (process.env.LORE_SMOKE) { console.error('LORE_SMOKE_FAIL uncaught: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); }
   console.error(e);
@@ -13,6 +14,15 @@ if (process.env.LORE_SMOKE) {
   process.on('unhandledRejection', (e) => { if (isUndici(e)) return; console.error('LORE_SMOKE_FAIL rejected: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); });
   global.__smokeStage = 'loaded';
   setTimeout(() => { console.error('LORE_SMOKE_FAIL no window after 45 s | stage=' + global.__smokeStage); process.exit(1); }, 45000).unref();
+}
+// While the window is closing, the page can still send a message (a tooltip hiding, a click) to a handler that looks at the
+// window. That "Object has been destroyed" is harmless, so it must not be reported as an error.
+const harmless = (e) => /Object has been destroyed/.test(String(e && e.message));
+{
+  const on = ipcMain.on.bind(ipcMain);
+  ipcMain.on = (ch, fn) => on(ch, (...a) => { try { return fn(...a); } catch (e) { if (harmless(e)) return undefined; throw e; } });
+  const handle = ipcMain.handle.bind(ipcMain);
+  ipcMain.handle = (ch, fn) => handle(ch, async (...a) => { try { return await fn(...a); } catch (e) { if (harmless(e)) return undefined; throw e; } });
 }
 const stage = (n) => { global.__smokeStage = n; };
 const path = require('path');
@@ -419,6 +429,7 @@ function runSmoke() {
       const page = t ? t.view.webContents.getURL() : '';
       if (!t || strip < 1 || !/home\.html/.test(page) || t.view.webContents.isLoading()) return setTimeout(check, 500);
       if (!blocker || !blocker.ready) return fail('the ad-block engine did not load');
+      global.__smokeDone = true;
       console.log('LORE_SMOKE_OK tabs=' + strip + ' packaged=' + app.isPackaged);
       app.exit(0);
     } catch (e) { setTimeout(check, 500); }
