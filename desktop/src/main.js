@@ -48,6 +48,7 @@ const { SitePerms } = require('./perms');
 const pwLib = require('./passwords');
 const pagenote = require('./pagenote');
 const chats = require('./chats');
+const startLib = require('./start');
 const { budgetFor } = require('./condense');
 const nodeCrypto = require('crypto');
 const breachLib = require('./breach');
@@ -68,20 +69,38 @@ const loadUi = (wc, file, query = {}) => {
   const tab = tabs.find((x) => x.view.webContents === wc);
   return wc.loadFile(file, { query: { lang: L(), blocked: String(S.blocked), ...(tab && tab.private ? { private: '1' } : {}), ...query } });
 };
-const loadHome = (wc, query = {}) => loadUi(wc, HOME, query);
-// MEM-06: the New tab page offers the last few pages from the local memory, newest first, one per site.
-function resumeQuery() {
-  if (!memory || !memory.size) return {};
+// The New tab page is built from what is on this computer each time, so it is useful and not the same every time.
+function startData(priv) {
+  const now = Date.now();
+  if (priv) return { private: true };
+  const web = (u) => /^https?:/.test(u);
   const seen = new Set();
-  const out = [];
-  for (const i of memory.list({ from: Date.now() - 3 * 86400000 })) {
-    const h = hostOfUrl(i.url);
-    if (!h || seen.has(h) || !/^https?:/.test(i.url)) continue;
-    seen.add(h); out.push({ url: i.url, title: i.title || h, host: h.replace(/^www\./, '') });
-    if (out.length === 3) break;
+  const recent = [];
+  for (const i of memory && memory.size ? memory.list({ from: now - 3 * 86400000 }) : []) {
+    const h = hostOfUrl(i.url).replace(/^www\./, '');
+    if (!h || seen.has(h) || !web(i.url)) continue;
+    seen.add(h); recent.push({ url: i.url, title: i.title || h, host: h, ts: i.ts });
+    if (recent.length === 4) break;
   }
-  return out.length ? { resume: JSON.stringify(out) } : {};
+  const icon = (host) => { const f = favicons ? favicons.get(host) : ''; return f && f.length < 3500 ? f : ''; };
+  const sites = (memory && memory.size ? startLib.topSites(memory.list({ from: now - 30 * 86400000 })) : []).map((x) => ({ host: x.host, url: x.url, icon: icon(x.host) }));
+  const folder = T('rl.folder');
+  const reading = bookmarks ? bookmarks.items.filter((b) => b.folder === folder).sort((a, b) => b.ts - a.ts) : [];
+  const dlDone = downloads ? downloads.items.find((r) => r.state === 'done' && !r.private && now - r.started < 86400000) : null;
+  return {
+    recent, sites, chats: chatStore ? chatStore.list().slice(0, 3) : [], closed: closedTabs.items.filter((x) => !x.private).slice(-3).reverse(),
+    reading: reading.slice(0, 2), readingCount: reading.length, download: dlDone ? dlDone.name : '', tabs: tabs.filter((t) => !t.isHome && !t.private).length,
+    modelReady: !!lastModel.ready || !!(llm && settings.get().provider !== 'off'), week: pstats ? pstats.week().total : null
+  };
 }
+const loadHome = (wc, query = {}) => {
+  const q = { ...query };
+  if (!q.kind) {
+    const tab = tabs.find((x) => x.view.webContents === wc);
+    try { q.start = JSON.stringify(startLib.build(startData(!!(tab && tab.private)))); } catch { /* the page falls back to its plain form */ }
+  }
+  return loadUi(wc, HOME, q);
+};
 const isOurHome = (url) => url.startsWith('file:') && decodeURI(url).includes('/ui/home.html');
 const { AgentRun, WORKFLOWS, match: matchWorkflow } = require('./agent');
 const { PageDriver } = require('./driver');
@@ -566,8 +585,9 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
     }
     if (url.startsWith('lore-do:')) {
       e.preventDefault();
-      const a = new URL(url).searchParams.get('a');
-      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openPrivate(), memory: openMemoryLocked, settings: openSettings, tasks: () => openTasks() }[a] || (() => {}))();
+      const sp = new URL(url).searchParams;
+      const a = sp.get('a');
+      if (isOurHome(wc.getURL()) && tab.id === activeId) ({ private: () => openPrivate(), memory: openMemoryLocked, settings: openSettings, tasks: () => openTasks(), ai: () => openSettings('ai'), organize: () => openOrganize('tabs'), bookmarks: openBookmarks, downloads: openDownloads, chat: () => openChat(sp.get('k') || '') }[a] || (() => {}))();
       return;
     }
     if (!url.startsWith('lore-run:')) return guard(e, url);
@@ -638,7 +658,7 @@ function openTab(target, { private: priv = false, lazy = false, pinned = false, 
   selectTab(tab.id);
   if (target && target.url) wc.loadURL(target.url);
   else {
-    loadHome(wc, target || (priv ? {} : resumeQuery()));
+    loadHome(wc, target || {});
     // The page loads after the box is shown, and loading takes the focus: take it back once it is ready.
     wc.once('did-finish-load', () => { if (tab.id === activeId && tab.isHome) focusIntent(); });
   }
@@ -938,6 +958,21 @@ let assistOn = false;      // the person opened the assistant and has not closed
 let chatSaveTimer = null;
 const convFor = (tab) => (tab && tab.private ? privConv : mainConv);
 const normUrl = (u) => { try { const x = new URL(u); x.hash = ''; return x.toString(); } catch { return String(u || ''); } };
+// Restores a saved conversation and goes to the page it read last (an open tab, or the page again in a new one).
+function rebind(conv) { for (const src of conv.sources) { const t = tabOfSource(conv, src); src.tabId = t ? t.id : 0; } }
+function openChat(key) {
+  if (!chatStore) return;
+  const t = chatStore.get(String(key));
+  if (!t || !isAllowedNavigation(t.url)) return;
+  mainConv = { id: t.key, url: t.url, title: t.title, states: t.states.map((x) => ({ ...x })), sources: t.sources.map((x) => ({ key: normUrl(x.url), url: x.url, title: x.title, tabId: 0 })) };
+  rebind(mainConv);
+  assistOn = true;
+  const last = mainConv.sources[mainConv.sources.length - 1];
+  let tab = last && tabOfSource(mainConv, last);
+  if (tab) selectTab(tab.id); else if (last && isAllowedNavigation(last.url)) { tab = openTab({ url: last.url }); tab.url = last.url; last.tabId = tab.id; }
+  // Show it at once, without waiting for the page to load.
+  if (tab) { pa = null; claimPanel(tab); }
+}
 // A page joins the conversation when something is asked about it.
 function addSource(conv, tab) {
   if (!tab || tab.isHome || !/^https?:/.test(tab.url)) return;
@@ -2522,22 +2557,8 @@ function wireIpc() {
   ipcMain.on('panel:copy', (e, text) => { if (e.sender === panel.webContents && typeof text === 'string') clipboard.writeText(text.slice(0, 20000)); });
   // Past conversations, newest first; opening one restores its messages and goes to the page it read last.
   const fromPanel = (e) => panel && e.sender === panel.webContents;
-  const rebind = (conv) => { for (const src of conv.sources) { const t = tabOfSource(conv, src); src.tabId = t ? t.id : 0; } };
-  const show = (tab) => { pa = null; claimPanel(tab); };
   ipcMain.handle('chats:list', (e) => (fromPanel(e) && chatStore ? chatStore.list() : []));
-  ipcMain.on('chats:open', (e, key) => {
-    if (!fromPanel(e) || !chatStore) return;
-    const t = chatStore.get(String(key));
-    if (!t || !isAllowedNavigation(t.url)) return;
-    mainConv = { id: t.key, url: t.url, title: t.title, states: t.states.map((x) => ({ ...x })), sources: t.sources.map((x) => ({ key: normUrl(x.url), url: x.url, title: x.title, tabId: 0 })) };
-    rebind(mainConv);
-    assistOn = true;
-    const last = mainConv.sources[mainConv.sources.length - 1];
-    let tab = last && tabOfSource(mainConv, last);
-    if (tab) selectTab(tab.id); else if (last && isAllowedNavigation(last.url)) { tab = openTab({ url: last.url }); tab.url = last.url; last.tabId = tab.id; }
-    // Show it at once, without waiting for the page to load.
-    if (tab) show(tab);
-  });
+  ipcMain.on('chats:open', (e, key) => { if (fromPanel(e)) openChat(key); });
   // A source chip: go to its tab, or open the page again when the tab was closed.
   ipcMain.on('chats:goto', (e, key) => {
     if (!fromPanel(e) || !pa) return;

@@ -56,3 +56,38 @@ h1{font-weight:500;font-size:clamp(30px,4.6vw,46px);line-height:1.1;letter-spaci
 #resume .res b{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #resume .res small{flex:none;color:var(--muted)}
 #resume .res:hover b{color:var(--accent)}
+
+/* The start page */
+#start .when{margin:0 0 6px;color:var(--muted);font-size:13px;text-transform:capitalize}
+#start h1{font-size:clamp(28px,4vw,38px);margin:0 0 22px}
+.ask-box{display:flex;align-items:center;gap:8px;height:56px;padding:0 8px 0 20px;border-radius:16px;border:1px solid var(--line);background:var(--win);box-shadow:0 1px 2px rgba(20,20,40,.04);transition:border-color .15s,box-shadow .15s}
+.ask-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.ask-box input{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--ink);font:400 16px var(--f);outline:0}
+.ask-box .go{flex:none;width:40px;height:40px;border-radius:12px;border:0;background:var(--accent-soft);color:var(--accent);cursor:pointer;display:grid;place-items:center}
+.ask-box .go:hover{background:var(--accent);color:var(--accent-ink)}
+.ask-box .go svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#start .k{margin:30px 0 10px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.conts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.cont{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;transition:border-color .15s,background .15s}
+.cont:hover{border-color:var(--accent);background:var(--hover)}
+.cont .ci{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--hover);color:var(--muted)}
+.cont.chat .ci{background:var(--accent-soft);color:var(--accent)}
+.cont .ci svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cont .cb{min-width:0;display:flex;flex-direction:column}
+.cont b{font-weight:500;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cont small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px 10px;border-radius:14px;transition:background .15s}
+.tile:hover{background:var(--hover)}
+.tile .tf{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:var(--hover);color:var(--muted);font:600 17px var(--f);overflow:hidden}
+.tile .tf img{width:28px;height:28px;object-fit:contain}
+.tile .tn{max-width:100%;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tipl{display:flex;flex-direction:column;gap:2px}
+.tip{display:flex;flex-direction:column;padding:10px 12px;border-radius:12px;border-left:3px solid var(--accent-soft);transition:background .15s,border-color .15s}
+.tip:hover{background:var(--hover);border-left-color:var(--accent)}
+.tip b{font-weight:500;font-size:14.5px}
+.tip small{color:var(--muted);font-size:12.5px}
+.privnote{margin:26px 2px 0;color:var(--muted);font-size:14px;line-height:1.6;max-width:520px}
+
+.tip b{color:var(--ink)}
+.tip:hover b{color:var(--accent)}

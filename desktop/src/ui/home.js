@@ -138,3 +138,75 @@ if (kind) $('cards').style.display = kind === 'loading' || kind === 'answer' ? '
 
 // A pressed card stays highlighted while the bar types its example.
 for (const c of document.querySelectorAll('.card')) c.addEventListener('click', () => c.classList.add('go'));
+
+
+// ---- The start page: built from this computer's own data every time a tab opens -------------------------------------------
+(function startPage() {
+  if (kind) return;
+  let st = null;
+  try { st = JSON.parse(p.get('start') || 'null'); } catch { st = null; }
+  if (!st) return;
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  $('start').hidden = false;
+  for (const id of ['h1', 'sub', 'cards', 'tools', 'resume']) { const n = $(id); if (n) n.style.display = 'none'; }
+  const d = new Date();
+  $('when').textContent = d.toLocaleDateString(lang === 'vi' ? 'vi-VN' : undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  $('hi').textContent = T('start.hi.' + st.period);
+  const input = $('askin');
+  input.placeholder = st.placeholder ? T('start.ph.about', { t: st.placeholder.replace(/^about:/, '') }) : T('start.ph');
+  $('askbox').addEventListener('submit', (e) => { e.preventDefault(); const q = input.value.trim(); if (q) location.href = 'lore-run:?q=' + encodeURIComponent(q); });
+  input.focus();
+
+  if (st.private) {
+    $('privnote').hidden = false;
+    $('privnote').textContent = T('start.private');
+    $('hi').textContent = T('start.private.h');
+    return;
+  }
+  const link = (c) => (c.kind === 'chat' ? 'lore-do:?a=chat&k=' + encodeURIComponent(c.key) : c.url);
+  const sub = (c) => ({
+    chat: () => T('start.chat', { n: c.count, when: ago(c.ts) }),
+    page: () => c.host + ' · ' + ago(c.ts),
+    read: () => T('start.read', { host: c.host }),
+    closed: () => T('start.closed', { host: c.host })
+  }[c.kind]());
+  if (st.cards.length) {
+    $('cont').hidden = false;
+    $('cont-k').textContent = T('start.continue');
+    for (const c of st.cards) {
+      const a = el('a', 'cont ' + c.kind);
+      a.href = link(c);
+      const ic = el('span', 'ci');
+      ic.innerHTML = { chat: '<svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>', page: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>', read: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg>', closed: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg>' }[c.kind]; // fixed strings above
+      const body = el('span', 'cb');
+      body.append(el('b', '', c.title || c.host), el('small', '', sub(c)));
+      a.append(ic, body);
+      $('conts').append(a);
+    }
+  }
+  if (st.tiles.length) {
+    $('sites').hidden = false;
+    $('sites-k').textContent = T('start.sites');
+    for (const s of st.tiles) {
+      const a = el('a', 'tile');
+      a.href = s.url;
+      const f = el('span', 'tf');
+      if (s.icon) { const i = el('img'); i.alt = ''; i.src = s.icon; f.append(i); } else f.textContent = s.host.charAt(0).toUpperCase();
+      a.append(f, el('span', 'tn', s.host.replace(/\.(com|org|net|vn|io)$/, '')));
+      a.title = s.host;
+      $('tiles').append(a);
+    }
+  }
+  if (st.tips.length) {
+    $('tips').hidden = false;
+    $('tips-k').textContent = st.empty ? T('start.try') : T('start.for');
+    for (const t of st.tips) {
+      const a = el('a', 'tip');
+      const href = { setup: 'lore-do:?a=ai', organize: 'lore-do:?a=organize', reading: 'lore-do:?a=bookmarks', download: 'lore-do:?a=downloads', week: 'lore-do:?a=settings' }[t.kind];
+      if (t.kind === 'idea') { a.href = 'lore-run:?q=' + encodeURIComponent(T('start.idea.' + t.idea + '.q')); a.append(el('b', '', T('start.idea.' + t.idea)), el('small', '', T('start.idea.' + t.idea + '.q'))); }
+      else { a.href = href; a.append(el('b', '', T('start.tip.' + t.kind, { n: t.n, name: t.name })), el('small', '', T('start.tip.' + t.kind + '.d'))); }
+      $('tipl').append(a);
+    }
+  }
+  if (!st.cards.length && !st.tiles.length && !st.tips.length) $('tips').hidden = true;
+})();
