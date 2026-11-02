@@ -1,11 +1,18 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences } = require('electron');
 // In the CI smoke test an error at start-up must end the run with its stack, not leave an error dialog nobody can see.
+// A known bug in the HTTP client that ships with Node (an assertion from inside undici when a server closes a connection) must
+// never take the browser down. Other start-up errors in the CI smoke test end the run with their stack; elsewhere they are shown.
+const isUndici = (e) => !!e && /undici/.test(String(e.stack)) && /paused/.test(String(e.message));
+process.on('uncaughtException', (e) => {
+  if (isUndici(e)) { console.error('[net] ignored an undici assertion'); return; }
+  if (process.env.LORE_SMOKE) { console.error('LORE_SMOKE_FAIL uncaught: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); }
+  console.error(e);
+  try { require('electron').dialog.showErrorBox('Lore', String(e && e.message || e)); } catch { /* not ready */ }
+});
 if (process.env.LORE_SMOKE) {
-  const die = (what, e) => { console.error('LORE_SMOKE_FAIL ' + what + ': ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); };
-  process.on('uncaughtException', (e) => die('uncaught', e));
-  process.on('unhandledRejection', (e) => die('rejected', e)); // an error inside app.whenReady().then() lands here, not above
+  process.on('unhandledRejection', (e) => { if (isUndici(e)) return; console.error('LORE_SMOKE_FAIL rejected: ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); });
   global.__smokeStage = 'loaded';
-  setTimeout(() => die('no window after 45 s', null), 45000).unref();
+  setTimeout(() => { console.error('LORE_SMOKE_FAIL no window after 45 s | stage=' + global.__smokeStage); process.exit(1); }, 45000).unref();
 }
 const stage = (n) => { global.__smokeStage = n; };
 const path = require('path');
@@ -24,7 +31,7 @@ const shield = require('./shield');
 const { Memory, fileStore, RANGES, isSensitiveHost } = require('./memory');
 const { Favicons, toDataUrl } = require('./favicons');
 const { createEmbedder } = require('./embedder');
-const { answerQuery } = require('./answer');
+const { answerQuery, answer: wikiAnswer } = require('./answer');
 const { createLlm, listLocalModels, pullLocalModel, isLocalHost } = require('./llm');
 const { Settings } = require('./settings');
 const writing = require('./writing');
@@ -55,6 +62,10 @@ const breachLib = require('./breach');
 const { DownloadList } = require('./downloads');
 const taskLib = require('./tasks');
 const { t: tr, resolve } = require('./ui/i18n');
+// Node's own fetch (undici) can throw an assertion from deep inside when a TLS server closes the connection in a certain way, and
+// that kills the process (seen on Windows). Anything that goes to an https address uses Chromium's network stack instead.
+const smartFetch = (u, o) => (String(u).startsWith('https:') ? net.fetch(u, o) : fetch(u, o));
+const makeLlm = (cfg) => createLlm(cfg, { fetchImpl: smartFetch });
 let settings;
 let llm = null;
 let settingsWin = null;
@@ -296,7 +307,7 @@ async function modelMenu(x, y) {
   try { names = await listLocalModels(c.local.url); } catch { /* Ollama not running */ }
   const pick = (patch) => () => {
     try { settings.update(patch); } catch { return openSettings('ai'); }
-    llm = createLlm(settings.get());
+    llm = makeLlm(settings.get());
     refreshEmbedder();
     pushState();
     modelInfo().then((m) => { if (panel && !panel.webContents.isDestroyed()) panel.webContents.send('model:info', m); });
@@ -1212,7 +1223,7 @@ async function submit(text) {
     tab.pending = r.text;
     pushState();
     let a;
-    try { a = await answerQuery(r.text, { llm, lang: L() }); } finally { tab.busy = false; tab.pending = ''; }
+    try { a = await answerQuery(r.text, { llm, lang: L(), wiki: (q) => wikiAnswer(q, smartFetch) }); } finally { tab.busy = false; tab.pending = ''; }
     if (!tabs.includes(tab)) return;
     if (a) loadHome(wc, { kind: 'answer', q: r.text, web: r.url, answer: JSON.stringify(a) });
     else { tab.pending = r.text; pushState(); wc.loadURL(r.url); }
@@ -2427,7 +2438,7 @@ function wireSettingsIpc() {
     const before = L();
     try {
       const view = settings.update(patch);
-      llm = createLlm(settings.get());
+      llm = makeLlm(settings.get());
       refreshEmbedder();
       if (L() !== before) applyLanguage();
       applyAppearance();
@@ -2446,7 +2457,7 @@ function wireSettingsIpc() {
   ipcMain.handle('settings:test', async (e, patch) => {
     if (!trusted(e)) return reject();
     try {
-      const m = createLlm(settings.preview(patch));
+      const m = makeLlm(settings.preview(patch));
       if (!m) return { ok: false, message: T('set.err.off') };
       if (!(await m.available())) return { ok: false, message: m.remote ? T('set.err.needKey') : T('set.err.notInstalled') };
       const reply = await m.chat([{ role: 'user', content: 'Reply with the single word: ok' }], { timeoutMs: 20000 });
@@ -2493,11 +2504,11 @@ function wireSettingsIpc() {
       const todo = [plan.chat, plan.embed].filter((m) => !modelplan.installed(names, m));
       for (const [i, m] of todo.entries()) { step(1 + i, 0); await pullLocalModel(url, m, (p) => step(1 + i, p)); }
       step(0, 1);
-      const probe = createLlm({ ...settings.get(), provider: 'local', local: { ...settings.get().local, model: plan.chat } });
+      const probe = makeLlm({ ...settings.get(), provider: 'local', local: { ...settings.get().local, model: plan.chat } });
       const reply = await probe.chat([{ role: 'user', content: 'Reply with the single word: ok' }], { timeoutMs: 90000 });
       if (!reply) return { ok: false, message: T('set.err.empty') };
       const view = settings.update({ provider: 'local', local: { url, model: plan.chat, embedModel: plan.embed } });
-      llm = createLlm(settings.get());
+      llm = makeLlm(settings.get());
       refreshEmbedder();
       return { ok: true, model: plan.chat, view };
     } catch (err) { return { ok: false, message: msg(err) }; } finally { settingUp = false; }
@@ -2799,7 +2810,7 @@ app.whenReady().then(() => {
     ...fileStore(path.join(app.getPath('userData'), 'settings.bin'), safeStorage),
     persistent: safeStorage.isEncryptionAvailable()
   });
-  llm = createLlm(settings.get());
+  llm = makeLlm(settings.get());
   applyAppearance();
   applyDoh();
   applySearch();
@@ -2839,10 +2850,10 @@ app.whenReady().then(() => {
   zoomFile = path.join(app.getPath('userData'), 'zoom.json');
   loadZooms();
   loadStats();
-  blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
+  blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin'), fetchImpl: smartFetch });
   blocker.load();
   stage('blocker');
-  scamList = createScamList({ cachePath: path.join(app.getPath('userData'), 'phishing.txt') });
+  scamList = createScamList({ cachePath: path.join(app.getPath('userData'), 'phishing.txt'), fetchImpl: smartFetch });
   scamList.load();
   scamList.refresh().catch(() => {});
   blocker.refresh().catch(() => {}); // weekly list update in the background
