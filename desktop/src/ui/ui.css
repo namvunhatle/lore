@@ -254,3 +254,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .newtab:hover{background:color-mix(in srgb,var(--ink) 11%,transparent)}
 :root[data-side="rail"] .tab .fav{width:22px;height:22px}
 :root[data-side="rail"] .tab{height:40px}
+
+/* Groups, third pass: one tinted block per group, a header with its colour, the tabs inside. */
+.gbox{flex:none;margin:6px 0;padding:3px;border-radius:12px;background:color-mix(in srgb,var(--g) 13%,transparent);display:flex;flex-direction:column;gap:1px}
+.gbox .grp{margin:0;height:30px;padding:0 4px 0 8px;border-radius:9px;color:color-mix(in srgb,var(--g) 55%,var(--ink));font-weight:700;font-size:12.5px}
+.gbox .grp:hover{background:color-mix(in srgb,var(--g) 14%,transparent)}
+.gbox .grp i{width:10px;height:10px;border-radius:50%}
+.gbox .tab{margin-left:0;border-radius:8px;box-shadow:none;height:32px}
+.gbox .tab:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.gbox .tab[aria-selected="true"]{background:var(--card);box-shadow:0 1px 2px rgba(20,20,40,.1)}
+.gbox .tab.grouped::before{display:none}
+.gbox .grp-edit{margin:0;width:100%}
+:root[data-side="rail"] .gbox{padding:3px 0;align-items:stretch}
+:root[data-side="rail"] .gbox .grp{justify-content:center;height:22px;padding:0}
+.gbox .grp .chev{font-size:12px;width:16px;color:color-mix(in srgb,var(--g) 55%,var(--ink))}

@@ -131,11 +131,14 @@ function render(s) {
   }
   const gmap = new Map((s.groups || []).map((g) => [g.id, g]));
   let lastGroup = 0;
+  let box = null;
   const sizes = new Map();
   for (const t of s.tabs) if (t.group) sizes.set(t.group, (sizes.get(t.group) || 0) + 1);
   for (const t of s.tabs) {
     const g = t.group ? gmap.get(t.group) : null;
-    if (g && g.id !== lastGroup) tabs.append(groupChip({ ...g, count: sizes.get(g.id) }, s.editGroup === g.id));
+    // A group is one block: its header and its tabs sit together in a tinted box.
+    if (g && g.id !== lastGroup) { box = document.createElement('div'); box.className = 'gbox g-' + g.color; box.append(groupChip({ ...g, count: sizes.get(g.id) }, s.editGroup === g.id)); tabs.append(box); }
+    if (!g) box = null;
     lastGroup = g ? g.id : 0;
     // A collapsed group shows only its header, unless the tab being used is inside it.
     if (g && g.collapsed && !t.active) continue;
@@ -185,10 +188,10 @@ function render(s) {
     x.dataset.tip = T('tab.close') + ' (' + key + 'W)';
     x.addEventListener('click', (e) => { e.stopPropagation(); lore.send('tab:close', t.id); });
     el.append(label, x);
-    if (t.pinned) { if (!pins) { pins = document.createElement('div'); pins.className = 'pins'; tabs.prepend(pins); } pins.append(el); } else tabs.append(el);
+    if (t.pinned) { if (!pins) { pins = document.createElement('div'); pins.className = 'pins'; tabs.prepend(pins); } pins.append(el); } else (box || tabs).append(el);
   }
   // A small heading over the list says how many tabs there are.
-  const firstRow = tabs.querySelector(':scope > .tab, :scope > .grp');
+  const firstRow = tabs.querySelector(':scope > .tab, :scope > .gbox');
   if (firstRow) { const lab = document.createElement('div'); lab.className = 'tlabel'; lab.textContent = T('side.tabs', { n: s.tabs.filter((x) => !x.pinned).length }); tabs.insertBefore(lab, firstRow); }
   $('#org').hidden = s.tabs.length < 3;
 
