@@ -1,9 +1,13 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, net, session, Menu, nativeTheme, safeStorage, shell, dialog, clipboard, systemPreferences } = require('electron');
 // In the CI smoke test an error at start-up must end the run with its stack, not leave an error dialog nobody can see.
 if (process.env.LORE_SMOKE) {
-  process.on('uncaughtException', (e) => { console.error('LORE_SMOKE_FAIL uncaught: ' + (e && e.stack || e)); process.exit(1); });
-  process.on('unhandledRejection', (e) => console.error('LORE_SMOKE_WARN unhandled rejection: ' + (e && e.stack || e)));
+  const die = (what, e) => { console.error('LORE_SMOKE_FAIL ' + what + ': ' + (e && e.stack || e) + ' | stage=' + global.__smokeStage); process.exit(1); };
+  process.on('uncaughtException', (e) => die('uncaught', e));
+  process.on('unhandledRejection', (e) => die('rejected', e)); // an error inside app.whenReady().then() lands here, not above
+  global.__smokeStage = 'loaded';
+  setTimeout(() => die('no window after 45 s', null), 45000).unref();
 }
+const stage = (n) => { global.__smokeStage = n; };
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -2424,6 +2428,7 @@ for (const a of process.argv.slice(1)) if (/^https?:\/\//i.test(a)) pendingUrls.
 app.whenReady().then(() => {
   // A packaged app already carries its icon; this is only for `npm start`. A missing icon must never stop the window opening.
   if (process.platform === 'darwin' && app.dock && !app.isPackaged) { try { app.dock.setIcon(path.join(__dirname, '..', 'build', 'icon.png')); } catch { /* keep the default icon */ } }
+  stage('ready');
   settings = new Settings({
     ...fileStore(path.join(app.getPath('userData'), 'settings.bin'), safeStorage),
     persistent: safeStorage.isEncryptionAvailable()
@@ -2449,6 +2454,7 @@ app.whenReady().then(() => {
   const logStore = fileStore(path.join(app.getPath('userData'), 'agent-log.bin'), safeStorage);
   const entries = logStore.load();
   agentLog = { append: (e) => { entries.push(e); logStore.save(entries); } };
+  stage('stores');
   wireIpc();
   wireSettingsIpc();
   wireMemoryIpc();
@@ -2461,19 +2467,24 @@ app.whenReady().then(() => {
   wirePrivIpc();
   wirePasswordsIpc();
   wireWelcomeIpc();
+  stage('ipc');
   statsFile = path.join(app.getPath('userData'), 'stats.json');
   zoomFile = path.join(app.getPath('userData'), 'zoom.json');
   loadZooms();
   loadStats();
   blocker = createBlocker({ bundledPath: path.join(__dirname, 'filters', 'engine.bin'), cachePath: path.join(app.getPath('userData'), 'filters.bin') });
   blocker.load();
+  stage('blocker');
   scamList = createScamList({ cachePath: path.join(app.getPath('userData'), 'phishing.txt') });
   scamList.load();
   scamList.refresh().catch(() => {});
   blocker.refresh().catch(() => {}); // weekly list update in the background
   hardenSession(session.defaultSession);
+  stage('menu');
   buildMenu();
+  stage('window');
   createWindow();
+  stage('tabs');
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 // A certificate Chromium cannot trust is refused, unless the person chose to continue to that host (see the warning page).
