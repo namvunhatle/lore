@@ -42,7 +42,7 @@ function row(r) {
   body.append(name, meta);
   if (r.state === 'progressing' || r.state === 'interrupted') {
     const bar = document.createElement('div'); bar.className = 'bar' + (r.total ? '' : ' wait');
-    const fill = document.createElement('i'); fill.style.width = pct + '%'; bar.append(fill);
+    const fill = document.createElement('i'); fill.style.transform = 'scaleX(' + pct / 100 + ')'; bar.append(fill);
     body.append(bar);
   }
   if (r.state === 'done' && r.risky) { const w = document.createElement('div'); w.className = 'warnline'; w.textContent = T('dl2.risky'); body.append(w); }

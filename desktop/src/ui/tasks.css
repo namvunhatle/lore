@@ -13,8 +13,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 main{flex:1;min-height:0;overflow-y:auto;padding:24px 28px 40px}
-.view{max-width:600px;margin:0 auto;animation:rise .2s ease both}
-@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.view{max-width:600px;margin:0 auto;animation:rise 200ms var(--ease-out) both}
 
 /* Launcher */
 .ask{display:flex;align-items:center;gap:10px;height:52px;padding:0 18px;border-radius:26px;background:var(--hover);border:1px solid transparent;transition:border-color .15s,background .15s}
@@ -24,8 +23,9 @@ main{flex:1;min-height:0;overflow-y:auto;padding:24px 28px 40px}
 .ask kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 6px;line-height:18px}
 .group{margin:26px 0 10px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.card{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;text-align:left;transition:border-color .15s,background .15s,transform .15s}
-.card:hover{border-color:var(--accent);background:var(--hover);transform:translateY(-1px)}
+.card{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;text-align:left;transition:border-color .15s,background .15s,transform 160ms cubic-bezier(.23,1,.32,1)}
+.card:hover{border-color:var(--accent);background:var(--hover)}
+@media (hover:hover) and (pointer:fine){.card:hover{transform:translateY(-1px)}}
 .card:active{transform:none}
 .card.now{grid-column:1/-1;border-style:dashed;border-color:var(--accent);background:var(--accent-soft)}
 .ic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
@@ -92,7 +92,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .count.over{color:var(--warn);font-weight:600}
 .spin{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp .8s linear infinite;vertical-align:-3px;margin-right:8px}
 @keyframes sp{to{transform:rotate(360deg)}}
-.pop{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);padding:8px 16px;border-radius:10px;background:var(--ink);color:var(--win);font-size:13px;font-weight:500;animation:rise .15s ease both}
+.pop{position:fixed;left:50%;bottom:22px;translate:-50% 0;padding:8px 16px;border-radius:10px;background:var(--ink);color:var(--win);font-size:13px;font-weight:500;animation:rise 150ms var(--ease-out) both}
 .f .dd-btn{height:40px}
 @media (max-width:620px){.cards{grid-template-columns:1fr}main{padding:20px 16px 32px}}
 @media (prefers-reduced-motion:reduce){.view,.pop{animation:none}.spin{animation:none}.card{transition:none}.card:hover{transform:none}}

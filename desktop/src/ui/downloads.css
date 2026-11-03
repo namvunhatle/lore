@@ -17,9 +17,9 @@ li:hover{background:var(--hover)}
 .meta{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta.bad{color:var(--warn)}
 .bar{height:3px;border-radius:2px;background:var(--line);margin:8px 0 2px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--accent);transition:width .25s}
-.bar.wait i{width:35%!important;animation:slide 1.1s ease-in-out infinite}
-@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+.bar i{display:block;width:100%;height:100%;background:var(--accent);transform-origin:left;transition:transform 250ms cubic-bezier(.23,1,.32,1)}
+.bar.wait i{width:35%!important;transform:none;animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(286%)}}
 .acts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}
 .acts button{color:var(--accent);font-size:12.5px;font-weight:500}
 .acts button:hover{text-decoration:underline}
@@ -28,7 +28,7 @@ li:hover{background:var(--hover)}
 .empty{max-width:420px;margin:90px auto;text-align:center;color:var(--muted)}
 .empty svg{width:40px;height:40px;fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .empty p{margin:10px 0 2px;color:var(--ink);font-weight:500}
-@media (prefers-reduced-motion:reduce){.bar.wait i{animation:none;width:100%!important;opacity:.5}}
+@media (prefers-reduced-motion:reduce){.bar.wait i{animation:none;width:100%!important;transform:none;opacity:.5}}
 
 .sug{margin-top:6px;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12.5px}
 .sug .new{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}

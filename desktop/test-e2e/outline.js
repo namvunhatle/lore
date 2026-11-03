@@ -48,6 +48,21 @@ app.whenReady().then(async () => {
     await scrollTo((await top('s4')) - 100);
     await until(() => outline().cur === 4, 'section 4 is current');
     assert.deepStrictEqual(outline().items.slice(0, 5).map((i) => i.s), [1, 2, 1, 1, 0], 'sections jumped over are skimmed: ' + JSON.stringify(outline().items.map((i) => i.s)));
+    // The open outline: titles line up with the title of their tab, and the heading level does not indent them.
+    const { webContents } = require('electron');
+    await until(() => webContents.getAllWebContents().some((w) => w.getURL().includes('side.html')), 'sidebar view');
+    const side = webContents.getAllWebContents().find((w) => w.getURL().includes('side.html'));
+    await side.executeJavaScript("lore.send('side:peek', true)");
+    await sleep(800);
+    await side.executeJavaScript("document.querySelector('.srow[aria-selected=\"true\"] .tg').click()");
+    for (let i = 0; i < 50 && !(await side.executeJavaScript("document.querySelectorAll('.srow.oi').length === 6")); i++) await sleep(100);
+    await sleep(500);
+    const xs = await side.executeJavaScript(`(() => {
+      const left = (e) => { const r = document.createRange(); r.selectNodeContents(e); return Math.round(r.getBoundingClientRect().left * 10) / 10; };
+      return { tab: left(document.querySelector('.srow[aria-selected="true"] .ttl')), items: [...document.querySelectorAll('.srow.oi .ttl')].map(left) };
+    })()`);
+    assert.strictEqual(xs.items.length, 6, 'six outline rows: ' + JSON.stringify(xs));
+    assert.deepStrictEqual(xs.items, Array(6).fill(xs.tab), 'every heading starts under the tab title, whatever its level: ' + JSON.stringify(xs));
     // Going to a heading scrolls the page.
     ui().executeJavaScript(`lore.send('outline:go', ${state.tabs[0].id}, 3)`);
     await until(async () => true, 'go sent');

@@ -227,7 +227,7 @@ function outlineItem(t, o, i, base, lv, enter) {
       el._o = { tab: t.id, i };
       const label = el.querySelector('.ttl');
       if (label.textContent !== o.text) label.textContent = o.text;
-      el.style.setProperty('--oi', (lv + 1) * 14 + Math.min(o.level - base, 2) * 10);
+      el.style.setProperty('--oi', 26 + lv * 14);
       el.classList.toggle('skim', o.s === 1);
       if (i === t.outline.cur) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
       el.setAttribute('aria-label', o.s === 1 ? o.text + ' (' + T('toc.skimmed') + ')' : o.text);

@@ -211,7 +211,7 @@ async function pull(model, btn) {
 }
 $('#pull').addEventListener('click', () => pull(val('#local-model'), $('#pull')));
 $('#pull-embed').addEventListener('click', () => pull(val('#local-embed'), $('#pull-embed')));
-settings.onPull((p) => { $('#pull-bar i').style.width = Math.round(p * 100) + '%'; });
+settings.onPull((p) => { $('#pull-bar i').style.transform = 'scaleX(' + Math.round(p * 100) / 100 + ')'; });
 
 // Site permissions (BRW-18): answers given to sites, with a way to take each back.
 async function paintPerms() {
@@ -232,7 +232,7 @@ paintPerms();
 
 // One-click setup of an on-device model (AI-11).
 settings.onSetup((n, p) => {
-  $('#setup-bar i').style.width = Math.round(p * 100) + '%';
+  $('#setup-bar i').style.transform = 'scaleX(' + Math.round(p * 100) / 100 + ')';
   $('#setup-s').textContent = n ? T('set.setup.pulling', { n }) : T('set.setup.testing');
 });
 $('#setup').addEventListener('click', async () => {

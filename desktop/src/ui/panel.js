@@ -58,7 +58,7 @@ function renderDl(s) {
     });
   } else if (s.state === 'running') {
     card.append(el('p', 'k', T('dl.downloading')), el('div', '', s.title));
-    const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round(s.pct * 100) + '%'; bar.append(fill);
+    const bar = el('div', 'bar'); const fill = el('i'); fill.style.transform = 'scaleX(' + Math.round(s.pct * 100) / 100 + ')'; bar.append(fill);
     card.append(bar, el('small', '', Math.round(s.pct * 100) + '%'));
   } else if (s.state === 'done') {
     card.append(el('p', 'k', T('dl.saved')), el('div', '', T('dl.savedTo')));
@@ -245,7 +245,7 @@ function body(s) {
   if (s.state === 'working') {
     if (s.mode === 'translate' && s.total) {
       b.append(el('p', '', T('pg.translating', { done: s.done, total: s.total })));
-      const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round((s.done / s.total) * 100) + '%'; bar.append(fill); b.append(bar);
+      const bar = el('div', 'bar'); const fill = el('i'); fill.style.transform = 'scaleX(' + Math.round((s.done / s.total) * 100) / 100 + ')'; bar.append(fill); b.append(bar);
     } else {
       const w = el('div', 'wait');
       const d = el('span', 'dots'); d.append(el('i'), el('i'), el('i'));

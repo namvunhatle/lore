@@ -202,9 +202,9 @@ const EXAMPLES = 6;
 let ex = 0;
 function setPh(text, animate) {
   if (!animate || calm) { ph.textContent = text; return; }
-  ph.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: 160, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
+  ph.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: 120, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' }).finished.then(() => {
     ph.textContent = text;
-    ph.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+    ph.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' });
   }).catch(() => { ph.textContent = text; });
 }
 function resetPh() { ex = 0; setPh(T('bar.placeholder'), false); }

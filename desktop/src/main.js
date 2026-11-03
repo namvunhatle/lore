@@ -444,32 +444,34 @@ function securityOf(t) {
 // Only the title and a few extracted sentences go to the model. Not for private tabs, home, internal pages, search pages,
 // sites with AI turned off, or sensitive sites. Results are kept per address, so switching tabs back and forth costs nothing.
 const SUGGEST_DWELL = 3000;
-const suggestCache = new Map(); // address -> items
+const suggestCache = new Map(); // address (without #fragment) -> items
+// A jump to a heading (#fragment) is still the same page: the list stays and nothing is searched again.
+const pageOf = (u) => String(u || '').split('#')[0];
 let suggestKey = '';            // which tab and address the timer below is working for
 let suggestNow = { key: '', items: [] };
 let suggestTimer = null;
 let suggestSeq = 0;
 const suggestEligible = (t) => !!t && !t.private && !t.isHome && /^https?:/.test(t.url) && !aiOffFor(t.url)
   && !isSensitiveHost(hostOfUrl(t.url)) && !suggestLib.isSearchHost(hostOfUrl(t.url));
-const suggestItems = () => { const t = active(); return t && suggestNow.key === t.id + '|' + t.url ? suggestNow.items : []; };
+const suggestItems = () => { const t = active(); return t && suggestNow.key === t.id + '|' + pageOf(t.url) ? suggestNow.items : []; };
 function watchSuggest() {
   const t = active();
-  const key = t && suggestEligible(t) ? t.id + '|' + t.url : '';
+  const key = t && suggestEligible(t) ? t.id + '|' + pageOf(t.url) : '';
   if (key === suggestKey) return;
   suggestKey = key;
   clearTimeout(suggestTimer);
   suggestSeq++;
   if (!key) return;
-  if (suggestCache.has(t.url)) { suggestNow = { key, items: suggestCache.get(t.url) }; return; }
+  if (suggestCache.has(pageOf(t.url))) { suggestNow = { key, items: suggestCache.get(pageOf(t.url)) }; return; }
   runSuggest(t, false, SUGGEST_DWELL);
 }
 function runSuggest(t, again, delay, tries = 0) {
   clearTimeout(suggestTimer);
   const seq = ++suggestSeq;
-  const url = t.url;
+  const url = pageOf(t.url);
   const key = t.id + '|' + url;
   suggestTimer = setTimeout(async () => {
-    const live = () => seq === suggestSeq && active() === t && t.url === url && !t.view.webContents.isDestroyed();
+    const live = () => seq === suggestSeq && active() === t && pageOf(t.url) === url && !t.view.webContents.isDestroyed();
     if (!live()) return;
     if ((isLoading(t) || !(t.title || '').trim()) && tries < 5) return runSuggest(t, again, 1500, tries + 1);
     try {

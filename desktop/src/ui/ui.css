@@ -17,7 +17,7 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 .badge{position:absolute;top:3px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font:600 9.5px/16px var(--f);text-align:center}
 #shield[aria-pressed="false"] .badge{display:none}
 #bar.loading::after{content:"";position:absolute;left:0;bottom:-1px;height:2px;width:35%;background:var(--accent);border-radius:1px;animation:load 1.1s ease-in-out infinite}
-@keyframes load{0%{left:-35%}100%{left:100%}}
+@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(286%)}}
 @media (prefers-reduced-motion:reduce){.fav.spin{animation:none}#bar.loading::after{animation:none;width:100%;opacity:.6}}
 /* Windows draws its own window buttons on the right, so leave them room and drop the macOS traffic-light gap. */
 #media[hidden]{display:none}
@@ -32,11 +32,11 @@ kbd{font:500 11px var(--f);color:var(--muted);border:1px solid var(--line);borde
 #tip kbd{color:inherit;border-color:currentColor;opacity:.75;line-height:16px}
 #tip[hidden]{display:none}
 @keyframes tip{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){#tip{animation:none}}
+@media (prefers-reduced-motion:reduce){#tip,#toast{animation:none}}
 .fav.lotus svg{display:block}
 @media (prefers-color-scheme:dark){.fav.lotus svg{filter:invert(.85) hue-rotate(180deg)}}
 :root[data-private] .fav.lotus svg{filter:invert(.85)}
-#toast{position:fixed;z-index:25;top:6px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:70vw;padding:6px 14px;border-radius:10px;background:var(--ink);color:var(--win);font:500 13px/1.4 var(--f);box-shadow:0 4px 14px rgba(0,0,0,.22);animation:tip .15s ease-out both;-webkit-app-region:no-drag}
+#toast{position:fixed;z-index:25;top:6px;left:50%;translate:-50% 0;display:flex;align-items:center;gap:10px;max-width:70vw;padding:6px 14px;border-radius:10px;background:var(--ink);color:var(--win);font:500 13px/1.4 var(--f);box-shadow:0 4px 14px rgba(0,0,0,.22);animation:tip 150ms cubic-bezier(.23,1,.32,1) both;-webkit-app-region:no-drag}
 #toast[hidden]{display:none}
 #toast button{color:inherit;text-decoration:underline;font-weight:600}
 #toast .fav.spin{border-color:rgba(128,128,128,.4);border-top-color:currentColor}
@@ -160,7 +160,7 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 .srow .tg:active{transform:scale(.95)}
 .srow .tg.open:active{transform:rotate(180deg) scale(.95)}
 /* Outline rows: one per heading under the tab in use, a little smaller than tabs. A dot marks sections that were skimmed. */
-.srow.oi{height:28px;margin-left:calc(var(--oi,14)*1px);width:calc(100% - var(--oi,14)*1px);padding:0 8px 0 6px;font-weight:400;color:color-mix(in srgb,var(--ink) 72%,var(--muted));gap:6px}
+.srow.oi{height:28px;margin-left:calc(var(--oi,26)*1px);width:calc(100% - var(--oi,26)*1px);padding:0 8px 0 6px;font-weight:400;color:color-mix(in srgb,var(--ink) 72%,var(--muted));gap:6px}
 .srow.oi[aria-current="true"]{color:var(--ink);font-weight:500;background:color-mix(in srgb,var(--win) 70%,transparent)}
 .srow.oi .sk{width:6px;height:6px;border-radius:50%;flex:none;background:var(--accent);opacity:0}
 .srow.oi.skim .sk{opacity:1}
@@ -195,8 +195,8 @@ html.side-tabs .bmbar{grid-column:2;grid-row:2}
 .srow,.pin{user-select:none;-webkit-user-select:none}
 .srow img,.pin img{-webkit-user-drag:none}
 /* "Khám phá tiếp": pages like the one being read, pinned to the foot of the sidebar, apart from the tabs. */
-.sug{--tx:32px;flex:none;margin:0 -8px;padding:8px 8px 0;border-top:1px solid var(--line)}
-/* --tx: where the titles of the tabs start (row padding 8 + icon 16 + gap 8), so the text of both lines up. */
+.sug{--tx:24px;flex:none;margin:0 -8px;padding:8px 8px 0;border-top:1px solid var(--line)}
+/* --tx: how far the text of the section sits from the left edge of a row (the tab titles sit at 32). */
 .sug[hidden]{display:none}
 .sug-head{display:flex;align-items:center;justify-content:space-between;height:22px;padding:0 4px 0 var(--tx)}
 .sug-head h2{margin:0;font:600 11px/1 var(--f);letter-spacing:.02em;color:var(--muted)}

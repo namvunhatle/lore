@@ -1,4 +1,5 @@
 :root{
+  --ease-out:cubic-bezier(.23,1,.32,1);
   --bg:#E9ECF0; --win:#FFFFFF; --ink:#12161C; --muted:#677080; --line:#E7EAEF; --hover:#F3F5F8;
   --accent:#4726B8; --accent-ink:#FFFFFF; --accent-soft:#ECE8FA; --warn:#8A4A06; --warn-soft:#FDEBD0;
   --f:'Google Sans','Google Sans Flex','Product Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -16,3 +17,5 @@
     --accent:#B9A7FF; --accent-ink:#170E40; --accent-soft:#261C52; --warn:#F5B454; --warn-soft:#3A2A10;
   }
 }
+/* One entrance for content that appears in place: a short rise and fade. Pages use `animation: rise 200ms var(--ease-out) both`. */
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
